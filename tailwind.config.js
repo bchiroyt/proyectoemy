@@ -2,10 +2,22 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,jsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      // AQUÍ deben ir los colores de shadcn
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        'pagina': 'var(--color-pagina)',
+        'blanco-pos': 'var(--color-blanco)',
+        // ... otros colores
+      },
+    },
   },
-  plugins: [],
+  plugins: [require("tailwindcss-animate")],
 }
