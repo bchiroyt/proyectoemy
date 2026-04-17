@@ -6,7 +6,7 @@ const MainLayout = ({ children }) => {
     return (
         <TooltipProvider>
             <SidebarProvider>
-                <div className="flex w-full h-screen overflow-hidden bg-color-pagina-4">
+                <div className="flex w-full h-screen overflow-hidden bg-(--color-pagina-4)">
                     {/* El Sidebar se queda fijo a la izquierda */}
 
                     <AppSidebar />
