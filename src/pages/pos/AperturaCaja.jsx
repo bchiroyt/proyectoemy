@@ -19,8 +19,8 @@ const AperturaCaja = () => {
     const setTitulo = useNavigationStore((state) => state.setTitulo);
     
     useEffect(() => {
-        setTitulo("Apertura Caja");
-    },);
+        setTitulo("Caja");
+    }, [setTitulo]);
 
   const [cantidades, setCantidades] = useState(
     denominaciones.reduce((acc, d) => ({ ...acc, [d.valor]: 0 }), {})
@@ -44,15 +44,10 @@ const AperturaCaja = () => {
   const total = totalBilletes + monedas;
 
   return (
-    <div className="bg-gray-100 min-h-full w-full p-6 md:p-10">
-
-      {/* Título */}
-      <h1 className="text-3xl font-bold text-center mb-8">
-        Control de Apertura
-      </h1>
+    <div>
 
       {/* Contenedor principal */}
-      <div className="bg-white rounded-2xl shadow-lg p-6 md:p-10">
+      <div className="bg-(--color-blanco) rounded-2xl shadow-lg p-1 md:p-2">
 
         {/* Sección billetes */}
         <h2 className="text-xl font-semibold mb-1">Conteo Inicial</h2>
@@ -60,7 +55,7 @@ const AperturaCaja = () => {
           Ingresa la cantidad de efectivo en caja para iniciar el turno.
         </p>
 
-        <p className="text-pink-500 font-semibold mb-4">
+        <p className="text-(--color-pagina) font-semibold mb-4">
           BILLETES (QUETZALES)
         </p>
 
@@ -69,7 +64,7 @@ const AperturaCaja = () => {
           {denominaciones.map((d) => (
             <div
               key={d.valor}
-              className="bg-pink-50 rounded-xl p-4 flex items-center justify-between"
+              className="bg-pink-50 rounded-xl p-1 flex items-center justify-between"
             >
               <div>
                 <p className="font-semibold">{d.label}</p>
@@ -101,7 +96,7 @@ const AperturaCaja = () => {
           ))}
 
           {/* Monedas */}
-          <div className="bg-gray-100 rounded-xl p-4 flex flex-col justify-center items-center">
+          <div className="bg-gray-100 rounded-xl p-2 flex flex-col justify-center items-center">
             <p className="font-semibold mb-2">Monedas</p>
             <input
               type="number"
@@ -127,7 +122,7 @@ const AperturaCaja = () => {
           </div>
 
           {/* Resumen */}
-          <div className="bg-pink-500 text-white rounded-xl p-5 flex flex-col justify-between">
+          <div className="bg-(--color-pagina) text-(--color-blanco) rounded-xl p-3 flex flex-col justify-between">
 
             <div>
               <p className="font-semibold text-lg">
@@ -143,7 +138,7 @@ const AperturaCaja = () => {
               <p>Monedas: Q{monedas.toFixed(2)}</p>
             </div>
 
-            <button className="mt-4 bg-white text-pink-500 rounded-lg py-2 flex items-center justify-center gap-2 font-semibold hover:bg-gray-100">
+            <button className="mt-4 bg-(--color-blanco) text-(--color-pagina) rounded-lg py-2 flex items-center justify-center gap-2 font-semibold hover:bg-gray-100">
               <Lock size={18} />
               Confirmar Apertura
             </button>

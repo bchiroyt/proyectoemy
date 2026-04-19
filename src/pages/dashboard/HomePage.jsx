@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigationStore } from "@/context/useNavigationStore";
 import { ShoppingCart, Package, Users, TrendingUp, ArrowUpRight, ArrowDownRight, CreditCard, Activity } from "lucide-react";
 
 // Helper
 const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 const HomePage = () => {
+    const setTitulo = useNavigationStore((s) => s.setTitulo);
+
+    useEffect(() => {
+        setTitulo("Dashboard");
+    }, [setTitulo]);
+
     // Datos de ejemplo
     const stats = [
         { 
@@ -43,7 +50,7 @@ const HomePage = () => {
     ];
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="h-full min-h-0 overflow-y-auto overscroll-contain space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-4">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-gray-800 tracking-tight">Bienvenido al Dashboard</h1>

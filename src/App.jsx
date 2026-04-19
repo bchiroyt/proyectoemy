@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/auth/LoginPage";
-import HomePage from "./pages/dashboard/HomePage"; // Tu nueva página de inicio
+import HomePage from "./pages/dashboard/HomePage";
 import MainLayout from "./components/layout/MainLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PanelControl from "./pages/dashboard/PanelControl";
@@ -10,16 +10,24 @@ import POS from "./pages/pos/Pos";
 import Apertura from "./pages/pos/AperturaCaja";
 import Ventas from "./pages/pos/VentasPos";
 import Contabilidad from "./pages/contabilidad/Contabilidad";
+import Compras from "./pages/compras/Compras";
+import NuevaCompra from "./pages/compras/NuevaCompra";
+import NuevoProducto from "./pages/producto/NuevoProducto";
+import { useAuthStore } from "./context/useAuthStore";
 
+function DefaultRedirect() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  return (
+    <Navigate to={isAuthenticated ? "/panel-control" : "/login"} replace />
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Ruta Pública */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Rutas Privadas (Protegidas y con Layout) */}
         <Route
           path="/dashboard"
           element={
@@ -61,6 +69,16 @@ function App() {
           }
         />
         <Route
+          path="/nuevo-producto"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <NuevoProducto />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/pos"
           element={
             <ProtectedRoute>
@@ -91,6 +109,26 @@ function App() {
           }
         />
         <Route
+          path="/compras"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Compras />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/compras/nueva"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <NuevaCompra />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/contabilidad"
           element={
             <ProtectedRoute>
@@ -101,8 +139,7 @@ function App() {
           }
         />
 
-        {/* Redirección por defecto */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<DefaultRedirect />} />
       </Routes>
     </BrowserRouter>
   );

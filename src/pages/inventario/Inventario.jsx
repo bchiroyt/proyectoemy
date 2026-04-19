@@ -10,11 +10,11 @@ const Inventario = () => {
         
         useEffect(() => {
             setTitulo("Inventario");
-        },);
+        }, [setTitulo]);
 
     
   return (
-    <div className="bg-(--color-pagina-4) min-h-full w-full p-6 space-y-6">
+    <div className="bg-(--color-pagina-4) h-full min-h-0 overflow-y-auto overscroll-contain w-full p-4 sm:p-6 space-y-6">
 
       <h1 className="text-2xl font-semibold text-(--color-pagina)">
         Inventario de Productos

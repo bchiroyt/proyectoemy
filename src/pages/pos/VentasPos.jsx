@@ -18,8 +18,8 @@ const VentasPOS = () => {
   const setTitulo = useNavigationStore((state) => state.setTitulo);
         
         useEffect(() => {
-            setTitulo("Punto de Venta");
-        },);
+            setTitulo("Ventas");
+        }, [setTitulo]);
   
         const [carrito, setCarrito] = useState([]);
   const [busqueda, setBusqueda] = useState("");

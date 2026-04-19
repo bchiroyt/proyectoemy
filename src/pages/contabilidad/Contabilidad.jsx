@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Wallet, Users, CreditCard } from "lucide-react";
+import { useNavigationStore } from "@/context/useNavigationStore";
 
 const datosContabilidad = [
   {
@@ -22,6 +24,12 @@ const datosContabilidad = [
 ];
 
 const Contabilidad = () => {
+  const setTitulo = useNavigationStore((s) => s.setTitulo);
+
+  useEffect(() => {
+    setTitulo("Contabilidad");
+  }, [setTitulo]);
+
   return (
     <div className="bg-(--color-pagina-4) min-h-full w-full flex flex-col p-6 md:p-10">
 

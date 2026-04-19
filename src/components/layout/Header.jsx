@@ -12,9 +12,9 @@ const Header = () => {
 
 
     return (
-        <header className="h-[70px] w-full bg-(--color-pagina) flex items-center justify-between px-8 shadow-sm border-b z-10 sticky top-0">
+        <header className="h-[65px] w-full bg-(--color-pagina) flex items-center justify-between px-8 shadow-sm border-b z-10 sticky top-0">
             <div className="flex items-center gap-4 text-center">
-                <h1 className="text-[20px] text-(--color-blanco) font-bold">POS Modas y Variedades EMY / <span className="text-pagina">{titulo}</span></h1>
+                <h1 className="text-[20px] text-(--color-blanco) font-bold"> <span className="text-pagina">{titulo}</span></h1>
             </div>
 
             <div className="flex items-center gap-5">

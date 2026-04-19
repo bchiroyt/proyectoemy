@@ -9,7 +9,7 @@ const POS = () => {
         
         useEffect(() => {
             setTitulo("POS");
-        },);
+        }, [setTitulo]);
 
   const navigate = useNavigate();
 

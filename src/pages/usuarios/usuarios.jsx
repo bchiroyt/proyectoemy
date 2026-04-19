@@ -21,7 +21,7 @@ const Usuarios = () => {
     
     useEffect(() => {
         setTitulo("Usuarios");
-    },);
+    }, [setTitulo]);
 
 
     useEffect(() => {
@@ -36,7 +36,7 @@ const Usuarios = () => {
     }, []);
 
     return (
-        <div className="flex flex-col h-full bg-(--color-pagina-4)">
+        <div className="flex flex-col h-full bg-(--color-fondo-pagina)">
 
             <div className="p-6 max-w-7xl mx-auto w-full">
                 {/* Toolbar superior */}

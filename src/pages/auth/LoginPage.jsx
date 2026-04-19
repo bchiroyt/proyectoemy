@@ -20,7 +20,6 @@ const LoginPage = () => {
   const [touched, setTouched] = useState({ email: false, password: false });
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const [setError] = useState({});
 
   // Validaciones en tiempo real
   useEffect(() => {
@@ -44,33 +43,24 @@ const LoginPage = () => {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    //setTouched({ email: true, password: true });
+    setTouched({ email: true, password: true });
 
     const result = loginSchema.safeParse(formData);
 
     if (!result.success) {
-      setLogin({
-        nombre: "",
-        rol: ""
-      },
-        "token_de_prueba_123");
-
-      navigate("/panel-control");
-    } else {
-      setError(result.error.flatten().fieldErrors);
-
-
-      //{
-      //setErrors(result.error.flatten().fieldErrors);
-      //return;
-      //}
-
-      // Si pasa la validación
-      /*setErrors({});
-      console.log("Datos listos para enviar a .NET:", result.data);
-      setLogin({ nombre: "admin POS", rol: "Administrador" }, "token_de_prueba_123");
-      */
+      setErrors(result.error.flatten().fieldErrors);
+      return;
     }
+
+    setErrors({});
+    setLogin(
+      {
+        nombre: result.data.email.split("@")[0] || "Usuario",
+        rol: "Administrador",
+      },
+      "token_de_prueba_123"
+    );
+    navigate("/panel-control", { replace: true });
   };
 
   // Helper properties to determine visual states

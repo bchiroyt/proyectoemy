@@ -1,51 +1,138 @@
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
     Package,
     DollarSign,
-    Tag,
     Calculator,
     ShoppingCart,
     BarChart3,
     Grid2x2,
-    Settings
+    Settings,
+    Store,
+    Users,
 } from "lucide-react";
+import { useNavigationStore } from "@/context/useNavigationStore";
+import { cn } from "@/lib/utils";
 
 const datosPanel = [
-    { id: 1, titulo: "Inventario", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: Package },
-    { id: 2, titulo: "Caja", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: DollarSign },
-    { id: 3, titulo: "Ventas", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: Tag },
-    { id: 4, titulo: "Contabilidad", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: Calculator },
-    { id: 5, titulo: "Compras", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: ShoppingCart },
-    { id: 6, titulo: "Dashboard", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: BarChart3 },
-    { id: 7, titulo: "Productos", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: Grid2x2 },
-    { id: 8, titulo: "Configuración", descripcion: "Descripción corta Lorem ipsum dolor sit amet, consectetur adipiscing elit.", icono: Settings },
+    {
+        id: 1,
+        titulo: "Inventario",
+        descripcion: "Existencias, movimientos y catálogo de productos.",
+        icono: Package,
+        to: "/inventario",
+    },
+    {
+        id: 2,
+        titulo: "Caja",
+        descripcion: "Apertura, arqueo y control de efectivo en caja.",
+        icono: DollarSign,
+        to: "/apertura",
+    },
+    {
+        id: 3,
+        titulo: "Ventas",
+        descripcion: "Punto de venta y registro de transacciones.",
+        icono: Store,
+        to: "/ventas",
+    },
+    {
+        id: 4,
+        titulo: "Contabilidad",
+        descripcion: "Gastos, deudas y pagos del negocio.",
+        icono: Calculator,
+        to: "/contabilidad",
+    },
+    {
+        id: 5,
+        titulo: "Compras",
+        descripcion: "Órdenes a proveedores y recepción de mercadería.",
+        icono: ShoppingCart,
+        to: "/compras",
+    },
+    {
+        id: 6,
+        titulo: "Dashboard",
+        descripcion: "Indicadores y resumen general del sistema.",
+        icono: BarChart3,
+        to: "/dashboard",
+    },
+    {
+        id: 7,
+        titulo: "Nuevo producto",
+        descripcion: "Alta rápida de artículos en el inventario.",
+        icono: Grid2x2,
+        to: "/nuevo-producto",
+    },
+    {
+        id: 8,
+        titulo: "Usuarios",
+        descripcion: "Administración de cuentas y permisos.",
+        icono: Users,
+        to: "/usuarios",
+    },
+    {
+        id: 9,
+        titulo: "Configuración",
+        descripcion: "Preferencias del sistema (próximamente).",
+        icono: Settings,
+        to: null,
+    },
 ];
 
 const PanelControl = () => {
+    const setTitulo = useNavigationStore((s) => s.setTitulo);
+
+    useEffect(() => {
+        setTitulo("Panel de Control");
+    }, [setTitulo]);
+
     return (
-        <div className="bg-gray-200 min-h-full flex flex-col p-0 md:p-12.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 max-w-7xl w-full mx-auto">
-                {datosPanel.map((item) => {
-                    const Icon = item.icono;
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-200/80 rounded-xl md:rounded-2xl border border-slate-200/60">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5 md:p-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 max-w-7xl w-full mx-auto pb-2">
+                    {datosPanel.map((item) => {
+                        const Icon = item.icono;
+                        const inner = (
+                            <>
+                                <div className="bg-slate-100 w-full aspect-[5/3] max-h-36 rounded-xl flex items-center justify-center mb-3 shrink-0">
+                                    <Icon className="w-10 h-10 sm:w-12 sm:h-12 text-(--color-pagina)" />
+                                </div>
+                                <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">
+                                    {item.titulo}
+                                </h3>
+                                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                                    {item.descripcion}
+                                </p>
+                            </>
+                        );
 
-                    return (
-                        <div
-                            key={item.id}
-                            className="bg-white rounded-2xl p-4 shadow-md flex flex-col items-center text-center min-h-[280px]"
-                        >
-                            <div className="bg-gray-100 w-48 h-35 rounded-xl flex items-center justify-center mb-3">
-                                <Icon className="w-10 h-10 text-blue-500" />
-                            </div>
+                        const cardClass = cn(
+                            "bg-white rounded-2xl p-4 sm:p-5 shadow-md flex flex-col items-center text-center min-h-[220px] sm:min-h-[260px] border border-slate-100/80 transition-shadow",
+                            item.to
+                                ? "hover:shadow-lg hover:border-(--color-pagina)/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-pagina)/40"
+                                : "opacity-75 cursor-not-allowed"
+                        );
 
-                            <h3 className="text-lg font-semibold mb-2">
-                                {item.titulo}
-                            </h3>
+                        if (!item.to) {
+                            return (
+                                <div key={item.id} className={cardClass} aria-disabled>
+                                    {inner}
+                                </div>
+                            );
+                        }
 
-                            <p className="text-sm text-gray-600">
-                                {item.descripcion}
-                            </p>
-                        </div>
-                    );
-                })}
+                        return (
+                            <Link
+                                key={item.id}
+                                to={item.to}
+                                className={cardClass}
+                            >
+                                {inner}
+                            </Link>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
