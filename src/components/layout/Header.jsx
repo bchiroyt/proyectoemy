@@ -1,13 +1,13 @@
-import React from 'react';
+import React from "react";
 import { useAuthStore } from "@/context/useAuthStore";
 import { Search, Bell, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigationStore } from "@/context/useNavigationStore";
 
 const Header = () => {
-    // Optionally access user state if available
-    const userRole = "admin POS";
-    const userName = "Administrador";
+    const user = useAuthStore((s) => s.user);
+    const userName = user?.nombreMostrar || user?.nombres || "Usuario";
+    const userRole = user?.rolesEtiqueta || user?.nombreRol || "—";
     const titulo = useNavigationStore((state) => state.titulo);
 
 

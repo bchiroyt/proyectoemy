@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { loginSchema } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/context/useAuthStore";
 import { Card } from "@/components/ui/card";
 import { User, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, LogIn } from "lucide-react";
+import { useLoginMutation } from "@/hooks/queries/useSeguridadQueries";
+import { buildSessionUser } from "@/lib/apiNormalizer";
+import { getApiErrorMessage } from "@/lib/apiClient";
 import logo1Img from "@/assets/logo1.jpeg";
 import logoImg from "@/assets/tran1.png";
 
@@ -15,10 +18,12 @@ const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 const LoginPage = () => {
   const setLogin = useAuthStore((state) => state.setLogin);
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const loginMut = useLoginMutation();
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({ email: false, password: false });
   const [showPassword, setShowPassword] = useState(false);
+  const [apiError, setApiError] = useState("");
   const navigate = useNavigate();
 
   // Validaciones en tiempo real
@@ -41,9 +46,10 @@ const LoginPage = () => {
     setTouched(prev => ({ ...prev, [id]: true }));
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setTouched({ email: true, password: true });
+    setApiError("");
 
     const result = loginSchema.safeParse(formData);
 
@@ -53,14 +59,21 @@ const LoginPage = () => {
     }
 
     setErrors({});
-    setLogin(
-      {
-        nombre: result.data.email.split("@")[0] || "Usuario",
-        rol: "Administrador",
-      },
-      "token_de_prueba_123"
-    );
-    navigate("/panel-control", { replace: true });
+    try {
+      const { token, usuario } = await loginMut.mutateAsync({
+        email: result.data.email,
+        password: result.data.password,
+      });
+      if (!token) {
+        setApiError("El servidor no devolvió un token de acceso. Revisa la respuesta del endpoint de login.");
+        return;
+      }
+      const user = buildSessionUser(usuario);
+      setLogin(user, token);
+      navigate("/panel-control", { replace: true });
+    } catch (err) {
+      setApiError(getApiErrorMessage(err, "No se pudo iniciar sesión. Verifica credenciales y conexión HTTPS."));
+    }
   };
 
   // Helper properties to determine visual states
@@ -200,11 +213,18 @@ const LoginPage = () => {
               {passwordInvalid && <p className="text-xs text-(--color-rojo) font-medium pl-1">{errors.password[0]}</p>}
             </div>
 
+            {apiError ? (
+              <p className="rounded-lg border border-(--color-rojo)/30 bg-(--color-rojo)/5 px-3 py-2 text-xs font-medium text-(--color-rojo-obscuro)">
+                {apiError}
+              </p>
+            ) : null}
+
             <Button
               type="submit"
-              className="w-full bg-(--color-pagina) cursor-pointer hover:bg-(--color-borde-button) text-(--color-blanco) rounded-xl h-12 mt-6 font-semibold shadow-(--color-pagina)/50 transition-all duration-200 hover:shadow-lg active:scale-[0.98]"
+              disabled={loginMut.isPending}
+              className="w-full bg-(--color-pagina) cursor-pointer hover:bg-(--color-borde-button) text-(--color-blanco) rounded-xl h-12 mt-6 font-semibold shadow-(--color-pagina)/50 transition-all duration-200 hover:shadow-lg active:scale-[0.98] disabled:opacity-70"
             >
-              Iniciar Sesión
+              {loginMut.isPending ? "Conectando…" : "Iniciar Sesión"}
               <LogIn className="ml-2 w-[18px] h-[18px]" />
             </Button>
 
