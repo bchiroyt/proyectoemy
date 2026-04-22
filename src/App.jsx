@@ -15,6 +15,15 @@ import NuevaCompra from "./pages/compras/NuevaCompra";
 import NuevoProducto from "./pages/producto/NuevoProducto";
 import { useAuthStore } from "./context/useAuthStore";
 
+// --- Importaciones añadidas de la versión antigua ---
+import Categorias from "./pages/inventario/Categorias";
+import GestionCategorias from "./pages/inventario/GestionCategoria";
+import GestionMarcas from "./pages/inventario/GestionMarca";
+import Gestionubicaciones from "./pages/inventario/GestionUbicacion";
+import Gestiontallas from "./pages/inventario/GestionTalla";
+import Gestionpresentaciones from "./pages/inventario/GestionPresentacion";
+import ReporteStock from "./pages/inventario/ReporteStock";
+
 function DefaultRedirect() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return (
@@ -26,8 +35,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Ruta Pública */}
         <Route path="/login" element={<LoginPage />} />
 
+        {/* Rutas Protegidas con Layout */}
         <Route
           path="/dashboard"
           element={
@@ -139,6 +150,79 @@ function App() {
           }
         />
 
+        {/* --- Rutas Integradas de la versión antigua --- */}
+        <Route
+          path="/categorias"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Categorias />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/categorias"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <GestionCategorias />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/marcas"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <GestionMarcas />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/ubicaciones"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Gestionubicaciones />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/tallas"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Gestiontallas />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/presentaciones"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Gestionpresentaciones />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/reporte-stock"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ReporteStock />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Redirección por defecto */}
         <Route path="*" element={<DefaultRedirect />} />
       </Routes>
     </BrowserRouter>
