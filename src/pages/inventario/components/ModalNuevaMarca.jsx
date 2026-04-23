@@ -1,81 +1,77 @@
-import { X } from "lucide-react";
 import { useState } from "react";
+import { X } from "lucide-react";
+import { crearMarca } from "@/services/marcas";
 
 const ModalNuevaMarca = ({ open, onClose, onSave }) => {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [loading, setLoading] = useState(false);
 
   if (!open) return null;
 
-  const handleGuardar = () => {
+  const handleSave = async () => {
     if (!nombre.trim()) return;
 
-    onSave(nombre);
-    setNombre("");
-    setDescripcion("");
-    onClose();
+    try {
+      setLoading(true);
+
+      const response = await crearMarca({
+        nombre,
+        descripcion
+      });
+
+      // 🔥 IMPORTANTE: tu backend devuelve { data: {...} }
+      const nuevaMarca = response.data;
+
+      onSave(nuevaMarca); // lo mandamos al padre
+      setNombre("");
+      setDescripcion("");
+      onClose();
+
+    } catch (error) {
+      console.error(error);
+      alert("Error al crear marca");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
 
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-lg p-6 relative border-t-4 border-(--color-pagina)">
+      <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
 
         {/* HEADER */}
-        <div className="flex justify-between items-center px-5 py-4 border-b">
-          <h2 className="font-semibold text-lg">
-            Crear Nueva Marca
-          </h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-semibold">Nueva Marca</h2>
+
           <button onClick={onClose}>
-            <X className="w-5 h-5 text-gray-500" />
+            <X />
           </button>
         </div>
 
-        {/* CONTENIDO */}
-        <div className="p-5 space-y-4">
+        <div className="space-y-4">
 
-          <div>
-            <label className="text-sm text-gray-600">
-              Nombre de la Marca
-            </label>
-            <input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej: Zapatillas Nike"
-              className="w-full mt-1 p-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-(--color-pagina)"
-            />
-          </div>
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Nombre"
+            className="w-full border p-3 rounded-lg"
+          />
 
-          <div>
-            <label className="text-sm text-gray-600">
-              Descripción
-            </label>
-            <textarea
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Descripción de la marca..."
-              className="w-full mt-1 p-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-(--color-pagina)"
-              rows={3}
-            />
-          </div>
-
-        </div>
-
-        {/* FOOTER */}
-        <div className="p-5 space-y-3 bg-gray-50">
+          <textarea
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Descripción"
+            className="w-full border p-3 rounded-lg"
+          />
 
           <button
-            onClick={handleGuardar}
-            className="w-full bg-(--color-pagina-2) text-white py-3 rounded-xl font-semibold hover:opacity-90"
+            onClick={handleSave}
+            disabled={loading}
+            className="w-full bg-(--color-pagina-2) text-white py-3 rounded-xl"
           >
-            Registrar
-          </button>
-
-          <button
-            onClick={onClose}
-            className="w-full bg-(--color-rosa-hover) text-(--color-pagina) py-3 rounded-xl font-semibold"
-          >
-            Cancelar
+            {loading ? "Guardando..." : "Guardar"}
           </button>
 
         </div>
