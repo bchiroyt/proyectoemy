@@ -53,3 +53,32 @@ export function permisosMapFromServer(list) {
   }
   return m;
 }
+
+/**
+ * Permisos excepcionales por usuario (API .NET: solo módulo + acción, sin submódulo).
+ */
+export function buildUsuarioExcepcionRows(modulos, acciones) {
+  const rows = [];
+  for (const m of modulos) {
+    for (const a of acciones) {
+      rows.push({
+        idModulo: m.idModulo,
+        idSubmodulo: null,
+        idAccion: a.idAccion,
+        etiquetaModulo: m.nombre,
+        etiquetaSub: null,
+        etiquetaAccion: a.nombre,
+        codigoAccion: a.codigo,
+      });
+    }
+  }
+  return rows;
+}
+
+export function permisosMapFromUsuarioExcepciones(list) {
+  const m = new Map();
+  for (const p of list) {
+    m.set(permKey(p.idModulo, null, p.idAccion), Boolean(p.permitido));
+  }
+  return m;
+}

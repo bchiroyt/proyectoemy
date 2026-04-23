@@ -91,6 +91,19 @@ export function RolesYPermisosPanel() {
   const loadErr = rolesQ.error || catQ.error;
 
   return (
+    <div className="space-y-4">
+      <Card className="border-border bg-(--color-pagina-4) shadow-sm">
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm text-foreground">Cómo encajan roles y permisos por usuario</CardTitle>
+          <CardDescription className="text-xs text-(--color-gris-letra) leading-relaxed">
+            Los <strong>roles</strong> agrupan permisos por defecto (matriz a la derecha cuando eliges un rol). Las{" "}
+            <strong>excepciones por usuario</strong> se gestionan en la pestaña <strong>Usuarios</strong>: botón{" "}
+            <strong>Permisos</strong> en cada fila. Ahí defines módulo × acción solo para esa persona (API: permisos
+            sin submódulo). Así los roles pueden mantenerse simples y las variaciones quedan a nivel usuario.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
     <div className="grid gap-4 lg:grid-cols-[minmax(220px,280px)_1fr]">
       <Card className="border-border bg-(--color-blanco) shadow-sm">
         <CardHeader className="pb-2">
@@ -233,6 +246,7 @@ export function RolesYPermisosPanel() {
 
       <CopiarRolDialog open={openCopiar} onOpenChange={setOpenCopiar} roles={rolesQ.data ?? []} />
       <NuevoRolDialog open={openNuevo} onOpenChange={setOpenNuevo} />
+    </div>
     </div>
   );
 }

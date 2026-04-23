@@ -20,5 +20,6 @@ export async function loginRequest({ email, password }) {
     pick(inner, "usuario", "Usuario", "user", "User") ??
     pick(data, "usuario", "Usuario", "user", "User") ??
     inner;
-  return { token, usuario };
+  const tokenExpiraEn = pick(inner, "expiraEn", "ExpiraEn") ?? null;
+  return { token, usuario, tokenExpiraEn };
 }

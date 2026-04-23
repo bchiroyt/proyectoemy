@@ -1,10 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { loginRequest } from "@/services/authService";
-import { fetchUsuarios, updateUsuarioRoles } from "@/services/usuariosService";
+import {
+  createUsuario,
+  desactivarUsuario,
+  fetchUsuarioById,
+  fetchUsuarios,
+  patchUsuario,
+  updateUsuarioPermisosExcepcionales,
+  updateUsuarioRoles,
+} from "@/services/usuariosService";
 import { copiarRol, createRol, fetchRoles, updateRol } from "@/services/rolesService";
 import { fetchPermisosByRol, fetchPermisosCatalogo, updatePermisosRol } from "@/services/permisosService";
 
 export const QK_USUARIOS = ["seguridad", "usuarios"];
+export const qkUsuario = (idUsuario) => ["seguridad", "usuario", idUsuario];
 export const QK_ROLES = ["seguridad", "roles"];
 export const QK_CATALOGO_PERMISOS = ["seguridad", "permisos", "catalogo"];
 export const qkPermisosRol = (idRol) => ["seguridad", "permisos", "rol", idRol];
@@ -14,6 +23,16 @@ export function useUsuariosQuery(options = {}) {
     queryKey: QK_USUARIOS,
     queryFn: fetchUsuarios,
     staleTime: 30_000,
+    ...options,
+  });
+}
+
+export function useUsuarioQuery(idUsuario, options = {}) {
+  return useQuery({
+    queryKey: qkUsuario(idUsuario),
+    queryFn: () => fetchUsuarioById(idUsuario),
+    enabled: Number.isFinite(idUsuario) && idUsuario > 0,
+    staleTime: 15_000,
     ...options,
   });
 }
@@ -50,7 +69,52 @@ export function useAsignarRolesUsuarioMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ idUsuario, idRoles }) => updateUsuarioRoles(idUsuario, idRoles),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: QK_USUARIOS });
+      qc.invalidateQueries({ queryKey: qkUsuario(v.idUsuario) });
+    },
+  });
+}
+
+export function usePatchUsuarioMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idUsuario, body }) => patchUsuario(idUsuario, body),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: QK_USUARIOS });
+      qc.invalidateQueries({ queryKey: qkUsuario(v.idUsuario) });
+    },
+  });
+}
+
+export function useDesactivarUsuarioMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (idUsuario) => desactivarUsuario(idUsuario),
+    onSuccess: (_d, idUsuario) => {
+      qc.invalidateQueries({ queryKey: QK_USUARIOS });
+      qc.invalidateQueries({ queryKey: qkUsuario(idUsuario) });
+    },
+  });
+}
+
+export function useCrearUsuarioMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => createUsuario(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK_USUARIOS }),
+  });
+}
+
+export function useUsuarioPermisosExcepcionalesMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idUsuario, permisosExcepcionales }) =>
+      updateUsuarioPermisosExcepcionales(idUsuario, permisosExcepcionales),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: QK_USUARIOS });
+      qc.invalidateQueries({ queryKey: qkUsuario(v.idUsuario) });
+    },
   });
 }
 

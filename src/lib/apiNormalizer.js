@@ -119,6 +119,41 @@ export function mapRolPermiso(raw) {
   };
 }
 
+export function mapUsuarioPermisoExcepcion(raw) {
+  if (!raw) return null;
+  const idModulo = toNumberOrNull(pick(raw, "idModulo", "IdModulo"));
+  const idAccion = toNumberOrNull(pick(raw, "idAccion", "IdAccion"));
+  if (idModulo == null || idAccion == null) return null;
+  return {
+    idUsuarioPermisoAccion: toNumberOrNull(
+      pick(raw, "idUsuarioPermisoAccion", "IdUsuarioPermisoAccion")
+    ),
+    idModulo,
+    idAccion,
+    codigoModulo: pick(raw, "codigoModulo", "CodigoModulo") ?? "",
+    codigoAccion: pick(raw, "codigoAccion", "CodigoAccion") ?? "",
+    permitido: Boolean(pick(raw, "permitido", "Permitido") ?? false),
+  };
+}
+
+/** Respuesta de GET /api/Usuarios/{id} (UsuarioResponse) */
+export function mapUsuarioDetallado(raw) {
+  if (!raw) return null;
+  const base = mapUsuario(raw);
+  const permRaw = pick(raw, "permisosExcepcionales", "PermisosExcepcionales") ?? [];
+  const permisosExcepcionales = Array.isArray(permRaw)
+    ? permRaw.map(mapUsuarioPermisoExcepcion).filter(Boolean)
+    : [];
+  return {
+    ...base,
+    requiereCambioPassword: Boolean(pick(raw, "requiereCambioPassword", "RequiereCambioPassword")),
+    ultimoAcceso: pick(raw, "ultimoAcceso", "UltimoAcceso") ?? null,
+    fechaCreacion: pick(raw, "fechaCreacion", "FechaCreacion") ?? null,
+    fechaActualizacion: pick(raw, "fechaActualizacion", "FechaActualizacion") ?? null,
+    permisosExcepcionales,
+  };
+}
+
 export function buildSessionUser(raw) {
   const u = mapUsuario(raw) || {};
   const nombreMostrar =
