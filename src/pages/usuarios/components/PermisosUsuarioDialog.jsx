@@ -1,29 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  usePermisosCatalogoQuery,
-  useUsuarioPermisosExcepcionalesMutation,
-  useUsuarioQuery,
-} from "@/hooks/queries/useSeguridadQueries";
+import { usePermisosCatalogoQuery, useUsuarioPermisosExcepcionalesMutation, useUsuarioQuery } from "@/hooks/queries/useSeguridadQueries";
 import { validateActualizarPermisosUsuario } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
-import {
-  buildUsuarioExcepcionRows,
-  permisosMapFromUsuarioExcepciones,
-  permKey,
-  sortAcciones,
-} from "@/pages/usuarios/permisosMatrix";
+import { buildUsuarioExcepcionRows, permisosMapFromUsuarioExcepciones, permKey, sortAcciones } from "@/pages/usuarios/permisosMatrix";
+
 
 export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
   const [localMap, setLocalMap] = useState(() => new Map());

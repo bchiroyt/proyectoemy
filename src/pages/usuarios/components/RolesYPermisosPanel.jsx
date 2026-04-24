@@ -4,12 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import {
-  useActualizarPermisosRolMutation,
-  usePermisosCatalogoQuery,
-  useRolPermisosQuery,
-  useRolesQuery,
-} from "@/hooks/queries/useSeguridadQueries";
+import { useActualizarPermisosRolMutation, usePermisosCatalogoQuery, useRolPermisosQuery, 
+useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
 import { validateActualizarPermisosRol } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { buildPermisoRows, permisosMapFromServer, permKey, sortAcciones } from "@/pages/usuarios/permisosMatrix";

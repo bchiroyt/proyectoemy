@@ -16,7 +16,7 @@ import { validateCrearUsuario } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
 
 const empty = {
-  idTipoUsuario: "",
+  idTipoUsuario: "1",
   username: "",
   email: "",
   password: "",
@@ -105,33 +105,14 @@ export function NuevoUsuarioDialog({ open, onOpenChange }) {
       <DialogContent className="max-h-[min(90vh,720px)] overflow-y-auto bg-(--color-blanco) sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-(--color-pagina-2)">Nuevo usuario</DialogTitle>
-          <DialogDescription className="text-(--color-gris-letra)">
-            Se envía a <code className="text-xs">POST /api/Usuarios</code>. Contraseña mínimo 8 caracteres. Puedes
-            asignar roles ahora o después desde la lista.
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="grid max-h-[55vh] gap-3 overflow-y-auto py-2 pr-1">
-          <div className="grid gap-2">
-            <Label htmlFor="nu-tipo" className="text-xs font-bold uppercase text-(--color-pagina)">
-              Id tipo usuario
-            </Label>
-            <Input
-              id="nu-tipo"
-              type="number"
-              min={1}
-              value={form.idTipoUsuario}
-              onChange={(e) => setForm((f) => ({ ...f, idTipoUsuario: e.target.value }))}
-            />
-            {fieldErrors.idTipoUsuario?.[0] ? (
-              <p className="text-xs text-(--color-rojo)">{fieldErrors.idTipoUsuario[0]}</p>
-            ) : null}
-          </div>
+        <div className="grid max-h-[55vh] gap-3 overflow-y-auto py-2 pr-1">          
 
           <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
             <div className="grid gap-2">
               <Label htmlFor="nu-user" className="text-xs font-bold uppercase text-(--color-pagina)">
-                Username
+                Usuario
               </Label>
               <Input
                 id="nu-user"
