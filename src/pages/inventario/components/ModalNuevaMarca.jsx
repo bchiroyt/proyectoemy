@@ -17,13 +17,13 @@ const ModalNuevaMarca = ({ open, onClose, onSave }) => {
 
       const response = await crearMarca({
         nombre,
-        descripcion
+        descripcion,
       });
 
-      // 🔥 IMPORTANTE: tu backend devuelve { data: {...} }
       const nuevaMarca = response.data;
 
-      onSave(nuevaMarca); // lo mandamos al padre
+      onSave(nuevaMarca);
+
       setNombre("");
       setDescripcion("");
       onClose();
@@ -38,13 +38,10 @@ const ModalNuevaMarca = ({ open, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
       <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
 
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold">Nueva Marca</h2>
-
           <button onClick={onClose}>
             <X />
           </button>
@@ -75,7 +72,6 @@ const ModalNuevaMarca = ({ open, onClose, onSave }) => {
           </button>
 
         </div>
-
       </div>
     </div>
   );
