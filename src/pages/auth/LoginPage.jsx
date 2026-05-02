@@ -87,7 +87,7 @@ const LoginPage = () => {
     <div className="flex min-h-screen h-screen w-full overflow-hidden bg-(--color-gris-claro)">
 
       {/* SECCION IZQUIERDA */}
-      <div className="hidden lg:flex flex-col w-[45%] bg-(--color-pagina) p-10 justify-center items-center relative overflow-hidden border-radius: 91% 9% 100% 0% / 0% 100% 0% 100%">
+      <div className="hidden lg:flex flex-col w-[45%] bg-(--color-pagina) p-10 justify-center items-center relative overflow-hidden border border-slate-200/100">
         {/* border-radius: 91% 9% 100% 0% / 0% 100% 0% 100%;   style={{ borderRadius: '91% 9% 100% 0% / 0% 100% 0% 100%' }}*/}
         <div className="flex flex-col items-center max-w-lg z-10 text-center">
           <div className="flex gap-2 text-3xl mb-6">

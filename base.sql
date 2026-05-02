@@ -301,4 +301,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_roles_permisos_modulo_sin_submodulo
     WHERE id_submodulo IS NULL;
 
 
+CREATE TABLE usuario_permiso_accion (
+    id_usuario_permiso_accion BIGSERIAL PRIMARY KEY,
+    id_usuario BIGINT NOT NULL,
+    id_modulo BIGINT NOT NULL,
+    id_accion BIGINT NOT NULL,
+    permitido BOOLEAN NOT NULL,
+    CONSTRAINT fk_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    CONSTRAINT fk_modulo FOREIGN KEY (id_modulo) REFERENCES modulos(id_modulo),
+    CONSTRAINT fk_accion FOREIGN KEY (id_accion) REFERENCES acciones(id_accion)
+);
+
+
 COMMIT;

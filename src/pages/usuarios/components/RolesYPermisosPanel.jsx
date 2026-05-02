@@ -87,21 +87,20 @@ export function RolesYPermisosPanel() {
   const loadErr = rolesQ.error || catQ.error;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <Card className="border-border bg-(--color-pagina-4) shadow-sm">
-        <CardHeader className="py-3">
+        <CardHeader className="py-0">
           <CardTitle className="text-sm text-foreground">Cómo encajan roles y permisos por usuario</CardTitle>
           <CardDescription className="text-xs text-(--color-gris-letra) leading-relaxed">
             Los <strong>roles</strong> agrupan permisos por defecto (matriz a la derecha cuando eliges un rol). Las{" "}
             <strong>excepciones por usuario</strong> se gestionan en la pestaña <strong>Usuarios</strong>: botón{" "}
-            <strong>Permisos</strong> en cada fila. Ahí defines módulo × acción solo para esa persona (API: permisos
-            sin submódulo). Así los roles pueden mantenerse simples y las variaciones quedan a nivel usuario.
+            <strong>Permisos</strong> en cada fila. Ahí defines módulo × acción solo para esa persona. Así los roles pueden mantenerse simples y las variaciones quedan a nivel usuario.
           </CardDescription>
         </CardHeader>
       </Card>
 
     <div className="grid gap-4 lg:grid-cols-[minmax(220px,280px)_1fr]">
-      <Card className="border-border bg-(--color-blanco) shadow-sm">
+      <Card className="border-border bg-(--color-blanco) shadow-sm h-[min(60vh,480px)]">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base text-(--color-pagina-2)">
             <Shield className="size-5" />
@@ -165,13 +164,9 @@ export function RolesYPermisosPanel() {
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-(--color-blanco) shadow-sm">
+      <Card className="border-border bg-(--color-blanco) shadow-sm h-[min(60vh,480px)]">
         <CardHeader>
           <CardTitle className="text-base text-(--color-pagina-2)">Permisos por módulo y acción</CardTitle>
-          <CardDescription className="text-(--color-gris-letra)">
-            Basado en <code className="text-xs">modulos</code>, <code className="text-xs">submodulos</code> y{" "}
-            <code className="text-xs">acciones</code> (CREATE, READ, UPDATE, DELETE) de tu base de datos.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           {!selectedRolId ? (
@@ -185,16 +180,15 @@ export function RolesYPermisosPanel() {
             <p className="text-sm text-(--color-rojo)">{getApiErrorMessage(permsQ.error)}</p>
           ) : !rows.length ? (
             <p className="text-sm text-muted-foreground">
-              El catálogo de permisos está vacío o la API no devolvió módulos/acciones. Verifica{" "}
-              <code className="text-xs">GET /api/Permisos/catalogo</code>.
+              El catálogo de permisos está vacío o la API no devolvió módulos/acciones. Verifica
             </p>
           ) : (
             <>
-              <ScrollArea className="h-[min(60vh,480px)] pr-3">
-                <div className="space-y-4">
+              <ScrollArea className="h-[min(40vh,480px)] pr-3">
+                <div className="space-y-3">
                   {groupedRows.map(({ meta, acciones: ars }) => (
                     <div key={`${meta.idModulo}|${meta.idSubmodulo ?? "null"}`} className="rounded-lg border border-border">
-                      <div className="bg-(--color-pagina-4) px-3 py-2 text-sm font-semibold text-foreground">
+                      <div className="bg-(--color-pagina-4) px-3 py-1 text-sm font-semibold text-foreground">
                         {meta.etiquetaModulo}
                         {meta.etiquetaSub ? (
                           <span className="text-muted-foreground"> · {meta.etiquetaSub}</span>
@@ -203,7 +197,7 @@ export function RolesYPermisosPanel() {
                       <Separator />
                       <ul className="divide-y divide-border">
                         {ars.map((row) => (
-                          <li key={permKey(row.idModulo, row.idSubmodulo, row.idAccion)} className="flex items-center justify-between gap-3 px-3 py-2">
+                          <li key={permKey(row.idModulo, row.idSubmodulo, row.idAccion)} className="flex items-center justify-between gap-3 px-3 py-1">
                             <div>
                               <span className="text-sm font-medium text-foreground">{row.etiquetaAccion}</span>
                               <span className="ml-2 text-xs text-muted-foreground">{row.codigoAccion}</span>

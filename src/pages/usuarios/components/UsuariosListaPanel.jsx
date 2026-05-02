@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { UserPlus, Edit2, Shield, UserX, Search } from "lucide-react";
+import { Edit2, Shield, UserX } from "lucide-react";
 import { useUsuariosQuery, useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
 import { useAuthStore } from "@/context/useAuthStore";
 import { getApiErrorMessage } from "@/lib/apiClient";
@@ -50,31 +49,21 @@ function sameUserId(a, b) {
   return Number(a) === Number(b);
 }
 
-export function UsuariosListaPanel() {
-  const [query, setQuery] = useState("");
-  const [openNuevo, setOpenNuevo] = useState(false);
+export function UsuariosListaPanel({
+  searchQuery = "",
+  nuevoUsuarioOpen = false,
+  onNuevoUsuarioOpenChange,
+}) {
   const [rolDialogUser, setRolDialogUser] = useState(null);
   const [editId, setEditId] = useState(null);
   const [permisosId, setPermisosId] = useState(null);
   const [desactivarUsuario, setDesactivarUsuario] = useState(null);
-  const searchInputRef = useRef(null);
   const miUsuarioId = useAuthStore((s) => s.user?.idUsuario);
   const usuariosQ = useUsuariosQuery();
   const rolesQ = useRolesQuery();
 
   const lista = usuariosQ.data ?? [];
-  const filtrados = useMemo(() => lista.filter((u) => matchesQuery(u, query)), [lista, query]);
-
-  useEffect(() => {
-    const down = (e) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        searchInputRef.current?.querySelector?.("input")?.focus?.();
-      }
-    };
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
-  }, []);
+  const filtrados = useMemo(() => lista.filter((u) => matchesQuery(u, searchQuery)), [lista, searchQuery]);
 
   const filteredHint = useMemo(
     () => `${filtrados.length} de ${lista.length} usuario(s) en la tabla`,
@@ -83,34 +72,12 @@ export function UsuariosListaPanel() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full max-w-md space-y-1">
-          <label className="text-xs font-bold uppercase text-(--color-pagina-2)">Filtrar listado</label>
-          <div ref={searchInputRef} className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-(--color-gris-letra)" />
-            <Input
-              placeholder="Nombre, correo, usuario, teléfono, id…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="h-10 border-border border-(--color-pagina-2) bg-(--color-pagina-2)/20 pl-9 shadow-sm"
-            />
-          </div>
-          <p className="text-xs text-(--color-pagina-2)">
-            {filteredHint}
-            <span className="ml-2 rounded border border-border bg-(--color-pagina-3) px-1.5 font-mono text-[10px] text-muted-foreground">
-              Ctrl+K
-            </span>
-          </p>
-        </div>
-        <Button
-          type="button"
-          className="shrink-0 bg-(--color-pagina) text-(--color-blanco) hover:bg-(--color-borde-button)"
-          onClick={() => setOpenNuevo(true)}
-        >
-          <UserPlus className="mr-2 size-4" />
-          Nuevo usuario
-        </Button>
-      </div>
+      <p className="text-xs text-(--color-pagina-2)">
+        {filteredHint}
+        <span className="ml-2 rounded border border-border bg-(--color-pagina-3) px-1.5 font-mono text-[10px] text-muted-foreground">
+          Ctrl+K
+        </span>
+      </p>
 
       {usuariosQ.isLoading ? (
         <div className="space-y-2 rounded-lg border border-border bg-(--color-blanco) p-4">
@@ -129,12 +96,12 @@ export function UsuariosListaPanel() {
               <TableHeader className="bg-muted/40">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="whitespace-nowrap font-bold">ID</TableHead>
-                  <TableHead className="whitespace-nowrap font-bold">Username</TableHead>
+                  <TableHead className="whitespace-nowrap font-bold">Usuario</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Correo</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Nombres</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Apellidos</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Teléfono</TableHead>
-                  <TableHead className="whitespace-nowrap font-bold">Tipo usuario</TableHead>
+                  {/*<TableHead className="whitespace-nowrap font-bold">Tipo usuario</TableHead>*/}
                   <TableHead className="whitespace-nowrap font-bold">Roles</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Estado</TableHead>
                   <TableHead className="min-w-[220px] text-center font-bold">Acciones</TableHead>
@@ -152,7 +119,7 @@ export function UsuariosListaPanel() {
                       <TableCell className="whitespace-nowrap text-sm">{u.nombres}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm">{u.apellidos || "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{u.telefono || "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">
+                      {/*<TableCell className="whitespace-nowrap text-xs">
                         {u.idTipoUsuario != null ? (
                           <span>
                             {u.idTipoUsuario}
@@ -163,7 +130,7 @@ export function UsuariosListaPanel() {
                         ) : (
                           "—"
                         )}
-                      </TableCell>
+                      </TableCell>*/}
                       <TableCell>
                         <div className="flex max-w-[200px] flex-wrap gap-1">
                           {rolItems.length ? (
@@ -199,7 +166,6 @@ export function UsuariosListaPanel() {
                             onClick={() => setEditId(u.idUsuario)}
                           >
                             <Edit2 className="size-3.5" />
-                            Editar
                           </Button>
                           <Button
                             type="button"
@@ -218,7 +184,6 @@ export function UsuariosListaPanel() {
                             onClick={() => setPermisosId(u.idUsuario)}
                           >
                             <Shield className="size-3.5" />
-                            Permisos
                           </Button>
                           <Button
                             type="button"
@@ -234,7 +199,6 @@ export function UsuariosListaPanel() {
                             onClick={() => !esMiUsuario && setDesactivarUsuario(u)}
                           >
                             <UserX className="size-3.5" />
-                            Desactivar
                           </Button>
                         </div>
                       </TableCell>
@@ -260,7 +224,7 @@ export function UsuariosListaPanel() {
         completos con <code className="text-[11px]">GET /api/Usuarios/{"{id}"}</code>.
       </p>
 
-      <NuevoUsuarioDialog open={openNuevo} onOpenChange={setOpenNuevo} />
+      <NuevoUsuarioDialog open={nuevoUsuarioOpen} onOpenChange={onNuevoUsuarioOpenChange} />
 
       <AsignarRolesUsuarioDialog
         open={Boolean(rolDialogUser)}

@@ -9,6 +9,15 @@ import { validateActualizarPermisosUsuario } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { buildUsuarioExcepcionRows, permisosMapFromUsuarioExcepciones, permKey, sortAcciones } from "@/pages/usuarios/permisosMatrix";
 
+const EMPTY = [];
+
+function mapsEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) {
+    if (b.get(k) !== v) return false;
+  }
+  return true;
+}
 
 export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
   const [localMap, setLocalMap] = useState(() => new Map());
@@ -18,21 +27,22 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
   const saveMut = useUsuarioPermisosExcepcionalesMutation();
 
   const acciones = useMemo(() => sortAcciones(catQ.data?.acciones ?? []), [catQ.data?.acciones]);
-  const modulos = catQ.data?.modulos ?? [];
+  const modulos = catQ.data?.modulos ?? EMPTY;
   const rows = useMemo(() => buildUsuarioExcepcionRows(modulos, acciones), [modulos, acciones]);
 
   useEffect(() => {
     if (!open || !rows.length) {
-      setLocalMap(new Map());
       return;
     }
     const fromServer = permisosMapFromUsuarioExcepciones(userQ.data?.permisosExcepcionales ?? []);
     const next = new Map();
     for (const row of rows) {
       const k = permKey(row.idModulo, row.idSubmodulo, row.idAccion);
-      next.set(k, fromServer.has(k) ? Boolean(fromServer.get(k)) : false);
+      next.set(k, fromServer.has(k) ? fromServer.get(k) ?? false : false);
     }
-    setLocalMap(next);
+    queueMicrotask(() => {
+      setLocalMap((prev) => (mapsEqual(prev, next) ? prev : next));
+    });
   }, [open, rows, userQ.data?.permisosExcepcionales]);
 
   const toggle = (row) => {
@@ -59,7 +69,7 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
     const permisosExcepcionales = rows.map((row) => ({
       idModulo: row.idModulo,
       idAccion: row.idAccion,
-      permitido: Boolean(localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion))),
+      permitido: localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion)) ?? false,
     }));
     const parsed = validateActualizarPermisosUsuario({ idUsuario, permisosExcepcionales });
     if (!parsed.success) {
@@ -131,7 +141,7 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
                             <input
                               type="checkbox"
                               className="size-4 accent-(--color-pagina-2)"
-                              checked={Boolean(localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion)))}
+                              checked={localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion)) ?? false}
                               onChange={() => toggle(row)}
                             />
                           </label>
