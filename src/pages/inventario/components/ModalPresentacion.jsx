@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
-const ModalCategoria = ({ open, onClose, onSave, data }) => {
+const ModalPresentacion = ({ open, onClose, onSave, data }) => {
   const [form, setForm] = useState({
     nombre: "",
     descripcion: "",
@@ -37,12 +37,13 @@ const ModalCategoria = ({ open, onClose, onSave, data }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-lg p-6 border-t-4 border-(--color-pagina)">
+      <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
 
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold">
-            {data ? "Editar Categoría" : "Nueva Categoría"}
+            {data ? "Editar Presentación" : "Nueva Presentación"}
           </h2>
+
           <button onClick={onClose}>
             <X />
           </button>
@@ -53,7 +54,7 @@ const ModalCategoria = ({ open, onClose, onSave, data }) => {
           <input
             value={form.nombre}
             onChange={(e) => handleChange("nombre", e.target.value)}
-            placeholder="Nombre"
+            placeholder="Nombre (Ej: Caja, Unidad, Pack)"
             className="w-full border p-3 rounded-lg"
           />
 
@@ -98,4 +99,4 @@ const ModalCategoria = ({ open, onClose, onSave, data }) => {
   );
 };
 
-export default ModalCategoria;
+export default ModalPresentacion;

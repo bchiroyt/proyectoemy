@@ -1,11 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { crearMarca } from "@/services/marcas";
+import { crearMarca, actualizarMarca } from "@/services/marcas";
 
-const ModalNuevaMarca = ({ open, onClose, onSave }) => {
+const ModalNuevaMarca = ({ open, onClose, onSave, marcaEditar }) => {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // 🔥 CARGAR DATOS SI ES EDICIÓN
+  useEffect(() => {
+    if (marcaEditar) {
+      setNombre(marcaEditar.nombre || "");
+      setDescripcion(marcaEditar.descripcion || "");
+    } else {
+      setNombre("");
+      setDescripcion("");
+    }
+  }, [marcaEditar, open]);
 
   if (!open) return null;
 
@@ -15,22 +26,31 @@ const ModalNuevaMarca = ({ open, onClose, onSave }) => {
     try {
       setLoading(true);
 
-      const response = await crearMarca({
-        nombre,
-        descripcion,
-      });
+      let response;
 
-      const nuevaMarca = response.data;
+      if (marcaEditar) {
+        // 🔥 EDITAR
+        response = await actualizarMarca(marcaEditar.idMarca, {
+          nombre,
+          descripcion,
+        });
+      } else {
+        // 🔥 CREAR
+        response = await crearMarca({
+          nombre,
+          descripcion,
+        });
+      }
 
-      onSave(nuevaMarca);
+      const marca = response.data || response;
 
-      setNombre("");
-      setDescripcion("");
+      onSave(marca);
+
       onClose();
 
     } catch (error) {
       console.error(error);
-      alert("Error al crear marca");
+      alert("Error al guardar marca");
     } finally {
       setLoading(false);
     }
@@ -41,7 +61,9 @@ const ModalNuevaMarca = ({ open, onClose, onSave }) => {
       <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
 
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold">Nueva Marca</h2>
+          <h2 className="font-semibold">
+            {marcaEditar ? "Editar Marca" : "Nueva Marca"}
+          </h2>
           <button onClick={onClose}>
             <X />
           </button>
@@ -68,7 +90,11 @@ const ModalNuevaMarca = ({ open, onClose, onSave }) => {
             disabled={loading}
             className="w-full bg-(--color-pagina-2) text-white py-3 rounded-xl"
           >
-            {loading ? "Guardando..." : "Guardar"}
+            {loading
+              ? "Guardando..."
+              : marcaEditar
+              ? "Actualizar"
+              : "Guardar"}
           </button>
 
         </div>
