@@ -60,7 +60,7 @@ const LoginPage = () => {
 
     setErrors({});
     try {
-      const { token, usuario } = await loginMut.mutateAsync({
+      const { token, usuario, tokenExpiraEn } = await loginMut.mutateAsync({
         email: result.data.email,
         password: result.data.password,
       });
@@ -69,7 +69,7 @@ const LoginPage = () => {
         return;
       }
       const user = buildSessionUser(usuario);
-      setLogin(user, token);
+      setLogin(user, token, { tokenExpiraEn });
       navigate("/panel-control", { replace: true });
     } catch (err) {
       setApiError(getApiErrorMessage(err, "No se pudo iniciar sesión. Verifica credenciales y conexión HTTPS."));

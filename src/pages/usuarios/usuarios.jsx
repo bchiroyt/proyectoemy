@@ -41,7 +41,7 @@ const Usuarios = () => {
             onClick={() => setTab("roles")}
           >
             <Shield className="mr-2 size-4" />
-            Roles y permisos
+            Permisos
           </Button>
         </div>
 

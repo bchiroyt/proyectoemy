@@ -1,247 +1,304 @@
--- Table: public.usuarios
+BEGIN;
 
--- DROP TABLE IF EXISTS public.usuarios;
+-- ============================================================
+-- CATALOGO: TIPOS DE USUARIO
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tipos_usuario (
+    id_tipo_usuario BIGSERIAL PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(250),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
 
-CREATE TABLE IF NOT EXISTS public.usuarios
-(
-    id_usuario bigint NOT NULL DEFAULT nextval('usuarios_id_usuario_seq'::regclass),
-    id_tipo_usuario bigint NOT NULL,
-    username character varying(80) COLLATE pg_catalog."default" NOT NULL,
-    email character varying(180) COLLATE pg_catalog."default" NOT NULL,
-    password_hash character varying(255) COLLATE pg_catalog."default" NOT NULL,
-    nombres character varying(120) COLLATE pg_catalog."default" NOT NULL,
-    apellidos character varying(120) COLLATE pg_catalog."default",
-    telefono character varying(30) COLLATE pg_catalog."default",
-    requiere_cambio_password boolean NOT NULL DEFAULT false,
-    ultimo_acceso timestamp with time zone,
-    activo boolean NOT NULL DEFAULT true,
-    fecha_creacion timestamp with time zone NOT NULL DEFAULT now(),
-    fecha_actualizacion timestamp with time zone,
-    creado_por bigint,
-    actualizado_por bigint,
-    CONSTRAINT usuarios_pkey PRIMARY KEY (id_usuario),
-    CONSTRAINT uq_usuarios_email UNIQUE (email),
-    CONSTRAINT uq_usuarios_username UNIQUE (username),
-    CONSTRAINT fk_usuarios_actualizado_por FOREIGN KEY (actualizado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT fk_usuarios_creado_por FOREIGN KEY (creado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT fk_usuarios_tipo_usuario FOREIGN KEY (id_tipo_usuario)
-        REFERENCES public.tipos_usuario (id_tipo_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
-    CONSTRAINT ck_usuarios_username_no_vacio CHECK (btrim(username::text) <> ''::text),
-    CONSTRAINT ck_usuarios_email_formato CHECK (email::text ~* '^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$'::text),
-    CONSTRAINT ck_usuarios_password_hash_no_vacio CHECK (btrim(password_hash::text) <> ''::text),
-    CONSTRAINT ck_usuarios_nombres_no_vacio CHECK (btrim(nombres::text) <> ''::text)
-)
-
-TABLESPACE pg_default;
-
-ALTER TABLE IF EXISTS public.usuarios
-    OWNER to postgres;
-
-
-
-    --Roles 
-    -- Table: public.roles
-
--- DROP TABLE IF EXISTS public.roles;
-
-CREATE TABLE IF NOT EXISTS public.roles
-(
-    id_rol bigint NOT NULL DEFAULT nextval('roles_id_rol_seq'::regclass),
-    codigo character varying(50) COLLATE pg_catalog."default" NOT NULL,
-    nombre character varying(100) COLLATE pg_catalog."default" NOT NULL,
-    descripcion character varying(250) COLLATE pg_catalog."default",
-    activo boolean NOT NULL DEFAULT true,
-    fecha_creacion timestamp with time zone NOT NULL DEFAULT now(),
-    fecha_actualizacion timestamp with time zone,
-    creado_por bigint,
-    actualizado_por bigint,
-    CONSTRAINT roles_pkey PRIMARY KEY (id_rol),
-    CONSTRAINT uq_roles_codigo UNIQUE (codigo),
-    CONSTRAINT uq_roles_nombre UNIQUE (nombre),
-    CONSTRAINT fk_roles_actualizado_por FOREIGN KEY (actualizado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT fk_roles_creado_por FOREIGN KEY (creado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT ck_roles_codigo_no_vacio CHECK (btrim(codigo::text) <> ''::text),
-    CONSTRAINT ck_roles_nombre_no_vacio CHECK (btrim(nombre::text) <> ''::text)
-)
-
-TABLESPACE pg_default;
-
-ALTER TABLE IF EXISTS public.roles
-    OWNER to postgres;
-
-
-    --permisos
-
-    -- Table: public.roles_permisos
-
--- DROP TABLE IF EXISTS public.roles_permisos;
-
-CREATE TABLE IF NOT EXISTS public.roles_permisos
-(
-    id_rol_permiso bigint NOT NULL DEFAULT nextval('roles_permisos_id_rol_permiso_seq'::regclass),
-    id_rol bigint NOT NULL,
-    id_modulo bigint NOT NULL,
-    id_submodulo bigint,
-    id_accion bigint NOT NULL,
-    permitido boolean NOT NULL DEFAULT true,
-    activo boolean NOT NULL DEFAULT true,
-    fecha_creacion timestamp with time zone NOT NULL DEFAULT now(),
-    fecha_actualizacion timestamp with time zone,
-    creado_por bigint,
-    actualizado_por bigint,
-    CONSTRAINT roles_permisos_pkey PRIMARY KEY (id_rol_permiso),
-    CONSTRAINT uq_roles_permisos_unico UNIQUE (id_rol, id_modulo, id_submodulo, id_accion),
-    CONSTRAINT fk_roles_permisos_accion FOREIGN KEY (id_accion)
-        REFERENCES public.acciones (id_accion) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
-    CONSTRAINT fk_roles_permisos_actualizado_por FOREIGN KEY (actualizado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT fk_roles_permisos_creado_por FOREIGN KEY (creado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT fk_roles_permisos_modulo FOREIGN KEY (id_modulo)
-        REFERENCES public.modulos (id_modulo) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-    CONSTRAINT fk_roles_permisos_rol FOREIGN KEY (id_rol)
-        REFERENCES public.roles (id_rol) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-    CONSTRAINT fk_roles_permisos_submodulo FOREIGN KEY (id_submodulo)
-        REFERENCES public.submodulos (id_submodulo) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
-)
-
-TABLESPACE pg_default;
-
-ALTER TABLE IF EXISTS public.roles_permisos
-    OWNER to postgres;
--- Index: idx_roles_permisos_id_submodulo
-
--- DROP INDEX IF EXISTS public.idx_roles_permisos_id_submodulo;
-
-CREATE INDEX IF NOT EXISTS idx_roles_permisos_id_submodulo
-    ON public.roles_permisos USING btree
-    (id_submodulo ASC NULLS LAST)
-    TABLESPACE pg_default;
--- Index: ux_roles_permisos_modulo_sin_submodulo
-
--- DROP INDEX IF EXISTS public.ux_roles_permisos_modulo_sin_submodulo;
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_roles_permisos_modulo_sin_submodulo
-    ON public.roles_permisos USING btree
-    (id_rol ASC NULLS LAST, id_modulo ASC NULLS LAST, id_accion ASC NULLS LAST)
-    TABLESPACE pg_default
-    WHERE id_submodulo IS NULL;
-
-    --Modulos 
-    -- Table: public.modulos
-
--- DROP TABLE IF EXISTS public.modulos;
-
-CREATE TABLE IF NOT EXISTS public.modulos
-(
-    id_modulo bigint NOT NULL DEFAULT nextval('modulos_id_modulo_seq'::regclass),
-    codigo character varying(80) COLLATE pg_catalog."default" NOT NULL,
-    nombre character varying(120) COLLATE pg_catalog."default" NOT NULL,
-    descripcion character varying(250) COLLATE pg_catalog."default",
-    ruta character varying(250) COLLATE pg_catalog."default",
-    icono character varying(80) COLLATE pg_catalog."default",
-    orden integer NOT NULL DEFAULT 0,
-    activo boolean NOT NULL DEFAULT true,
-    fecha_creacion timestamp with time zone NOT NULL DEFAULT now(),
-    fecha_actualizacion timestamp with time zone,
-    creado_por bigint,
-    actualizado_por bigint,
-    CONSTRAINT modulos_pkey PRIMARY KEY (id_modulo),
-    CONSTRAINT uq_modulos_codigo UNIQUE (codigo),
-    CONSTRAINT uq_modulos_nombre UNIQUE (nombre),
-    CONSTRAINT fk_modulos_actualizado_por FOREIGN KEY (actualizado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT fk_modulos_creado_por FOREIGN KEY (creado_por)
-        REFERENCES public.usuarios (id_usuario) MATCH SIMPLE
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-    CONSTRAINT ck_modulos_codigo_no_vacio CHECK (btrim(codigo::text) <> ''::text),
-    CONSTRAINT ck_modulos_nombre_no_vacio CHECK (btrim(nombre::text) <> ''::text),
-    CONSTRAINT ck_modulos_orden_no_negativo CHECK (orden >= 0)
-)
-
-TABLESPACE pg_default;
-
-ALTER TABLE IF EXISTS public.modulos
-    OWNER to postgres;
-
-    --Acciones 
-    -- Table: public.acciones
-
--- DROP TABLE IF EXISTS public.acciones;
-
-CREATE TABLE IF NOT EXISTS public.acciones
-(
-    id_accion bigint NOT NULL DEFAULT nextval('acciones_id_accion_seq'::regclass),
-    codigo character varying(20) COLLATE pg_catalog."default" NOT NULL,
-    nombre character varying(80) COLLATE pg_catalog."default" NOT NULL,
-    descripcion character varying(250) COLLATE pg_catalog."default",
-    activo boolean NOT NULL DEFAULT true,
-    fecha_creacion timestamp with time zone NOT NULL DEFAULT now(),
-    fecha_actualizacion timestamp with time zone,
-    CONSTRAINT acciones_pkey PRIMARY KEY (id_accion),
-    CONSTRAINT uq_acciones_codigo UNIQUE (codigo),
-    CONSTRAINT uq_acciones_nombre UNIQUE (nombre),
-    CONSTRAINT ck_acciones_codigo_valido CHECK (codigo::text = ANY (ARRAY['CREATE'::character varying, 'READ'::character varying, 'UPDATE'::character varying, 'DELETE'::character varying]::text[])),
-    CONSTRAINT ck_acciones_nombre_no_vacio CHECK (btrim(nombre::text) <> ''::text)
-)
-
-TABLESPACE pg_default;
-
-ALTER TABLE IF EXISTS public.acciones
-    OWNER to postgres;
-
-    --Tipo de usuarios
-
-    -- Table: public.tipos_usuario
-
--- DROP TABLE IF EXISTS public.tipos_usuario;
-
-CREATE TABLE IF NOT EXISTS public.tipos_usuario
-(
-    id_tipo_usuario bigint NOT NULL DEFAULT nextval('tipos_usuario_id_tipo_usuario_seq'::regclass),
-    codigo character varying(50) COLLATE pg_catalog."default" NOT NULL,
-    nombre character varying(100) COLLATE pg_catalog."default" NOT NULL,
-    descripcion character varying(250) COLLATE pg_catalog."default",
-    activo boolean NOT NULL DEFAULT true,
-    fecha_creacion timestamp with time zone NOT NULL DEFAULT now(),
-    fecha_actualizacion timestamp with time zone,
-    CONSTRAINT tipos_usuario_pkey PRIMARY KEY (id_tipo_usuario),
     CONSTRAINT uq_tipos_usuario_codigo UNIQUE (codigo),
     CONSTRAINT uq_tipos_usuario_nombre UNIQUE (nombre),
-    CONSTRAINT ck_tipos_usuario_codigo_no_vacio CHECK (btrim(codigo::text) <> ''::text),
-    CONSTRAINT ck_tipos_usuario_nombre_no_vacio CHECK (btrim(nombre::text) <> ''::text)
-)
+    CONSTRAINT ck_tipos_usuario_codigo_no_vacio CHECK (btrim(codigo) <> ''),
+    CONSTRAINT ck_tipos_usuario_nombre_no_vacio CHECK (btrim(nombre) <> '')
+);
 
-TABLESPACE pg_default;
+-- ============================================================
+-- CATALOGO: ACCIONES
+-- ============================================================
+CREATE TABLE IF NOT EXISTS acciones (
+    id_accion BIGSERIAL PRIMARY KEY,
+    codigo VARCHAR(20) NOT NULL,
+    nombre VARCHAR(80) NOT NULL,
+    descripcion VARCHAR(250),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
 
-ALTER TABLE IF EXISTS public.tipos_usuario
-    OWNER to postgres;
+    CONSTRAINT uq_acciones_codigo UNIQUE (codigo),
+    CONSTRAINT uq_acciones_nombre UNIQUE (nombre),
+    CONSTRAINT ck_acciones_codigo_valido CHECK (
+        codigo IN ('CREATE', 'READ', 'UPDATE', 'DELETE')
+    ),
+    CONSTRAINT ck_acciones_nombre_no_vacio CHECK (btrim(nombre) <> '')
+);
+
+-- ============================================================
+-- USUARIOS
+-- Nota:
+-- Se crea antes que roles/modulos/submodulos para permitir
+-- las FK autoreferenciales y futuras auditorias.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS usuarios (
+    id_usuario BIGSERIAL PRIMARY KEY,
+    id_tipo_usuario BIGINT NOT NULL,
+    username VARCHAR(80) NOT NULL,
+    email VARCHAR(180) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    nombres VARCHAR(120) NOT NULL,
+    apellidos VARCHAR(120),
+    telefono VARCHAR(30),
+    requiere_cambio_password BOOLEAN NOT NULL DEFAULT FALSE,
+    ultimo_acceso TIMESTAMPTZ,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
+    creado_por BIGINT,
+    actualizado_por BIGINT,
+
+    CONSTRAINT fk_usuarios_tipo_usuario
+        FOREIGN KEY (id_tipo_usuario)
+        REFERENCES tipos_usuario (id_tipo_usuario)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_usuarios_creado_por
+        FOREIGN KEY (creado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_usuarios_actualizado_por
+        FOREIGN KEY (actualizado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_usuarios_username UNIQUE (username),
+    CONSTRAINT uq_usuarios_email UNIQUE (email),
+    CONSTRAINT ck_usuarios_username_no_vacio CHECK (btrim(username) <> ''),
+    CONSTRAINT ck_usuarios_email_formato CHECK (
+        email ~* '^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$'
+    ),
+    CONSTRAINT ck_usuarios_password_hash_no_vacio CHECK (btrim(password_hash) <> ''),
+    CONSTRAINT ck_usuarios_nombres_no_vacio CHECK (btrim(nombres) <> '')
+);
+
+-- ============================================================
+-- ROLES
+-- ============================================================
+CREATE TABLE IF NOT EXISTS roles (
+    id_rol BIGSERIAL PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(250),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
+    creado_por BIGINT,
+    actualizado_por BIGINT,
+
+    CONSTRAINT fk_roles_creado_por
+        FOREIGN KEY (creado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_roles_actualizado_por
+        FOREIGN KEY (actualizado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_roles_codigo UNIQUE (codigo),
+    CONSTRAINT uq_roles_nombre UNIQUE (nombre),
+    CONSTRAINT ck_roles_codigo_no_vacio CHECK (btrim(codigo) <> ''),
+    CONSTRAINT ck_roles_nombre_no_vacio CHECK (btrim(nombre) <> '')
+);
+
+-- ============================================================
+-- MODULOS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS modulos (
+    id_modulo BIGSERIAL PRIMARY KEY,
+    codigo VARCHAR(80) NOT NULL,
+    nombre VARCHAR(120) NOT NULL,
+    descripcion VARCHAR(250),
+    ruta VARCHAR(250),
+    icono VARCHAR(80),
+    orden INTEGER NOT NULL DEFAULT 0,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
+    creado_por BIGINT,
+    actualizado_por BIGINT,
+
+    CONSTRAINT fk_modulos_creado_por
+        FOREIGN KEY (creado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_modulos_actualizado_por
+        FOREIGN KEY (actualizado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_modulos_codigo UNIQUE (codigo),
+    CONSTRAINT uq_modulos_nombre UNIQUE (nombre),
+    CONSTRAINT ck_modulos_codigo_no_vacio CHECK (btrim(codigo) <> ''),
+    CONSTRAINT ck_modulos_nombre_no_vacio CHECK (btrim(nombre) <> ''),
+    CONSTRAINT ck_modulos_orden_no_negativo CHECK (orden >= 0)
+);
+
+-- ============================================================
+-- SUBMODULOS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS submodulos (
+    id_submodulo BIGSERIAL PRIMARY KEY,
+    id_modulo BIGINT NOT NULL,
+    codigo VARCHAR(80) NOT NULL,
+    nombre VARCHAR(120) NOT NULL,
+    descripcion VARCHAR(250),
+    ruta VARCHAR(250),
+    icono VARCHAR(80),
+    orden INTEGER NOT NULL DEFAULT 0,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
+    creado_por BIGINT,
+    actualizado_por BIGINT,
+
+    CONSTRAINT fk_submodulos_modulo
+        FOREIGN KEY (id_modulo)
+        REFERENCES modulos (id_modulo)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_submodulos_creado_por
+        FOREIGN KEY (creado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_submodulos_actualizado_por
+        FOREIGN KEY (actualizado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_submodulos_modulo_codigo UNIQUE (id_modulo, codigo),
+    CONSTRAINT uq_submodulos_modulo_nombre UNIQUE (id_modulo, nombre),
+    CONSTRAINT ck_submodulos_codigo_no_vacio CHECK (btrim(codigo) <> ''),
+    CONSTRAINT ck_submodulos_nombre_no_vacio CHECK (btrim(nombre) <> ''),
+    CONSTRAINT ck_submodulos_orden_no_negativo CHECK (orden >= 0)
+);
+
+-- ============================================================
+-- RELACION USUARIOS - ROLES
+-- ============================================================
+CREATE TABLE IF NOT EXISTS usuarios_roles (
+    id_usuario_rol BIGSERIAL PRIMARY KEY,
+    id_usuario BIGINT NOT NULL,
+    id_rol BIGINT NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
+    creado_por BIGINT,
+    actualizado_por BIGINT,
+
+    CONSTRAINT fk_usuarios_roles_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_usuarios_roles_rol
+        FOREIGN KEY (id_rol)
+        REFERENCES roles (id_rol)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_usuarios_roles_creado_por
+        FOREIGN KEY (creado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_usuarios_roles_actualizado_por
+        FOREIGN KEY (actualizado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_usuarios_roles_usuario_rol UNIQUE (id_usuario, id_rol)
+);
+
+-- ============================================================
+-- PERMISOS POR ROL
+-- ============================================================
+CREATE TABLE IF NOT EXISTS roles_permisos (
+    id_rol_permiso BIGSERIAL PRIMARY KEY,
+    id_rol BIGINT NOT NULL,
+    id_modulo BIGINT NOT NULL,
+    id_submodulo BIGINT,
+    id_accion BIGINT NOT NULL,
+    permitido BOOLEAN NOT NULL DEFAULT TRUE,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_actualizacion TIMESTAMPTZ,
+    creado_por BIGINT,
+    actualizado_por BIGINT,
+
+    CONSTRAINT fk_roles_permisos_rol
+        FOREIGN KEY (id_rol)
+        REFERENCES roles (id_rol)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_roles_permisos_modulo
+        FOREIGN KEY (id_modulo)
+        REFERENCES modulos (id_modulo)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_roles_permisos_submodulo
+        FOREIGN KEY (id_submodulo)
+        REFERENCES submodulos (id_submodulo)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_roles_permisos_accion
+        FOREIGN KEY (id_accion)
+        REFERENCES acciones (id_accion)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_roles_permisos_creado_por
+        FOREIGN KEY (creado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_roles_permisos_actualizado_por
+        FOREIGN KEY (actualizado_por)
+        REFERENCES usuarios (id_usuario)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_roles_permisos_unico
+        UNIQUE (id_rol, id_modulo, id_submodulo, id_accion)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_roles_permisos_modulo_sin_submodulo
+    ON roles_permisos (id_rol, id_modulo, id_accion)
+    WHERE id_submodulo IS NULL;
+
+
+COMMIT;

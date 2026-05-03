@@ -6,16 +6,20 @@ export const useAuthStore = create(
         (set) => ({
             user: null,
             token: null,
+            /** ISO 8601 del backend (AuthLoginResponse.expiraEn), si está disponible */
+            tokenExpiraEn: null,
             isAuthenticated: false,
 
-            setLogin: (userData, token) => set({
-                user: userData,
-                token: token,
-                isAuthenticated: true
-            }),
+            setLogin: (userData, token, opts = {}) =>
+                set({
+                    user: userData,
+                    token,
+                    tokenExpiraEn: opts.tokenExpiraEn ?? null,
+                    isAuthenticated: true,
+                }),
 
             logout: () => {
-                set({ user: null, token: null, isAuthenticated: false });
+                set({ user: null, token: null, tokenExpiraEn: null, isAuthenticated: false });
                 // Opcional: limpiar el storage manualmente
                 localStorage.removeItem('auth-storage');
             },
