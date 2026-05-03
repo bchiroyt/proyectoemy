@@ -1,183 +1,222 @@
-import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import ModalPresentacion from "./components/ModalPresentacion";
 
-const Gestionpresentaciones = () => {
-  const [presentaciones, setpresentaciones] = useState([
-    { id: 1, nombre: "Ropa", descripcion: "Productos textiles", estado: "Activo" },
-    { id: 2, nombre: "Calzado", descripcion: "Zapatos y sandalias", estado: "Activo" },
-  ]);
+import {
+  obtenerPresentaciones,
+  crearPresentacion,
+  actualizarPresentacion,
+  eliminarPresentacion,
+} from "@/services/presentaciones";
 
+const GestionPresentacion = () => {
+  const navigate = useNavigate();
+
+  // --- ESTADOS ---
+  const [presentaciones, setPresentaciones] = useState([]);
+  const [loading, setLoading] = useState(false); // Opcional: para feedback visual
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
 
-  const handleGuardar = (data) => {
-    if (editando) {
-      setpresentaciones(presentaciones.map(c =>
-        c.id === editando.id ? { ...c, ...data } : c
-      ));
-    } else {
-      setpresentaciones([
-        ...presentaciones,
-        { id: Date.now(), ...data }
-      ]);
-    }
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [presentacionAEliminar, setPresentacionAEliminar] = useState(null);
 
-    setOpenModal(false);
-    setEditando(null);
+  // --- FUNCIONES ---
+
+  // CARGAR - Envuelta en useCallback para evitar el warning de image_742168.png
+  const fetchPresentaciones = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await obtenerPresentaciones({
+        Activo: true,
+        Page: 1,
+        PageSize: 10,
+      });
+      setPresentaciones(data.items || []);
+    } catch (error) {
+      console.error("Error al obtener presentaciones:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Efecto inicial de carga
+  useEffect(() => {
+    fetchPresentaciones();
+  }, [fetchPresentaciones]);
+
+  // GUARDAR (Crear o Editar)
+  const handleGuardar = async (form) => {
+    try {
+      if (editando) {
+        await actualizarPresentacion(editando.idPresentacion, form);
+      } else {
+        await crearPresentacion(form);
+      }
+      
+      // Refrescar lista y cerrar modal
+      await fetchPresentaciones();
+      setOpenModal(false);
+      setEditando(null);
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      alert("No se pudo guardar la presentación.");
+    }
   };
 
-  const handleEditar = (presentacion) => {
-    setEditando(presentacion);
+  // EDITAR (Abrir modal con datos)
+  const handleEditar = (p) => {
+    setEditando(p);
     setOpenModal(true);
   };
 
-  const handleEliminar = (id) => {
-    setpresentaciones(presentaciones.filter(c => c.id !== id));
+  // ELIMINAR (Manejo de confirmación)
+  const handleEliminarClick = (p) => {
+    setPresentacionAEliminar(p);
+    setDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!presentacionAEliminar) return;
+    
+    try {
+      await eliminarPresentacion(presentacionAEliminar.idPresentacion);
+      await fetchPresentaciones();
+    } catch (error) {
+      console.error("Error al eliminar:", error);
+      alert("Error al intentar eliminar.");
+    } finally {
+      setDeleteModal(false);
+      setPresentacionAEliminar(null);
+    }
   };
 
   return (
     <div className="p-6 space-y-6">
-
       <h1 className="text-2xl font-semibold text-(--color-pagina)">
-        Gestión de presentaciones
+        Gestión de Presentaciones
       </h1>
 
-      <button
-        onClick={() => {
-          setEditando(null);
-          setOpenModal(true);
-        }}
-        className="bg-(--color-pagina) text-white px-5 py-2 rounded-xl"
-      >
-        + Crear presentacion
-      </button>
+      <div className="flex justify-between items-center">
+        <button
+          onClick={() => {
+            setEditando(null);
+            setOpenModal(true);
+          }}
+          className="bg-(--color-pagina) text-white px-5 py-2 rounded-xl hover:opacity-90 transition-opacity"
+        >
+          + Crear Presentación
+        </button>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+        <button
+          onClick={() => navigate("/inventario")}
+          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Regresar
+        </button>
+      </div>
 
-          <thead className="bg-gray-100 text-left">
+      {/* TABLA */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-gray-50 text-gray-600 font-medium border-b">
             <tr>
-              <th className="p-3">ID</th>
-              <th className="p-3">Nombre</th>
-              <th className="p-3">Descripción</th>
-              <th className="p-3">Estado</th>
-              <th className="p-3">Acciones</th>
+              <th className="p-4">ID</th>
+              <th className="p-4">Nombre</th>
+              <th className="p-4">Descripción</th>
+              <th className="p-4">Estado</th>
+              <th className="p-4 text-center">Acciones</th>
             </tr>
           </thead>
 
-          <tbody>
-            {presentaciones.map((cat) => (
-              <tr key={cat.id} className="border-t">
-
-                <td className="p-3">{cat.id}</td>
-                <td className="p-3">{cat.nombre}</td>
-                <td className="p-3">{cat.descripcion}</td>
-                <td className="p-3">{cat.estado}</td>
-
-                <td className="p-3 flex gap-2">
-                  <button
-                    onClick={() => handleEditar(cat)}
-                    className="p-2 bg-gray-100 rounded-lg"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() => handleEliminar(cat.id)}
-                    className="p-2 bg-red-100 rounded-lg"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </button>
+          <tbody className="divide-y divide-gray-100">
+            {loading ? (
+              <tr>
+                <td colSpan="5" className="p-10 text-center text-gray-400">
+                  Cargando presentaciones...
                 </td>
-
               </tr>
-            ))}
+            ) : presentaciones.length > 0 ? (
+              presentaciones.map((p) => (
+                <tr key={p.idPresentacion} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4 font-medium">{p.idPresentacion}</td>
+                  <td className="p-4">{p.nombre}</td>
+                  <td className="p-4 text-gray-500">{p.descripcion || "Sin descripción"}</td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 rounded-full text-xs ${p.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {p.activo ? "Activo" : "Inactivo"}
+                    </span>
+                  </td>
+                  <td className="p-4 flex justify-center gap-2">
+                    <button
+                      onClick={() => handleEditar(p)}
+                      className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                      title="Editar"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEliminarClick(p)}
+                      className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" className="p-10 text-center text-gray-400">
+                  No se encontraron presentaciones.
+                </td>
+              </tr>
+            )}
           </tbody>
-
         </table>
       </div>
 
-      <Modalpresentacion
+      {/* MODAL FORMULARIO */}
+      <ModalPresentacion
         open={openModal}
-        onClose={() => setOpenModal(false)}
+        onClose={() => {
+          setOpenModal(false);
+          setEditando(null);
+        }}
         onSave={handleGuardar}
         data={editando}
       />
 
-    </div>
-  );
-};
+      {/* MODAL CONFIRMACIÓN ELIMINAR */}
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">¿Confirmar eliminación?</h2>
+            <p className="text-gray-500">
+              Estás a punto de eliminar la presentación <span className="font-semibold text-gray-700">"{presentacionAEliminar?.nombre}"</span>. Esta acción no se puede deshacer.
+            </p>
 
-export default Gestionpresentaciones;
-
-
-
-const Modalpresentacion = ({ open, onClose, onSave, data }) => {
-  const [nombre, setNombre] = useState(data?.nombre || "");
-  const [descripcion, setDescripcion] = useState(data?.descripcion || "");
-  const [estado, setEstado] = useState(data?.estado || "Activo");
-
-  if (!open) return null;
-
-  const handleSave = () => {
-    onSave({ nombre, descripcion, estado });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-      <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
-
-        <h2 className="text-lg font-semibold mb-4">
-          {data ? "Editar Categoría" : "Nueva Categoría"}
-        </h2>
-
-        <div className="space-y-4">
-
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Nombre"
-            className="w-full border p-3 rounded-lg"
-          />
-
-          <textarea
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Descripción"
-            className="w-full border p-3 rounded-lg"
-          />
-
-          <select
-            value={estado}
-            onChange={(e) => setEstado(e.target.value)}
-            className="w-full border p-3 rounded-lg"
-          >
-            <option>Activo</option>
-            <option>Inactivo</option>
-          </select>
-
-          <div className="flex justify-end gap-2 pt-4">
-
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border rounded-lg"
-            >
-              Cancelar
-            </button>
-
-            <button
-              onClick={handleSave}
-              className="bg-(--color-pagina) text-white px-4 py-2 rounded-lg"
-            >
-              Guardar
-            </button>
-
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                onClick={() => setDeleteModal(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
+              >
+                Sí, eliminar
+              </button>
+            </div>
           </div>
-
         </div>
-
-      </div>
+      )}
     </div>
   );
 };
+
+export default GestionPresentacion;

@@ -1,205 +1,184 @@
-import { useState } from "react";
-import { Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Trash2, ArrowLeft, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ModalNuevaMarca from "./components/ModalNuevaMarca";
+import ModalConfirmacion from "./components/ModalConfirmacion";
+import { obtenerMarcas, eliminarMarca } from "@/services/marcas";
 
 const GestionMarcas = () => {
   const navigate = useNavigate();
 
-  const [marcas, setMarcas] = useState([
-    { id: 1, nombre: "Ropa", descripcion: "Productos textiles", estado: "Activo" },
-    { id: 2, nombre: "Calzado", descripcion: "Zapatos y sandalias", estado: "Activo" },
-  ]);
-
+  const [marcas, setMarcas] = useState([]);
   const [openModal, setOpenModal] = useState(false);
-  const [editando, setEditando] = useState(null);
 
-  const handleGuardar = (data) => {
-    if (editando) {
-      setMarcas(marcas.map(c =>
-        c.id === editando.id ? { ...c, ...data } : c
-      ));
+  // 🔥 EDITAR
+  const [marcaEditar, setMarcaEditar] = useState(null);
+
+  // 🔥 ELIMINAR
+  const [openConfirm, setOpenConfirm] = useState(false);
+  const [marcaAEliminar, setMarcaAEliminar] = useState(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
+
+  // 🔥 CARGAR (Original)
+  useEffect(() => {
+    const fetchMarcas = async () => {
+      try {
+        const data = await obtenerMarcas();
+        setMarcas(data || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchMarcas();
+  }, []);
+
+  // 🔥 GUARDAR / ACTUALIZAR
+  const handleGuardar = (marca) => {
+    if (marcaEditar) {
+      setMarcas((prev) =>
+        prev.map((m) => (m.idMarca === marca.idMarca ? marca : m))
+      );
     } else {
-      setMarcas([
-        ...marcas,
-        { id: Date.now(), ...data }
-      ]);
+      setMarcas((prev) => [...prev, marca]);
     }
 
+    setMarcaEditar(null);
     setOpenModal(false);
-    setEditando(null);
   };
 
+  // 🔥 EDITAR CLICK
   const handleEditar = (marca) => {
-    setEditando(marca);
+    setMarcaEditar(marca);
     setOpenModal(true);
   };
 
-  const handleEliminar = (id) => {
-    setMarcas(marcas.filter(c => c.id !== id));
+  // 🔥 ELIMINAR CLICK
+  const handleEliminarClick = (marca) => {
+    setMarcaAEliminar(marca);
+    setOpenConfirm(true);
+  };
+
+  // 🔥 ELIMINAR CONFIRMADO
+  const handleEliminarConfirmado = async () => {
+    if (!marcaAEliminar) return;
+
+    try {
+      setLoadingDelete(true);
+      await eliminarMarca(marcaAEliminar.idMarca);
+
+      setMarcas((prev) =>
+        prev.filter((m) => m.idMarca !== marcaAEliminar.idMarca)
+      );
+
+      setOpenConfirm(false);
+      setMarcaAEliminar(null);
+    } catch (error) {
+      console.error(error);
+      alert("Error al eliminar");
+    } finally {
+      setLoadingDelete(false);
+    }
   };
 
   return (
     <div className="p-6 space-y-6">
-
-      {/* HEADER */}
       <h1 className="text-2xl font-semibold text-(--color-pagina)">
         Gestión de Marcas
       </h1>
 
-      {/* BOTÓN DE REGRESAR */}
       <div className="flex justify-between items-center">
-
-        {/* BOTÓN CREAR */}
         <button
           onClick={() => {
-            setEditando(null);
+            setMarcaEditar(null);
             setOpenModal(true);
           }}
-          className="bg-(--color-pagina) text-white px-5 py-2 rounded-xl hover:opacity-90"
+          className="bg-(--color-pagina) text-white px-5 py-2 rounded-xl hover:opacity-90 transition-opacity"
         >
           + Crear Marca
         </button>
 
-        {/* 👇 AQUÍ ESTÁ EL BOTÓN DE REGRESAR */}
+        {/* BOTÓN REGRESAR AÑADIDO Y CORREGIDO */}
         <button
           onClick={() => navigate("/inventario")}
-          className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-100 transition"
+          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Regresar
         </button>
-
       </div>
 
-      {/* TABLA */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-
-          <thead className="bg-gray-100 text-left">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-gray-100 text-gray-600 font-medium">
             <tr>
-              <th className="p-3">ID</th>
-              <th className="p-3">Nombre</th>
-              <th className="p-3">Descripción</th>
-              <th className="p-3">Estado</th>
-              <th className="p-3">Acciones</th>
+              <th className="p-4">ID</th>
+              <th className="p-4">Nombre</th>
+              <th className="p-4">Descripción</th>
+              <th className="p-4 text-center">Acciones</th>
             </tr>
           </thead>
 
-          <tbody>
-            {marcas.map((cat) => (
-              <tr key={cat.id} className="border-t">
+          <tbody className="divide-y divide-gray-100">
+            {marcas.length > 0 ? (
+              marcas.map((m) => (
+                <tr key={m.idMarca} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4 font-medium">{m.idMarca}</td>
+                  <td className="p-4">{m.nombre}</td>
+                  <td className="p-4 text-gray-500">{m.descripcion || "Sin descripción"}</td>
 
-                <td className="p-3">{cat.id}</td>
-                <td className="p-3">{cat.nombre}</td>
-                <td className="p-3">{cat.descripcion}</td>
-                <td className="p-3">{cat.estado}</td>
+                  <td className="p-4 flex justify-center gap-2">
+                    <button
+                      onClick={() => handleEditar(m)}
+                      className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                      title="Editar"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
 
-                <td className="p-3 flex gap-2">
-                  <button
-                    onClick={() => handleEditar(cat)}
-                    className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() => handleEliminar(cat.id)}
-                    className="p-2 bg-red-100 rounded-lg hover:bg-red-200"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </button>
+                    <button
+                      onClick={() => handleEliminarClick(m)}
+                      className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="4" className="p-10 text-center text-gray-400">
+                  No hay marcas disponibles.
                 </td>
-
               </tr>
-            ))}
+            )}
           </tbody>
-
         </table>
       </div>
 
-      {/* MODAL */}
-      <ModalMarca
+      {/* MODAL CREAR / EDITAR */}
+      <ModalNuevaMarca
         open={openModal}
-        onClose={() => setOpenModal(false)}
+        onClose={() => {
+          setOpenModal(false);
+          setMarcaEditar(null);
+        }}
         onSave={handleGuardar}
-        data={editando}
+        marcaEditar={marcaEditar}
       />
 
+      {/* MODAL ELIMINAR */}
+      <ModalConfirmacion
+        open={openConfirm}
+        onClose={() => setOpenConfirm(false)}
+        onConfirm={handleEliminarConfirmado}
+        loading={loadingDelete}
+        titulo="Eliminar marca"
+        mensaje={`¿Seguro que quieres eliminar "${marcaAEliminar?.nombre}"?`}
+      />
     </div>
   );
 };
 
 export default GestionMarcas;
-
-
-/* MODAL */
-
-const ModalMarca = ({ open, onClose, onSave, data }) => {
-  const [nombre, setNombre] = useState(data?.nombre || "");
-  const [descripcion, setDescripcion] = useState(data?.descripcion || "");
-  const [estado, setEstado] = useState(data?.estado || "Activo");
-
-  if (!open) return null;
-
-  const handleSave = () => {
-    onSave({ nombre, descripcion, estado });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-      <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
-
-        <h2 className="text-lg font-semibold mb-4">
-          {data ? "Editar Marca" : "Nueva Marca"}
-        </h2>
-
-        <div className="space-y-4">
-
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Nombre"
-            className="w-full border p-3 rounded-lg"
-          />
-
-          <textarea
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Descripción"
-            className="w-full border p-3 rounded-lg"
-          />
-
-          <select
-            value={estado}
-            onChange={(e) => setEstado(e.target.value)}
-            className="w-full border p-3 rounded-lg"
-          >
-            <option>Activo</option>
-            <option>Inactivo</option>
-          </select>
-
-          <div className="flex justify-end gap-2 pt-4">
-
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border rounded-lg"
-            >
-              Cancelar
-            </button>
-
-            <button
-              onClick={handleSave}
-              className="bg-(--color-pagina) text-white px-4 py-2 rounded-lg"
-            >
-              Guardar
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-    </div>
-  );
-};

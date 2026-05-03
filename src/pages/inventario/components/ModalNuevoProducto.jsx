@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, ArrowLeft, Plus } from "lucide-react";
 import ModalNuevaMarca from "./ModalNuevaMarca";
 import ModalAgregarSimple from "./ModalAgregarSimple";
+import { obtenerMarcas } from "@/services/marcas";
 
 const ModalNuevoProducto = ({ open, onClose }) => {
   const [step, setStep] = useState(1);
 
-  // STEP 1
+  // 🔥 MARCAS (BACKEND)
   const [marcas, setMarcas] = useState([]);
   const [marcaSeleccionada, setMarcaSeleccionada] = useState("");
   const [openMarcaModal, setOpenMarcaModal] = useState(false);
@@ -29,6 +30,20 @@ const ModalNuevoProducto = ({ open, onClose }) => {
   const [openTallaModal, setOpenTallaModal] = useState(false);
   const [openColorModal, setOpenColorModal] = useState(false);
   const [openUbicacionModal, setOpenUbicacionModal] = useState(false);
+
+  // 🔥 CARGAR MARCAS DESDE BACKEND
+  useEffect(() => {
+    const fetchMarcas = async () => {
+      try {
+        const res = await obtenerMarcas();
+        setMarcas(res.data?.items || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    if (open) fetchMarcas();
+  }, [open]);
 
   if (!open) return null;
 
@@ -69,10 +84,9 @@ const ModalNuevoProducto = ({ open, onClose }) => {
 
             <select className="w-full p-3 border rounded-lg">
               <option>Seleccionar categoría</option>
-              <option>Ropa</option>
-              <option>Calzado</option>
             </select>
 
+            {/* 🔥 MARCAS DINÁMICAS */}
             <div className="flex gap-2">
               <select
                 value={marcaSeleccionada}
@@ -80,8 +94,11 @@ const ModalNuevoProducto = ({ open, onClose }) => {
                 className="flex-1 p-3 border rounded-lg"
               >
                 <option value="">Seleccionar marca</option>
-                {marcas.map((m, i) => (
-                  <option key={i}>{m}</option>
+
+                {marcas.map((m) => (
+                  <option key={m.idMarca} value={m.idMarca}>
+                    {m.nombre}
+                  </option>
                 ))}
               </select>
 
@@ -119,7 +136,6 @@ const ModalNuevoProducto = ({ open, onClose }) => {
                 <input placeholder="SKU Base" className="border p-3 rounded-lg" />
               </div>
 
-              {/* PRESENTACIÓN */}
               <div className="flex gap-2">
                 <select
                   value={presentacionSeleccionada}
@@ -142,7 +158,6 @@ const ModalNuevoProducto = ({ open, onClose }) => {
 
             </div>
 
-            {/* VARIANTES */}
             <div className="bg-gray-50 p-4 rounded-xl space-y-4">
 
               <div className="grid grid-cols-3 gap-4">
@@ -201,16 +216,17 @@ const ModalNuevoProducto = ({ open, onClose }) => {
 
       </div>
 
-      {/* MODALES */}
+      {/* 🔥 MODAL MARCA CON BACKEND */}
       <ModalNuevaMarca
         open={openMarcaModal}
         onClose={() => setOpenMarcaModal(false)}
-        onSave={(valor) => {
-          setMarcas([...marcas, valor]);
-          setMarcaSeleccionada(valor);
+        onSave={(nuevaMarca) => {
+          setMarcas([...marcas, nuevaMarca]);
+          setMarcaSeleccionada(nuevaMarca.idMarca);
         }}
       />
 
+      {/* DEMÁS MODALES */}
       <ModalAgregarSimple
         open={openPresentacionModal}
         onClose={() => setOpenPresentacionModal(false)}
