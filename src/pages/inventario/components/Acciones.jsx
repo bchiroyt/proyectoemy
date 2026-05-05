@@ -5,7 +5,7 @@ const Acciones = () => {
         + Crear Nuevo Producto
       </button>
 
-      <button className="bg-green-700 hover:bg-green-800 text-white px-6 py-3 rounded-xl shadow-md transition w-full sm:w-auto">
+      <button className="bg-green-700 hover:bg-green-800 text-(--color-pagina) px-6 py-3 rounded-xl shadow-md transition w-full sm:w-auto">
         Nueva Compra
       </button>
     </div>
