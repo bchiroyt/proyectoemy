@@ -11,27 +11,36 @@ import {
 } from "@/services/comprasService";
 import { buscarVariantesCompra } from "@/services/productosService";
 import { fetchProveedores } from "@/services/proveedoresService";
+import { pick } from "@/lib/apiNormalizer";
 
 function unwrapPaged(resp) {
-  const inner = resp?.data ?? resp?.Data;
-  const items = inner?.items ?? inner?.Items ?? [];
-  const page = inner?.page ?? inner?.Page ?? 1;
-  const pageSize = inner?.pageSize ?? inner?.PageSize ?? 10;
-  const totalRecords = inner?.totalRecords ?? inner?.TotalRecords ?? 0;
-  const totalPages = inner?.totalPages ?? inner?.TotalPages ?? 1;
-  return { items, page, pageSize, totalRecords, totalPages };
+  const inner = pick(resp, "data", "Data") ?? resp;
+  const items = pick(inner, "items", "Items") ?? [];
+  const page = Number(pick(inner, "page", "Page") ?? 1) || 1;
+  const pageSize = Number(pick(inner, "pageSize", "PageSize") ?? 10) || 10;
+  const totalCount = Number(
+    pick(inner, "totalCount", "TotalCount", "totalRecords", "TotalRecords") ?? 0
+  ) || 0;
+  const totalPages = Number(pick(inner, "totalPages", "TotalPages") ?? 1) || 1;
+  return { items: Array.isArray(items) ? items : [], page, pageSize, totalCount, totalPages };
 }
 
-export function useComprasListQuery({ page, pageSize, numeroOrden, estadoCompra }) {
+export function useComprasListQuery({ page = 1, pageSize = 10, search = "", estadoCompra, ...options } = {}) {
   return useQuery({
-    queryKey: ["compras", "lista", { page, pageSize, numeroOrden, estadoCompra }],
+    queryKey: ["compras", "lista", { page, pageSize, search, estadoCompra }],
     queryFn: async () => {
-      const raw = await fetchCompras({ page, pageSize, numeroOrden, estadoCompra });
+      const raw = await fetchCompras({
+        page,
+        pageSize,
+        numeroOrden: search || undefined,
+        estadoCompra,
+      });
       if (raw && raw.exito === false) {
         throw new Error(raw.mensaje || raw.Mensaje || "Error al cargar compras");
       }
       return unwrapPaged(raw);
     },
+    ...options,
   });
 }
 

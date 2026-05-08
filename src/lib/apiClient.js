@@ -3,9 +3,7 @@ import { useAuthStore } from "@/context/useAuthStore";
 
 const fromEnv = import.meta.env.VITE_API_BASE_URL?.trim?.() ?? "";
 
-const baseURL =
-  fromEnv ||
-  (import.meta.env.DEV ? "https://localhost:7199" : "");
+const baseURL = fromEnv;
 if (!baseURL) {
   throw new Error(
     "Falta VITE_API_BASE_URL. Crea frontendemy/.env con VITE_API_BASE_URL=https://tu-api (sin barra final)."

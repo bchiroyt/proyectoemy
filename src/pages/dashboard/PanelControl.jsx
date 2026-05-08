@@ -74,7 +74,7 @@ const PanelControl = () => {
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-200/80 rounded-xl md:rounded-2xl border border-slate-200/60">
-            className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-200/80 rounded-xl md:rounded-2xl border border-slate-200/60"
+            
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5 md:p-8">
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 max-w-7xl w-full mx-auto pb-2">

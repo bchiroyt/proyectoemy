@@ -16,8 +16,15 @@ const MainLayout = ({ children }) => {
                     <div className="flex-1 flex flex-col min-w-0 min-h-0">
                         <Header />
 
-                        <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                        {/*<main className="flex-1 min-h-0 flex flex-col overflow-hidden">
                             <div className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 flex flex-col px-2 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
+                                {children}
+                            </div>
+                        </main>
+                        */}
+                        <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                        {/* Quitamos max-w, mx-auto y los px/py de aquí */}
+                            <div className="w-full flex-1 min-h-0 flex flex-col">
                                 {children}
                             </div>
                         </main>

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Edit2, Shield, UserX } from "lucide-react";
-import { useUsuariosQuery, useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
+import { useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
 import { useAuthStore } from "@/context/useAuthStore";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { AsignarRolesUsuarioDialog } from "./AsignarRolesUsuarioDialog";
@@ -50,6 +50,10 @@ function sameUserId(a, b) {
 }
 
 export function UsuariosListaPanel({
+  usuarios = [],
+  isLoading = false,
+  isError = false,
+  error = null,
   searchQuery = "",
   nuevoUsuarioOpen = false,
   onNuevoUsuarioOpenChange,
@@ -59,10 +63,9 @@ export function UsuariosListaPanel({
   const [permisosId, setPermisosId] = useState(null);
   const [desactivarUsuario, setDesactivarUsuario] = useState(null);
   const miUsuarioId = useAuthStore((s) => s.user?.idUsuario);
-  const usuariosQ = useUsuariosQuery();
   const rolesQ = useRolesQuery();
 
-  const lista = usuariosQ.data ?? [];
+  const lista = usuarios ?? [];
   const filtrados = useMemo(() => lista.filter((u) => matchesQuery(u, searchQuery)), [lista, searchQuery]);
 
   const filteredHint = useMemo(
@@ -79,15 +82,15 @@ export function UsuariosListaPanel({
         </span>
       </p>
 
-      {usuariosQ.isLoading ? (
+      {isLoading ? (
         <div className="space-y-2 rounded-lg border border-border bg-(--color-blanco) p-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-      ) : usuariosQ.isError ? (
+      ) : isError ? (
         <div className="rounded-lg border border-destructive/30 bg-(--color-blanco) p-4 text-sm text-(--color-rojo)">
-          {getApiErrorMessage(usuariosQ.error, "No se pudieron cargar los usuarios.")}
+          {getApiErrorMessage(error, "No se pudieron cargar los usuarios.")}
         </div>
       ) : (
         <ScrollArea className="w-full rounded-lg border border-border bg-(--color-blanco) shadow-sm">

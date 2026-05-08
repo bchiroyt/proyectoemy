@@ -299,7 +299,7 @@ const NuevaCompra = () => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pb-3 border-b border-slate-200/80">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pb-3 border-b border-(--color-gris-claro-2)">
         <Button variant="ghost" size="sm" className="gap-1.5 w-fit -ml-2" asChild>
           <Link to="/compras">
             <ArrowLeft className="size-4" />
@@ -307,10 +307,10 @@ const NuevaCompra = () => {
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+          <h2 className="text-lg sm:text-xl font-bold text-(--color-negro)">
             {isEdit ? "Editar orden de compra" : "Nueva Orden de Compra"}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
+          <p className="text-xs sm:text-sm text-(--color-gris-letra)">
             Gestión de suministros y entrada de inventario
             {isEdit ? (
               <span className="ml-1 font-mono text-(--color-pagina)">· #{idCompraEdit}</span>
@@ -318,9 +318,9 @@ const NuevaCompra = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-center">
-          <Avatar className="size-9 border border-slate-200">
+          <Avatar className="size-9 border border-(--color-gris-claro-2)">
             <AvatarImage src="" alt="" />
-            <AvatarFallback className="bg-(--color-pagina) text-white text-sm font-bold">
+            <AvatarFallback className="bg-(--color-pagina) text-(--color-blanco) text-sm font-bold">
               AD
             </AvatarFallback>
           </Avatar>
@@ -328,31 +328,31 @@ const NuevaCompra = () => {
       </div>
 
       {loadErrEdit ? (
-        <p className="text-sm text-red-600 py-4">{getApiErrorMessage(compraQ.error)}</p>
+        <p className="text-sm text-(--color-rojo) py-4">{getApiErrorMessage(compraQ.error)}</p>
       ) : null}
 
       {formError ? (
-        <p className="text-sm text-red-600 py-2" role="alert">
+        <p className="text-sm text-(--color-rojo) py-2" role="alert">
           {formError}
         </p>
       ) : null}
 
       <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4">
-        <Card className="border-slate-200 shadow-sm">
+        <Card className="border-(--color-gris-claro-2) shadow-sm">
           <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-bold text-slate-800">
+            <CardTitle className="text-sm font-bold text-(--color-negro)">
               Datos generales de la orden
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-slate-500">Proveedor</Label>
+                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">Proveedor</Label>
                 {provQ.isLoading ? (
-                  <div className="h-10 rounded-md bg-slate-100 animate-pulse" />
+                  <div className="h-10 rounded-md bg-(--color-gris-claro-2) animate-pulse" />
                 ) : (
                   <Select value={proveedor} onValueChange={setProveedor} disabled={loadingEdit}>
-                    <SelectTrigger className="bg-slate-50 h-10">
+                    <SelectTrigger className="bg-(--color-gris-claro-2) h-10">
                       <SelectValue placeholder="Seleccione…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -366,35 +366,35 @@ const NuevaCompra = () => {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-slate-500">
+                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
                   Fecha de pedido
                 </Label>
                 <Input
                   type="date"
                   value={fechaPedido}
                   onChange={(e) => setFechaPedido(e.target.value)}
-                  className="bg-slate-50 h-10"
+                  className="bg-(--color-gris-claro-2) h-10"
                   disabled={loadingEdit}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-slate-500">
+                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
                   No. documento / Ref.
                 </Label>
                 <Input
                   value={documentoRef}
                   onChange={(e) => setDocumentoRef(e.target.value)}
                   placeholder="REF-00123"
-                  className="bg-slate-50 h-10"
+                  className="bg-(--color-gris-claro-2) h-10"
                   disabled={loadingEdit}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-slate-500">
+                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
                   Tipo comprobante (id)
                 </Label>
                 <Select value={tipoComprobante} onValueChange={setTipoComprobante} disabled={loadingEdit}>
-                  <SelectTrigger className="bg-slate-50 h-10">
+                  <SelectTrigger className="bg-(--color-gris-claro-2) h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -411,25 +411,25 @@ const NuevaCompra = () => {
         <div className="grid gap-4 xl:grid-cols-[1fr_320px] items-start">
           <div className="space-y-4 min-w-0">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-teal-600/70" />
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-(--color-pagina)" />
               <Input
                 placeholder="Buscar variantes por nombre, SKU o código…"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 className={cn(
-                  "pl-10 h-11 border-teal-100",
-                  "bg-teal-50/60 placeholder:text-slate-500 focus-visible:ring-teal-200"
+                  "pl-10 h-11 border-(--color-gris-claro-2)",
+                  "bg-(--color-gris-claro-2) placeholder:text-(--color-gris-letra) focus-visible:ring-(--color-gris-claro-2)"
                 )}
                 disabled={loadingEdit}
               />
             </div>
 
             {variantesQ.isFetching ? (
-              <p className="text-xs text-slate-500">Buscando…</p>
+              <p className="text-xs text-(--color-gris-letra)">Buscando…</p>
             ) : null}
 
             {variantesResultado.length > 0 && debouncedCriterio.length >= 1 && (
-              <Card className="border-teal-100 bg-white shadow-sm">
+              <Card className="border-(--color-gris-claro-2) bg-(--color-blanco) shadow-sm">
                 <CardContent className="p-2 max-h-48 overflow-y-auto">
                   {variantesResultado.map((v) => {
                     const idVariante = v.idVariante ?? v.IdVariante;
@@ -449,13 +449,13 @@ const NuevaCompra = () => {
                         }}
                         className={cn(
                           "w-full text-left px-3 py-2 rounded-md text-sm flex justify-between gap-2",
-                          disp === false ? "opacity-50 cursor-not-allowed" : "hover:bg-teal-50"
+                          disp === false ? "opacity-50 cursor-not-allowed" : "hover:bg-(--color-pagina-hover)"
                         )}
                       >
-                        <span className="font-medium text-slate-800">
+                        <span className="font-medium text-(--color-negro)">
                           {v.productoNombre ?? v.ProductoNombre}
                         </span>
-                        <span className="text-xs text-slate-500 font-mono">{v.sku ?? v.Sku}</span>
+                        <span className="text-xs text-(--color-gris-letra) font-mono">{v.sku ?? v.Sku}</span>
                       </button>
                     );
                   })}
@@ -463,15 +463,15 @@ const NuevaCompra = () => {
               </Card>
             )}
 
-            <Card className="border-slate-200 shadow-sm overflow-hidden">
-              <CardHeader className="py-3 px-4 border-b border-slate-100">
+            <Card className="border-(--color-gris-claro-2) shadow-sm overflow-hidden">
+              <CardHeader className="py-3 px-4 border-b border-(--color-gris-claro-2)">
                 <CardTitle className="text-sm font-bold">Productos</CardTitle>
               </CardHeader>
               <ScrollArea className="h-[min(360px,45vh)] sm:h-[min(400px,50vh)]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50 hover:bg-slate-50">
-                      <TableHead className="text-[10px] uppercase font-bold">Producto</TableHead>
+                    <TableRow className="bg-(--color-gris-claro-2) hover:bg-(--color-gris-claro-2)">
+                      <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra)">Producto</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold w-28">SKU</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold text-right w-24">
                         Costo
@@ -490,8 +490,8 @@ const NuevaCompra = () => {
                       <TableRow key={row.idVariante}>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-slate-800 text-sm">{row.nombre}</p>
-                            <p className="text-xs text-slate-500">{row.detalle}</p>
+                            <p className="font-medium text-(--color-negro) text-sm">{row.nombre}</p>
+                            <p className="text-xs text-(--color-gris-letra)">{row.detalle}</p>
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{row.sku}</TableCell>
@@ -547,7 +547,7 @@ const NuevaCompra = () => {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="size-8 text-slate-400 hover:text-red-600"
+                            className="size-8 text-(--color-gris-letra) hover:text-(--color-rojo)"
                             onClick={() => quitar(row.idVariante)}
                           >
                             <Trash2 className="size-4" />
@@ -558,8 +558,8 @@ const NuevaCompra = () => {
                   </TableBody>
                 </Table>
               </ScrollArea>
-              <div className="flex items-start gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50/80 text-xs text-slate-600">
-                <Info className="size-4 shrink-0 text-sky-600 mt-0.5" />
+              <div className="flex items-start gap-2 px-4 py-3 border-t border-(--color-gris-claro-2) bg-(--color-gris-claro-2)/80 text-xs text-(--color-gris-letra)">
+                <Info className="size-4 shrink-0 text-(--color-pagina) mt-0.5" />
                 <p>
                   Busque variantes con el campo superior (misma API que{" "}
                   <code className="text-[11px]">GET /api/Productos/variantes/buscar</code>). Los costos
@@ -570,18 +570,18 @@ const NuevaCompra = () => {
           </div>
 
           <div className="space-y-4 min-w-0">
-            <Card className="border-0 shadow-md bg-(--color-pagina) text-white overflow-hidden">
+            <Card className="border-0 shadow-md bg-(--color-pagina) text-(--color-blanco) overflow-hidden">
               <CardContent className="p-5 space-y-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-white/90">
+                <p className="text-xs font-bold uppercase tracking-wide text-(--color-blanco)/90">
                   Total estimado
                 </p>
                 <p className="text-3xl font-black tabular-nums">{fmtQ(total)}</p>
-                <div className="space-y-2 text-sm border-t border-white/20 pt-3">
-                  <div className="flex justify-between text-white/90">
+                <div className="space-y-2 text-sm border-t border-(--color-blanco)/20 pt-3">
+                  <div className="flex justify-between text-(--color-blanco)/90">
                     <span>Subtotal</span>
                     <span className="tabular-nums">{fmtQ(subtotal / (1 + IVA_RATE))}</span>
                   </div>
-                  <div className="flex justify-between text-white/90">
+                  <div className="flex justify-between text-(--color-blanco)/90">
                     <span>IVA (12%) incluido</span>
                     <span className="tabular-nums">{fmtQ(ivaIncluido)}</span>
                   </div>
@@ -595,7 +595,7 @@ const NuevaCompra = () => {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-(--color-gris-claro-2) shadow-sm">
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-sm font-bold">Notas internas</CardTitle>
               </CardHeader>
@@ -604,7 +604,7 @@ const NuevaCompra = () => {
                   placeholder="Observaciones adicionales…"
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
-                  className="min-h-[120px] bg-slate-50 resize-y"
+                  className="min-h-[120px] bg-(--color-gris-claro-2) resize-y"
                   disabled={loadingEdit}
                 />
               </CardContent>
@@ -613,7 +613,7 @@ const NuevaCompra = () => {
         </div>
       </div>
 
-      <footer className="shrink-0 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-slate-200 bg-white pt-3 pb-1 md:pb-0 -mx-2 px-2 md:mx-0 md:px-0">
+      <footer className="shrink-0 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-(--color-gris-claro-2) bg-(--color-blanco) pt-3 pb-1 md:pb-0 -mx-2 px-2 md:mx-0 md:px-0">
         <Button variant="outline" type="button" onClick={() => setLineas([])} disabled={busy}>
           Limpiar líneas
         </Button>
@@ -622,7 +622,7 @@ const NuevaCompra = () => {
         </Button>
         <Button
           type="button"
-          className="bg-(--color-pagina-2) hover:opacity-90 text-white font-semibold sm:min-w-[160px]"
+          className="bg-(--color-pagina-2) hover:opacity-90 text-(--color-blanco) font-semibold sm:min-w-[160px]"
           disabled={busy || loadingEdit}
           onClick={guardar}
         >
