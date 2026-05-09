@@ -16,7 +16,6 @@ import NuevoProducto from "./pages/producto/NuevoProducto";
 import { useAuthStore } from "./context/useAuthStore";
 
 // --- Importaciones añadidas de la versión antigua ---
-import Categorias from "./pages/inventario/Categorias";
 import GestionCategorias from "./pages/inventario/GestionCategoria";
 import GestionMarcas from "./pages/inventario/GestionMarca";
 import Gestionubicaciones from "./pages/inventario/GestionUbicacion";
@@ -151,16 +150,6 @@ function App() {
         />
 
         {/* --- Rutas Integradas de la versión antigua --- */}
-        <Route
-          path="/categorias"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Categorias />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/inventario/categorias"
           element={
