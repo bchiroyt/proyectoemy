@@ -5,9 +5,11 @@ import {
   agregarDetalleCompra,
   anularCompra,
   crearCompra,
+  crearCompraDirecta,
   eliminarDetalleCompra,
   fetchCompraPorId,
   fetchCompras,
+  finalizarCompra,
 } from "@/services/comprasService";
 import { buscarVariantesCompra } from "@/services/productosService";
 import { fetchProveedores } from "@/services/proveedoresService";
@@ -93,6 +95,22 @@ export function useCrearCompraMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: crearCompra,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["compras"] }),
+  });
+}
+
+export function useCrearCompraDirectaMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: crearCompraDirecta,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["compras"] }),
+  });
+}
+
+export function useFinalizarCompraMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idCompra, body }) => finalizarCompra(idCompra, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["compras"] }),
   });
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { mapCompraApiToListRow } from "@/lib/comprasMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
@@ -10,8 +10,27 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import DetalleCompraDialog from "./components/DetalleCompraDialog";
-import { ChevronLeft, ChevronRight, Download, Eye, Pencil, Trash2 } from "lucide-react";
+import RecibirCompraDialog from "./components/RecibirCompraDialog";
+import {
+  ChevronDown,
+  ClipboardList,
+  Download,
+  Eye,
+  PackageCheck,
+  Pencil,
+  Plus,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 import Paginacion from "@/components/shared/Paginacion";
@@ -47,10 +66,12 @@ const estadoClass = (estado) => {
 const PAGE_SIZE = 10;
 
 const Compras = () => {
+  const navigate = useNavigate();
   const setTitulo = useNavigationStore((state) => state.setTitulo);
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
   const [detalle, setDetalle] = useState(null);
+  const [recibirCompra, setRecibirCompra] = useState(null);
 
   const listQ = useComprasListQuery({
     page,
@@ -92,12 +113,48 @@ const Compras = () => {
     <div className="flex h-full min-h-0 flex-col gap-3 md:gap-4">
       <div className="sticky top-0 z-10 flex w-full flex-wrap items-center gap-1 border-b border-border bg-(--color-blanco) p-2 shadow-sm">
         <div className="flex flex-1 justify-start gap-2">
-          <Button
-            asChild
-            className="bg-(--color-pagina-2) hover:opacity-90 text-(--color-blanco) font-semibold"
-          >
-            <Link to="/compras/nueva">Nueva compra</Link>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                className="bg-(--color-pagina-2) hover:opacity-90 text-(--color-blanco) font-semibold gap-1.5"
+              >
+                <Plus className="size-4" />
+                Nueva compra
+                <ChevronDown className="size-4 opacity-90" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72">
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-wide">
+                Tipo de compra
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => navigate("/compras/nueva?mode=presupuesto")}
+                className="gap-2 py-2"
+              >
+                <ClipboardList className="size-4 text-(--color-pagina-2)" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold">Presupuesto de pedido</span>
+                  <span className="text-xs text-(--color-gris-letra) leading-snug">
+                    Borrador previo. Se recibe y confirma después.
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => navigate("/compras/nueva?mode=directa")}
+                className="gap-2 py-2"
+              >
+                <Zap className="size-4 text-(--color-verde)" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold">Pedido de compra (directo)</span>
+                  <span className="text-xs text-(--color-gris-letra) leading-snug">
+                    Registra y cierra en un solo paso. Actualiza inventario.
+                  </span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="icon" type="button" aria-label="Exportar">
             <Download className="size-5 text-(--color-gris-letra)" />
           </Button>
@@ -166,84 +223,105 @@ const Compras = () => {
                   <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
                     Estado
                   </TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra) text-right w-[120px]">
+                  <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra) text-right w-[160px]">
                     Acciones
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {slice.map((row, index) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium text-(--color-gris-letra)">
-                      {(page - 1) * PAGE_SIZE + index + 1}
-                    </TableCell>
-                    <TableCell className="tabular-nums text-(--color-gris-letra)">
-                      {fmtFecha(row.fechaPedido)}
-                    </TableCell>
-                    <TableCell className="tabular-nums text-(--color-gris-letra)">
-                      {fmtFecha(row.fechaRecepcion)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Avatar className="size-8 shrink-0 border border-(--color-gris-claro-2)">
-                          <AvatarFallback className="text-[10px] font-bold bg-(--color-gris-claro-2) text-(--color-gris-letra)">
-                            {row.proveedor.iniciales}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate text-sm font-medium text-(--color-negro text-base)">
-                          {row.proveedor.nombre}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{row.comprobante}</TableCell>
-                    <TableCell className="text-right tabular-nums font-semibold text-(--color-negro)">
-                      {fmtQ(row.total)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn("font-semibold border", estadoClass(row.estado))}
-                      >
-                        {row.estado}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-(--color-celeste) hover:text-(--color-celeste-hover)"
-                          aria-label="Ver"
-                          onClick={() => setDetalle(row)}
+                {slice.map((row, index) => {
+                  const esEnProceso = row.estadoCompraRaw === "EN_PROCESO" || row.estado === "En Proceso";
+                  const esAnulada = row.estado === "Anulada";
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium text-(--color-gris-letra)">
+                        {(page - 1) * PAGE_SIZE + index + 1}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-(--color-gris-letra)">
+                        {fmtFecha(row.fechaPedido)}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-(--color-gris-letra)">
+                        {fmtFecha(row.fechaRecepcion)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Avatar className="size-8 shrink-0 border border-(--color-gris-claro-2)">
+                            <AvatarFallback className="text-[10px] font-bold bg-(--color-gris-claro-2) text-(--color-gris-letra)">
+                              {row.proveedor.iniciales}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="truncate text-sm font-medium text-(--color-negro text-base)">
+                            {row.proveedor.nombre}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{row.comprobante}</TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold text-(--color-negro)">
+                        {fmtQ(row.total)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn("font-semibold border", estadoClass(row.estado))}
                         >
-                          <Eye className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-(--color-celeste) hover:text-(--color-celeste-hover)"
-                          aria-label="Editar"
-                          asChild
-                        >
-                          <Link to={`/compras/nueva?edit=${encodeURIComponent(row.idCompra)}`}>
-                            <Pencil className="size-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-(--color-gris-letra) hover:text-(--color-rojo)"
-                          aria-label="Anular compra"
-                          type="button"
-                          disabled={row.estado === "Anulada" || anularMut.isPending}
-                          onClick={() => handleAnular(row)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {row.estado}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-(--color-celeste) hover:text-(--color-celeste-hover)"
+                            aria-label="Ver"
+                            onClick={() => setDetalle(row)}
+                          >
+                            <Eye className="size-4" />
+                          </Button>
+                          {esEnProceso ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-(--color-esmeralda-hover) hover:text-emerald-800"
+                              aria-label="Recibir pedido"
+                              type="button"
+                              onClick={() => setRecibirCompra(row)}
+                            >
+                              <PackageCheck className="size-4" />
+                            </Button>
+                          ) : null}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-(--color-celeste) hover:text-(--color-celeste-hover) disabled:opacity-40"
+                            aria-label="Editar"
+                            asChild={esEnProceso}
+                            disabled={!esEnProceso}
+                          >
+                            {esEnProceso ? (
+                              <Link to={`/compras/nueva?edit=${encodeURIComponent(row.idCompra)}`}>
+                                <Pencil className="size-4" />
+                              </Link>
+                            ) : (
+                              <Pencil className="size-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-(--color-gris-letra) hover:text-(--color-rojo)"
+                            aria-label="Anular compra"
+                            type="button"
+                            disabled={esAnulada || !esEnProceso || anularMut.isPending}
+                            onClick={() => handleAnular(row)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </ScrollArea>
@@ -254,6 +332,12 @@ const Compras = () => {
         open={!!detalle}
         onOpenChange={(o) => !o && setDetalle(null)}
         compra={detalle}
+      />
+
+      <RecibirCompraDialog
+        open={!!recibirCompra}
+        onOpenChange={(o) => !o && setRecibirCompra(null)}
+        idCompra={recibirCompra?.idCompra ?? null}
       />
     </div>
     </div>

@@ -39,6 +39,25 @@ export async function crearCompra(body) {
 }
 
 /**
+ * Crea y cierra una compra en un solo paso (pedido directo).
+ * @param {object} body — coincide con `CompraCerrarCrearRequest` del backend
+ */
+export async function crearCompraDirecta(body) {
+  const { data } = await apiClient.post("/api/Compras/create-all", body);
+  return data;
+}
+
+/**
+ * Finaliza (recibe) un presupuesto previamente creado.
+ * @param {number|string} idCompra
+ * @param {object} body — coincide con `CompraFinalizarRequest` del backend
+ */
+export async function finalizarCompra(idCompra, body) {
+  const { data } = await apiClient.post(`/api/Compras/${idCompra}/finalizar`, body);
+  return data;
+}
+
+/**
  * @param {number|string} idCompra
  * @param {object} body — `CompraActualizarRequest`
  */

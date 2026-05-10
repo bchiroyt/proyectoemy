@@ -68,19 +68,19 @@ export function UsuariosListaPanel({
   const lista = usuarios ?? [];
   const filtrados = useMemo(() => lista.filter((u) => matchesQuery(u, searchQuery)), [lista, searchQuery]);
 
-  const filteredHint = useMemo(
-    () => `${filtrados.length} de ${lista.length} usuario(s) en la tabla`,
-    [filtrados.length, lista.length]
-  );
+  //const filteredHint = useMemo(
+  //  () => `${filtrados.length} de ${lista.length} usuario(s) en la tabla`,
+  //  [filtrados.length, lista.length]
+  //);
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-(--color-pagina-2)">
+      {/*<p className="text-xs text-(--color-pagina-2)">
         {filteredHint}
         <span className="ml-2 rounded border border-border bg-(--color-pagina-3) px-1.5 font-mono text-[10px] text-muted-foreground">
           Ctrl+K
         </span>
-      </p>
+      </p> */}
 
       {isLoading ? (
         <div className="space-y-2 rounded-lg border border-border bg-(--color-blanco) p-4">
