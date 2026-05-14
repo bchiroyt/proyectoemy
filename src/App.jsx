@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import LoginPage from "./pages/auth/LoginPage";
 import HomePage from "./pages/dashboard/HomePage";
 import MainLayout from "./components/layout/MainLayout";
@@ -93,30 +93,22 @@ function App() {
           element={
             <ProtectedRoute>
               <MainLayout>
-                <POS />
+                <Outlet />
               </MainLayout>
             </ProtectedRoute>
           }
-        />
+        >
+          <Route index element={<POS />} />
+          <Route path="apertura" element={<Apertura />} />
+          <Route path="ventas" element={<Ventas />} />
+        </Route>
         <Route
           path="/apertura"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Apertura />
-              </MainLayout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/pos/apertura" replace />}
         />
         <Route
           path="/ventas"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Ventas />
-              </MainLayout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/pos/ventas" replace />}
         />
         <Route
           path="/compras"

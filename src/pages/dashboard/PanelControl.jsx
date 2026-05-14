@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, DollarSign, Calculator, ShoppingCart, BarChart3, Grid2x2,
+import { Package, Calculator, ShoppingCart, BarChart3, Grid2x2,
          Settings, Store, Users,} from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { cn } from "@/lib/utils";
@@ -15,17 +15,10 @@ const datosPanel = [
     },
     {
         id: 2,
-        titulo: "Caja",
-        descripcion: "Apertura, arqueo y control de efectivo en caja.",
-        icono: DollarSign,
-        to: "/apertura",
-    },
-    {
-        id: 3,
-        titulo: "Ventas",
-        descripcion: "Punto de venta y registro de transacciones.",
+        titulo: "POS",
+        descripcion: "Apertura de caja, control de efectivo y punto de venta.",
         icono: Store,
-        to: "/ventas",
+        to: "/pos",
     },
     {
         id: 4,

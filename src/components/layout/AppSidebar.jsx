@@ -4,7 +4,6 @@ import {
     Home,
     Package,
     PlusCircle,
-    Calculator,
     ShoppingCart,
     Landmark,
     Users,
@@ -44,8 +43,7 @@ const menuItems = [
     { icon: Home, label: "Panel de Control", to: "/panel-control" },
     { icon: Package, label: "Inventario", to: "/inventario" },
     { icon: PlusCircle, label: "Nuevo Producto", to: "/nuevo-producto" },
-    { icon: Calculator, label: "Caja", to: "/apertura" },
-    { icon: Store, label: "Ventas", to: "/ventas" },
+    { icon: Store, label: "POS", to: "/pos" },
     { icon: ShoppingCart, label: "Compras", to: "/compras" },
     { icon: Landmark, label: "Contabilidad", to: "/contabilidad" },
     { icon: Users, label: "Usuarios", to: "/usuarios" },
@@ -54,6 +52,7 @@ const menuItems = [
 
 const isRouteActive = (pathname, to) => {
     if (to === "/compras") return pathname === "/compras" || pathname.startsWith("/compras/");
+    if (to === "/pos") return pathname === "/pos" || pathname.startsWith("/pos/");
     return pathname === to;
 };
 
