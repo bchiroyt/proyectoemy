@@ -13,7 +13,7 @@ const ModalPresentacion = ({ open, onClose, onSave, data }) => {
       setForm({
         nombre: data.nombre || "",
         descripcion: data.descripcion || "",
-        estado: data.estado || "Activo",
+        estado: data.estado ? "Activo" : "Inactivo",
       });
     } else {
       setForm({
@@ -27,24 +27,31 @@ const ModalPresentacion = ({ open, onClose, onSave, data }) => {
   if (!open) return null;
 
   const handleChange = (campo, valor) => {
-    setForm({ ...form, [campo]: valor });
+    setForm((prev) => ({
+      ...prev,
+      [campo]: valor,
+    }));
   };
 
   const handleSave = () => {
     if (!form.nombre.trim()) return;
+
     onSave(form);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white w-full max-w-md rounded-3xl p-6 border-t-4 border-(--color-pagina) shadow-2xl">
 
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold">
+        <div className="flex justify-between items-center mb-5">
+          <h2 className="font-semibold text-lg">
             {data ? "Editar Presentación" : "Nueva Presentación"}
           </h2>
 
-          <button onClick={onClose}>
+          <button
+            onClick={onClose}
+            className="hover:bg-gray-100 p-2 rounded-xl transition cursor-pointer"
+          >
             <X />
           </button>
         </div>
@@ -54,24 +61,24 @@ const ModalPresentacion = ({ open, onClose, onSave, data }) => {
           <input
             value={form.nombre}
             onChange={(e) => handleChange("nombre", e.target.value)}
-            placeholder="Nombre (Ej: Caja, Unidad, Pack)"
-            className="w-full border p-3 rounded-lg"
+            placeholder="Nombre"
+            className="w-full border border-gray-200 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-(--color-pagina)"
           />
 
           <textarea
             value={form.descripcion}
             onChange={(e) => handleChange("descripcion", e.target.value)}
             placeholder="Descripción"
-            className="w-full border p-3 rounded-lg"
+            className="w-full border border-gray-200 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-(--color-pagina)"
           />
 
           <select
             value={form.estado}
             onChange={(e) => handleChange("estado", e.target.value)}
-            className="w-full border p-3 rounded-lg"
+            className="w-full border border-gray-200 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-(--color-pagina) cursor-pointer"
           >
-            <option>Activo</option>
-            <option>Inactivo</option>
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
           </select>
 
         </div>
@@ -80,14 +87,14 @@ const ModalPresentacion = ({ open, onClose, onSave, data }) => {
 
           <button
             onClick={onClose}
-            className="px-4 py-2 border rounded-lg"
+            className="px-4 py-2 border border-gray-200 rounded-2xl hover:bg-gray-100 transition cursor-pointer"
           >
             Cancelar
           </button>
 
           <button
             onClick={handleSave}
-            className="bg-(--color-pagina-2) text-white px-5 py-2 rounded-lg"
+            className="bg-(--color-pagina-2) text-white px-5 py-2 rounded-2xl hover:opacity-90 transition cursor-pointer"
           >
             Guardar
           </button>

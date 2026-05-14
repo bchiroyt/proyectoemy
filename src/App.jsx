@@ -14,14 +14,13 @@ import Compras from "./pages/compras/Compras";
 import NuevaCompra from "./pages/compras/NuevaCompra";
 import NuevoProducto from "./pages/producto/NuevoProducto";
 import { useAuthStore } from "./context/useAuthStore";
-
-// --- Importaciones añadidas de la versión antigua ---
-import GestionCategorias from "./pages/inventario/GestionCategoria";
+import GestionCategorias from "./pages/inventario/GestionCategoria";// --- Importaciones de la versión antigua ---
 import GestionMarcas from "./pages/inventario/GestionMarca";
 import Gestionubicaciones from "./pages/inventario/GestionUbicacion";
 import Gestiontallas from "./pages/inventario/GestionTalla";
 import Gestionpresentaciones from "./pages/inventario/GestionPresentacion";
 import ReporteStock from "./pages/inventario/ReporteStock";
+import Proveedores from "./pages/inventario/Proveedores";
 
 function DefaultRedirect() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -198,6 +197,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <ReporteStock />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/proveedores"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Proveedores />
               </MainLayout>
             </ProtectedRoute>
           }

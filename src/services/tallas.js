@@ -1,31 +1,59 @@
 import { apiClient } from "../lib/apiClient";
 
-// 🔥 OBTENER TALLAS
+const mapTalla = (t) => ({
+  idTalla: t.idTalla,
+  nombre: t.nombre,
+  descripcion: t.descripcion,
+  activo:
+    t.activo ??
+    t.estado ??
+    false,
+});
+
+// OBTENER
 export const obtenerTallas = async (params = {}) => {
   const res = await apiClient.get("/api/Tallas", {
     params,
   });
 
-  return res.data?.data || {
-    items: [],
-    page: 1,
-    totalPages: 1,
+  const data = res.data?.data;
+
+  return {
+    items: Array.isArray(data?.items)
+      ? data.items.map(mapTalla)
+      : [],
+    page: data?.page || 1,
+    totalPages: data?.totalPages || 1,
   };
 };
 
-// 🔥 CREAR
+// CREAR
 export const crearTalla = async (data) => {
-  const res = await apiClient.post("/api/Tallas", data);
+  const payload = {
+    nombre: data.nombre,
+    descripcion: data.descripcion,
+    estado: data.activo,
+  };
+
+  const res = await apiClient.post("/api/Tallas", payload);
+
   return res.data?.data;
 };
 
-// 🔥 ACTUALIZAR
+// ACTUALIZAR
 export const actualizarTalla = async (id, data) => {
-  const res = await apiClient.put(`/api/Tallas/${id}`, data);
+  const payload = {
+    nombre: data.nombre,
+    descripcion: data.descripcion,
+    estado: data.activo,
+  };
+
+  const res = await apiClient.put(`/api/Tallas/${id}`, payload);
+
   return res.data?.data;
 };
 
-// 🔥 ELIMINAR (soft delete)
+// ELIMINAR
 export const eliminarTalla = async (id) => {
   const res = await apiClient.delete(`/api/Tallas/${id}`);
   return res.data;
