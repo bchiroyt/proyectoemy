@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Search,
   ShoppingCart,
   Check,
   Info,
@@ -16,6 +15,10 @@ import {
   BARCODE_DEFAULT_MAX_INTER_KEY_MS,
 } from "@/hooks/useBarcodeScanner";
 import { fetchProductoByCodigo, getProductosPosDemo } from "@/services/posProductoService";
+import { useMiCajaActivaQuery } from "@/hooks/queries/useCajaQueries";
+import { MovimientoCajaDialog } from "@/components/caja/MovimientoCajaDialog";
+import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -40,12 +43,10 @@ const PAGE_SIZE = 8;
 const VentasPOS = () => {
   const setTitulo = useNavigationStore((state) => state.setTitulo);
   const navigate = useNavigate();
+  const miCajaQ = useMiCajaActivaQuery();
+  const idCaja = miCajaQ.data?.data?.idCaja;
   const flashTimerRef = useRef(0);
   const scanMsgTimerRef = useRef(0);
-
-  useEffect(() => {
-    setTitulo("POS · Ventas");
-  }, [setTitulo]);
 
   const [carrito, setCarrito] = useState([]);
   const [busqueda, setBusqueda] = useState("");
@@ -53,6 +54,17 @@ const VentasPOS = () => {
   const [pagina, setPagina] = useState(1);
   const [flashRowId, setFlashRowId] = useState(null);
   const [scanFeedback, setScanFeedback] = useState(null);
+  const [gastosOpen, setGastosOpen] = useState(false);
+
+  useEffect(() => {
+    setTitulo("POS · Ventas");
+  }, [setTitulo]);
+
+  useEffect(() => {
+    if (!miCajaQ.isLoading && !miCajaQ.data?.data) {
+      navigate("/pos", { replace: true });
+    }
+  }, [miCajaQ.isLoading, miCajaQ.data, navigate]);
 
   const agregarProducto = useCallback((producto, notaLinea) => {
     setCarrito((prev) => {
@@ -137,6 +149,18 @@ const VentasPOS = () => {
     sliceStart,
     sliceStart + PAGE_SIZE
   );
+
+  if (miCajaQ.isLoading) {
+    return (
+      <div className="p-8">
+        <Skeleton className="h-[400px] w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (!miCajaQ.data?.data || !idCaja) {
+    return null;
+  }
 
   return (
     <div className="flex h-full min-h-0 bg-(--color-pos-fondo) text-foreground">
@@ -268,32 +292,28 @@ const VentasPOS = () => {
       <section className="flex-1 flex flex-col min-w-0 min-h-0">
         <div className="shrink-0 p-3 sm:p-4 space-y-3 border-b border-(--color-pos-borde-suave) bg-(--color-pos-panel)/95">
           <div className="flex flex-wrap items-center gap-3">
-            <div
-              data-barcode-listener="off"
-              className="flex flex-1 min-w-48 items-center rounded-xl px-3 py-2 border border-(--color-pos-busqueda-borde) bg-(--color-pos-busqueda-fondo)"
-            >
-              <Search className="w-4 h-4 shrink-0 text-(--color-pos-busqueda-icono)" />
-              <input
-                type="search"
-                placeholder="Buscar..."
+            <div data-barcode-listener="off" className="flex flex-1 min-w-48 max-w-md">
+              <BuscadorPrincipal
+                placeholder="Buscar producto por nombre o código..."
                 value={busqueda}
                 onChange={(e) => {
                   setBusqueda(e.target.value);
                   setPagina(1);
                 }}
-                className="ml-2 outline-none w-full bg-transparent text-foreground placeholder:text-(--color-pos-texto-muted)"
+                className="max-w-none"
               />
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                onClick={() => setGastosOpen(true)}
                 className="px-4 py-2 rounded-xl bg-(--color-pagina) text-(--color-blanco) text-sm font-semibold hover:opacity-90"
               >
                 Gastos
               </button>
               <button
                 type="button"
-                onClick={() => navigate("/pos")}
+                onClick={() => navigate("/pos/cierre")}
                 className="px-4 py-2 rounded-xl bg-(--color-pagina) text-(--color-blanco) text-sm font-semibold hover:opacity-90"
               >
                 Cerrar turno
@@ -420,6 +440,13 @@ const VentasPOS = () => {
           </div>
         </div>
       </section>
+
+      <MovimientoCajaDialog
+        open={gastosOpen}
+        onOpenChange={setGastosOpen}
+        idCaja={idCaja}
+        dialogTitle="Registrar gasto de caja"
+      />
     </div>
   );
 };

@@ -11,9 +11,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useCrearCredencialCajaMutation } from "@/hooks/queries/useCredencialCajaQueries";
 import { useCrearUsuarioMutation, useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
+import { validateCredencialCajaCrear } from "@/lib/credencialCajaValidations";
 import { validateCrearUsuario } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { mapUsuario } from "@/lib/apiNormalizer";
+import {
+  CredencialCajaFormSection,
+  getEmptyCredencialCajaForm,
+} from "@/pages/usuarios/components/CredencialCajaFormSection";
 
 const empty = {
   idTipoUsuario: "1",
@@ -31,9 +38,12 @@ export function NuevoUsuarioDialog({ open, onOpenChange }) {
   const [form, setForm] = useState(empty);
   const [rolesSel, setRolesSel] = useState(() => new Set());
   const [fieldErrors, setFieldErrors] = useState({});
+  const [nipForm, setNipForm] = useState(getEmptyCredencialCajaForm);
+  const [nipFieldErrors, setNipFieldErrors] = useState({});
   const [localError, setLocalError] = useState("");
   const rolesQ = useRolesQuery({ enabled: open });
   const mut = useCrearUsuarioMutation();
+  const crearCredencialMut = useCrearCredencialCajaMutation();
 
   const rolesActivos = useMemo(
     () => (rolesQ.data ?? []).filter((r) => r.activo !== false),
@@ -45,6 +55,8 @@ export function NuevoUsuarioDialog({ open, onOpenChange }) {
       setForm(empty);
       setRolesSel(new Set());
       setFieldErrors({});
+      setNipForm(getEmptyCredencialCajaForm());
+      setNipFieldErrors({});
       setLocalError("");
     }
     onOpenChange(v);
@@ -79,9 +91,24 @@ export function NuevoUsuarioDialog({ open, onOpenChange }) {
       setFieldErrors(parsed.error.flatten().fieldErrors);
       return;
     }
+
+    if (nipForm.assignNip) {
+      const nipParsed = validateCredencialCajaCrear({
+        nip: nipForm.nip,
+        confirmacionNip: nipForm.confirmacionNip,
+        activo: nipForm.credencialActivo,
+      });
+      if (!nipParsed.success) {
+        setNipFieldErrors(nipParsed.error.flatten().fieldErrors);
+        return;
+      }
+    } else {
+      setNipFieldErrors({});
+    }
+
     const d = parsed.data;
     try {
-      await mut.mutateAsync({
+      const created = await mut.mutateAsync({
         idTipoUsuario: d.idTipoUsuario,
         username: d.username,
         email: d.email,
@@ -94,9 +121,24 @@ export function NuevoUsuarioDialog({ open, onOpenChange }) {
         idRoles: d.idRoles,
         permisosExcepcionales: [],
       });
+      const idUsuario = mapUsuario(created)?.idUsuario;
+      if (nipForm.assignNip) {
+        if (!idUsuario) {
+          setLocalError(
+            "Usuario creado, pero no se obtuvo el ID para asignar el NIP. Asígnalo desde editar usuario."
+          );
+          return;
+        }
+        await crearCredencialMut.mutateAsync({
+          idUsuario,
+          nip: nipForm.nip,
+          confirmacionNip: nipForm.confirmacionNip,
+          activo: nipForm.credencialActivo,
+        });
+      }
       onClose(false);
     } catch (e) {
-      setLocalError(getApiErrorMessage(e, "No se pudo crear el usuario."));
+      setLocalError(getApiErrorMessage(e, "No se pudo completar la operación."));
     }
   };
 
@@ -234,6 +276,22 @@ export function NuevoUsuarioDialog({ open, onOpenChange }) {
               <p className="text-xs text-(--color-rojo)">{fieldErrors.idRoles[0]}</p>
             ) : null}
           </div>
+
+          <CredencialCajaFormSection
+            mode="create"
+            assignNip={nipForm.assignNip}
+            onAssignNipChange={(v) => {
+              setNipForm((f) => ({ ...f, assignNip: v }));
+              if (!v) setNipFieldErrors({});
+            }}
+            nip={nipForm.nip}
+            confirmacionNip={nipForm.confirmacionNip}
+            credencialActivo={nipForm.credencialActivo}
+            onNipChange={(v) => setNipForm((f) => ({ ...f, nip: v }))}
+            onConfirmacionNipChange={(v) => setNipForm((f) => ({ ...f, confirmacionNip: v }))}
+            onCredencialActivoChange={(v) => setNipForm((f) => ({ ...f, credencialActivo: v }))}
+            fieldErrors={nipFieldErrors}
+          />
         </div>
 
         {localError ? <p className="text-sm text-(--color-rojo)">{localError}</p> : null}
@@ -244,11 +302,11 @@ export function NuevoUsuarioDialog({ open, onOpenChange }) {
           </Button>
           <Button
             type="button"
-            disabled={mut.isPending}
+            disabled={mut.isPending || crearCredencialMut.isPending}
             className="bg-(--color-pagina) text-(--color-blanco) hover:bg-(--color-borde-button)"
             onClick={handleSubmit}
           >
-            {mut.isPending ? "Creando…" : "Crear usuario"}
+            {mut.isPending || crearCredencialMut.isPending ? "Creando…" : "Crear usuario"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -11,9 +11,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  useActualizarEstadoCredencialCajaMutation,
+  useActualizarNipCredencialCajaMutation,
+  useCrearCredencialCajaMutation,
+  useCredencialCajaPorUsuarioQuery,
+} from "@/hooks/queries/useCredencialCajaQueries";
 import { usePatchUsuarioMutation, useUsuarioQuery } from "@/hooks/queries/useSeguridadQueries";
+import {
+  validateCredencialCajaActualizarNip,
+  validateCredencialCajaCrear,
+} from "@/lib/credencialCajaValidations";
 import { validateUsuarioEditForm } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import {
+  CredencialCajaFormSection,
+  getEmptyCredencialCajaForm,
+} from "@/pages/usuarios/components/CredencialCajaFormSection";
 
 function fmtIso(v) {
   if (!v) return "—";
@@ -40,14 +54,28 @@ const emptyForm = {
 export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
   const [form, setForm] = useState(emptyForm);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [nipForm, setNipForm] = useState(getEmptyCredencialCajaForm);
+  const [nipFieldErrors, setNipFieldErrors] = useState({});
+  const [changeNip, setChangeNip] = useState(false);
+  const [nipSuccess, setNipSuccess] = useState("");
   const [localError, setLocalError] = useState("");
   const userQ = useUsuarioQuery(idUsuario, { enabled: open && Number(idUsuario) > 0 });
+  const credencialQ = useCredencialCajaPorUsuarioQuery(idUsuario, {
+    enabled: open && Number(idUsuario) > 0,
+  });
   const patchMut = usePatchUsuarioMutation();
+  const crearCredencialMut = useCrearCredencialCajaMutation();
+  const actualizarNipMut = useActualizarNipCredencialCajaMutation();
+  const actualizarEstadoMut = useActualizarEstadoCredencialCajaMutation();
 
   useEffect(() => {
     if (!open) {
       setForm(emptyForm);
       setFieldErrors({});
+      setNipForm(getEmptyCredencialCajaForm());
+      setNipFieldErrors({});
+      setChangeNip(false);
+      setNipSuccess("");
       setLocalError("");
       return;
     }
@@ -98,6 +126,89 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
       setLocalError(getApiErrorMessage(e, "No se pudo guardar el usuario."));
     }
   };
+
+  const handleGuardarNip = async () => {
+    setLocalError("");
+    setNipSuccess("");
+    setNipFieldErrors({});
+
+    const credencial = credencialQ.data;
+
+    if (!credencial && nipForm.assignNip) {
+      const parsed = validateCredencialCajaCrear({
+        nip: nipForm.nip,
+        confirmacionNip: nipForm.confirmacionNip,
+        activo: nipForm.credencialActivo,
+      });
+      if (!parsed.success) {
+        setNipFieldErrors(parsed.error.flatten().fieldErrors);
+        return;
+      }
+      try {
+        await crearCredencialMut.mutateAsync({
+          idUsuario,
+          nip: nipForm.nip,
+          confirmacionNip: nipForm.confirmacionNip,
+          activo: nipForm.credencialActivo,
+        });
+        setNipForm(getEmptyCredencialCajaForm());
+        setNipSuccess("Credencial de caja creada correctamente.");
+      } catch (e) {
+        setLocalError(getApiErrorMessage(e, "No se pudo crear la credencial de caja."));
+      }
+      return;
+    }
+
+    if (credencial && changeNip) {
+      const parsed = validateCredencialCajaActualizarNip({
+        nipNuevo: nipForm.nip,
+        confirmacionNipNuevo: nipForm.confirmacionNip,
+      });
+      if (!parsed.success) {
+        const fe = parsed.error.flatten().fieldErrors;
+        setNipFieldErrors({
+          nipNuevo: fe.nipNuevo,
+          confirmacionNipNuevo: fe.confirmacionNipNuevo,
+        });
+        return;
+      }
+      try {
+        await actualizarNipMut.mutateAsync({
+          idUsuario,
+          nipNuevo: nipForm.nip,
+          confirmacionNipNuevo: nipForm.confirmacionNip,
+        });
+        setNipForm((f) => ({ ...f, nip: "", confirmacionNip: "" }));
+        setChangeNip(false);
+        setNipSuccess("NIP de caja actualizado correctamente.");
+      } catch (e) {
+        setLocalError(getApiErrorMessage(e, "No se pudo actualizar el NIP de caja."));
+      }
+    }
+  };
+
+  const handleToggleCredencialActiva = async () => {
+    const credencial = credencialQ.data;
+    if (!credencial) return;
+    setLocalError("");
+    setNipSuccess("");
+    try {
+      await actualizarEstadoMut.mutateAsync({
+        idUsuario,
+        activo: !credencial.activo,
+      });
+      setNipSuccess(
+        !credencial.activo ? "Credencial de caja activada." : "Credencial de caja desactivada."
+      );
+    } catch (e) {
+      setLocalError(getApiErrorMessage(e, "No se pudo cambiar el estado de la credencial."));
+    }
+  };
+
+  const nipBusy =
+    crearCredencialMut.isPending || actualizarNipMut.isPending || actualizarEstadoMut.isPending;
+  const credencial = credencialQ.data;
+  const showNipAction = (!credencial && nipForm.assignNip) || (credencial && changeNip);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -247,9 +358,70 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
                 <p className="text-xs text-(--color-rojo)">{fieldErrors.password[0]}</p>
               ) : null}
             </div>
+
+            <CredencialCajaFormSection
+              mode="edit"
+              assignNip={nipForm.assignNip}
+              onAssignNipChange={(v) => {
+                setNipForm((f) => ({ ...f, assignNip: v }));
+                if (!v) setNipFieldErrors({});
+              }}
+              nip={nipForm.nip}
+              confirmacionNip={nipForm.confirmacionNip}
+              credencialActivo={nipForm.credencialActivo}
+              onNipChange={(v) => setNipForm((f) => ({ ...f, nip: v }))}
+              onConfirmacionNipChange={(v) => setNipForm((f) => ({ ...f, confirmacionNip: v }))}
+              onCredencialActivoChange={(v) => setNipForm((f) => ({ ...f, credencialActivo: v }))}
+              fieldErrors={nipFieldErrors}
+              credencial={credencial}
+              credencialLoading={credencialQ.isLoading}
+              credencialError={
+                credencialQ.isError
+                  ? getApiErrorMessage(credencialQ.error, "No se pudo cargar la credencial de caja.")
+                  : null
+              }
+              changeNip={changeNip}
+              onChangeNipToggle={(v) => {
+                setChangeNip(v);
+                if (!v) {
+                  setNipForm((f) => ({ ...f, nip: "", confirmacionNip: "" }));
+                  setNipFieldErrors({});
+                }
+              }}
+            />
+
+            {credencial ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={nipBusy}
+                onClick={handleToggleCredencialActiva}
+              >
+                {credencial.activo ? "Desactivar credencial de caja" : "Activar credencial de caja"}
+              </Button>
+            ) : null}
+
+            {showNipAction ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={nipBusy}
+                className="w-full sm:w-auto"
+                onClick={handleGuardarNip}
+              >
+                {nipBusy
+                  ? "Guardando NIP…"
+                  : credencial
+                    ? "Actualizar NIP de caja"
+                    : "Crear credencial de caja"}
+              </Button>
+            ) : null}
           </div>
         )}
 
+        {nipSuccess ? <p className="text-sm text-(--color-verde)">{nipSuccess}</p> : null}
         {localError ? <p className="text-sm text-(--color-rojo)">{localError}</p> : null}
 
         <DialogFooter className="gap-2 sm:gap-0">
@@ -258,7 +430,7 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
           </Button>
           <Button
             type="button"
-            disabled={patchMut.isPending || userQ.isLoading || userQ.isError}
+            disabled={patchMut.isPending || nipBusy || userQ.isLoading || userQ.isError}
             className="bg-(--color-pagina-2) text-(--color-blanco) hover:bg-(--color-pagina-2)/90"
             onClick={handleSubmit}
           >

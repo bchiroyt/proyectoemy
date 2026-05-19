@@ -8,6 +8,7 @@ import Usuarios from "./pages/usuarios/usuarios";
 import Inventario from "./pages/inventario/Inventario";
 import POS from "./pages/pos/Pos";
 import Apertura from "./pages/pos/AperturaCaja";
+import CierreCaja from "./pages/pos/CierreCaja";
 import Ventas from "./pages/pos/VentasPos";
 import Contabilidad from "./pages/contabilidad/Contabilidad";
 import Compras from "./pages/compras/Compras";
@@ -99,8 +100,10 @@ function App() {
         >
           <Route index element={<POS />} />
           <Route path="apertura" element={<Apertura />} />
+          <Route path="cierre" element={<CierreCaja />} />
           <Route path="ventas" element={<Ventas />} />
         </Route>
+        <Route path="/caja" element={<Navigate to="/pos" replace />} />
         <Route
           path="/apertura"
           element={<Navigate to="/pos/apertura" replace />}
