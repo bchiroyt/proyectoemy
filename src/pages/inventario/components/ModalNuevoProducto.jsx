@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, ArrowLeft, Plus } from "lucide-react";
+import { X, ArrowLeft, Plus, Trash2, Search, CheckCircle, AlertCircle } from "lucide-react";
 
 import ModalNuevaMarca from "./ModalNuevaMarca";
 import ModalAgregarSimple from "./ModalAgregarSimple";
@@ -14,43 +14,67 @@ import { crearProducto } from "@/services/productos";
 
 const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [step, setStep] = useState(1);
-
   const [loading, setLoading] = useState(false);
+
+  // ESTADO PARA AVISOS/NOTIFICACIONES PERSONALIZADAS
+  const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
 
   // DATOS GENERALES
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
-
-  // CATEGORÍAS
-  const [categorias, setCategorias] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
-
-  // MARCAS
-  const [marcas, setMarcas] = useState([]);
   const [marcaSeleccionada, setMarcaSeleccionada] = useState("");
-  const [openMarcaModal, setOpenMarcaModal] = useState(false);
 
-  // PRESENTACIONES
+  // ESTADOS PARA LOS BUSCADORES DE STEP 1
+  const [busquedaCat, setBusquedaCat] = useState("");
+  const [openCatDropdown, setOpenCatDropdown] = useState(false);
+  const [busquedaMarca, setBusquedaMarca] = useState("");
+  const [openMarcaDropdown, setOpenMarcaDropdown] = useState(false);
+
+  // LISTAS DE LA BASE DE DATOS
+  const [categorias, setCategorias] = useState([]);
+  const [marcas, setMarcas] = useState([]);
   const [presentaciones, setPresentaciones] = useState([]);
-  const [presentacionSeleccionada, setPresentacionSeleccionada] = useState("");
-  const [openPresentacionModal, setOpenPresentacionModal] = useState(false);
-
-  // TALLAS
   const [tallas, setTallas] = useState([]);
-  const [tallaSeleccionada, setTallaSeleccionada] = useState("");
-  const [openTallaModal, setOpenTallaModal] = useState(false);
-
-  // COLOR MANUAL
-  const [color, setColor] = useState("");
-
-  // UBICACIONES
   const [ubicaciones, setUbicaciones] = useState([]);
-  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState("");
+
+  // ARRAY DINÁMICO DE VARIANTES (Cada una con sus propios estados de buscador)
+  const [variantes, setVariantes] = useState([
+    {
+      talla: "",
+      busquedaTalla: "",
+      openTallaDropdown: false,
+      
+      presentacion: "",
+      busquedaPres: "",
+      openPresDropdown: false,
+      
+      color: "",
+      precioVenta: "",
+      codigoBarras: "",
+      
+      ubicacion: "",
+      busquedaUbic: "",
+      openUbicDropdown: false,
+    },
+  ]);
+
+  // MODALES AUXILIARES
+  const [openMarcaModal, setOpenMarcaModal] = useState(false);
+  const [openPresentacionModal, setOpenPresentacionModal] = useState(false);
+  const [openTallaModal, setOpenTallaModal] = useState(false);
   const [openUbicacionModal, setOpenUbicacionModal] = useState(false);
 
-  // VARIANTE
-  const [precioVenta, setPrecioVenta] = useState("");
-  const [codigoBarras, setCodigoBarras] = useState("");
+  // FUNCIÓN PARA MOSTRAR AVISOS
+  const mostrarAviso = (tipo, mensaje) => {
+    setNotificacion({ mostrar: true, tipo, mensaje });
+    // Si es un éxito, se cierra solo en 3 segundos
+    if (tipo === "exito") {
+      setTimeout(() => {
+        setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
+      }, 3000);
+    }
+  };
 
   // CARGAR DATOS
   useEffect(() => {
@@ -63,35 +87,11 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           tallasData,
           ubicacionesData,
         ] = await Promise.all([
-          obtenerMarcas({
-            Activo: true,
-            Page: 1,
-            PageSize: 100,
-          }),
-
-          obtenerCategorias({
-            Activo: true,
-            Page: 1,
-            PageSize: 100,
-          }),
-
-          obtenerPresentaciones({
-            Activo: true,
-            Page: 1,
-            PageSize: 100,
-          }),
-
-          obtenerTallas({
-            Activo: true,
-            Page: 1,
-            PageSize: 100,
-          }),
-
-          obtenerUbicaciones({
-            Activo: true,
-            Page: 1,
-            PageSize: 100,
-          }),
+          obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 }),
+          obtenerCategorias({ Activo: true, Page: 1, PageSize: 500 }),
+          obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
+          obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
+          obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }),
         ]);
 
         setMarcas(marcasData.items || []);
@@ -100,7 +100,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         setTallas(tallasData.items || []);
         setUbicaciones(ubicacionesData.items || []);
       } catch (error) {
-        console.error(error);
+        console.error("Error al cargar datos iniciales:", error);
       }
     };
 
@@ -109,28 +109,67 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     }
   }, [open]);
 
+  // MANEJO DE VARIANTES DINÁMICAS
+  const handleAgregarVariante = () => {
+    setVariantes([
+      ...variantes,
+      {
+        talla: "",
+        busquedaTalla: "",
+        openTallaDropdown: false,
+        presentacion: "",
+        busquedaPres: "",
+        openPresDropdown: false,
+        color: "",
+        precioVenta: "",
+        codigoBarras: "",
+        ubicacion: "",
+        busquedaUbic: "",
+        openUbicDropdown: false,
+      },
+    ]);
+  };
+
+  const handleEliminarVariante = (index) => {
+    if (variantes.length > 1) {
+      setVariantes(variantes.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleCambioVariante = (index, campo, valor) => {
+    const nuevasVariantes = [...variantes];
+    nuevasVariantes[index][campo] = valor;
+    setVariantes(nuevasVariantes);
+  };
+
   // RESET
   const resetForm = () => {
     setStep(1);
-
     setNombre("");
     setDescripcion("");
-
     setCategoriaSeleccionada("");
     setMarcaSeleccionada("");
-
-    setPresentacionSeleccionada("");
-    setTallaSeleccionada("");
-
-    setColor("");
-
-    setUbicacionSeleccionada("");
-
-    setPrecioVenta("");
-    setCodigoBarras("");
+    setBusquedaCat("");
+    setBusquedaMarca("");
+    setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
+    setVariantes([
+      {
+        talla: "",
+        busquedaTalla: "",
+        openTallaDropdown: false,
+        presentacion: "",
+        busquedaPres: "",
+        openPresDropdown: false,
+        color: "",
+        precioVenta: "",
+        codigoBarras: "",
+        ubicacion: "",
+        busquedaUbic: "",
+        openUbicDropdown: false,
+      },
+    ]);
   };
 
-  // CERRAR
   const handleClose = () => {
     resetForm();
     onClose();
@@ -139,30 +178,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   // REGISTRAR
   const handleRegistrar = async () => {
     try {
-      if (!nombre.trim()) {
-        alert("Debes ingresar un nombre.");
-        return;
-      }
+      if (!nombre.trim()) return mostrarAviso("error", "Debes ingresar un nombre para el producto.");
+      if (!categoriaSeleccionada) return mostrarAviso("error", "Debes seleccionar una categoría.");
+      if (!marcaSeleccionada) return mostrarAviso("error", "Debes seleccionar una marca.");
 
-      if (!categoriaSeleccionada) {
-        alert("Debes seleccionar una categoría.");
-        return;
-      }
-
-      if (!marcaSeleccionada) {
-        alert("Debes seleccionar una marca.");
-        return;
-      }
-
-      if (
-        !tallaSeleccionada &&
-        !presentacionSeleccionada &&
-        !color.trim()
-      ) {
-        alert(
-          "Debes ingresar al menos talla, presentación o color."
-        );
-        return;
+      for (let i = 0; i < variantes.length; i++) {
+        const v = variantes[i];
+        if (!v.talla && !v.presentacion && !v.color.trim()) {
+          return mostrarAviso("error", `En la variante #${i + 1}, debes ingresar al menos talla, presentación o color.`);
+        }
       }
 
       setLoading(true);
@@ -173,446 +197,524 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         categoria: Number(categoriaSeleccionada),
         marca: Number(marcaSeleccionada),
         estadoCatalogo: "BORRADOR",
-
-        variantes: [
-          {
-            talla: tallaSeleccionada
-              ? Number(tallaSeleccionada)
-              : null,
-
-            presentacion: presentacionSeleccionada
-              ? Number(presentacionSeleccionada)
-              : null,
-
-            color: color || null,
-
-            precioVenta: precioVenta
-              ? Number(precioVenta)
-              : null,
-
-            codigosExternos: codigoBarras
-              ? [
-                  {
-                    codigo: codigoBarras,
-                    esPrincipal: true,
-                  },
-                ]
-              : [],
-          },
-        ],
+        variantes: variantes.map((v) => ({
+          talla: v.talla ? Number(v.talla) : null,
+          presentacion: v.presentacion ? Number(v.presentacion) : null,
+          color: v.color || null,
+          precioVenta: v.precioVenta ? Number(v.precioVenta) : null,
+          codigosExternos: v.codigoBarras
+            ? [
+                {
+                  codigo: v.codigoBarras,
+                  esPrincipal: true,
+                },
+              ]
+            : [],
+        })),
       };
 
       await crearProducto(payload);
-
-      alert("Producto creado correctamente.");
-
+      
+      mostrarAviso("exito", "¡Producto creado correctamente en el catálogo!");
+      
       if (onSuccess) {
-        onSuccess();
+        setTimeout(() => onSuccess(), 1500);
       }
+      setTimeout(() => handleClose(), 1500);
 
-      handleClose();
     } catch (error) {
       console.error(error);
-
-      alert(
-        error?.response?.data?.mensaje ||
-          "Error al crear producto."
-      );
+      const msgError = error?.response?.data?.mensaje || "Error interno al intentar crear el producto.";
+      mostrarAviso("error", msgError);
     } finally {
       setLoading(false);
     }
   };
 
+  // FILTRADOS STEP 1
+  const categoriasFiltradas = categorias.filter((c) =>
+    c.nombre.toLowerCase().includes(busquedaCat.toLowerCase())
+  );
+
+  const marcasFiltradas = marcas.filter((m) =>
+    m.nombre.toLowerCase().includes(busquedaMarca.toLowerCase())
+  );
+
+  const nombreCategoriaActual = categorias.find((c) => String(c.idCategoria) === String(categoriaSeleccionada))?.nombre || "Seleccionar categoría";
+  const nombreMarcaActual = marcas.find((m) => String(m.idMarca) === String(marcaSeleccionada))?.nombre || "Seleccionar marca";
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-lg p-6 border-t-4 border-(--color-pagina)">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 transition-all">
+      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-lg flex flex-col max-h-[90vh] border-t-4 border-(--color-pagina) relative">
+        
+        {/* SISTEMA DE AVISOS PROPIOS (TOAST INTERNO) */}
+        {notificacion.mostrar && (
+          <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all max-w-md w-11/12 animate-bounce ${
+            notificacion.tipo === "exito" 
+              ? "bg-green-50 border-green-200 text-green-800" 
+              : "bg-red-50 border-red-200 text-red-800"
+          }`}>
+            {notificacion.tipo === "exito" ? <CheckCircle className="w-5 h-5 text-green-600 shrink-0" /> : <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />}
+            <span className="flex-1">{notificacion.mensaje}</span>
+            <button onClick={() => setNotificacion({ mostrar: false, tipo: "", mensaje: "" })} className="text-gray-400 hover:text-gray-600 ml-2 p-0.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* HEADER */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center p-6 border-b">
           {step === 2 ? (
-            <button onClick={() => setStep(1)}>
+            <button onClick={() => setStep(1)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900 cursor-pointer">
               <ArrowLeft />
             </button>
           ) : (
-            <div />
+            <div className="w-9" />
           )}
-
-          <h2 className="text-lg font-semibold">
-            Nuevo Producto
-          </h2>
-
-          <button onClick={handleClose}>
+          <h2 className="text-lg font-semibold text-gray-800">Nuevo Producto</h2>
+          <button onClick={handleClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-800 cursor-pointer">
             <X />
           </button>
         </div>
 
         {/* STEPS */}
-        <div className="flex justify-center gap-4 mb-6">
-          <div
-            className={`w-8 h-8 flex items-center justify-center rounded-full ${
-              step === 1
-                ? "bg-(--color-pagina) text-white"
-                : "bg-gray-200"
-            }`}
-          >
-            1
+        <div className="flex justify-center gap-4 py-4 bg-gray-50 border-b">
+          <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 1 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>1</div>
+          <div className="w-16 h-1 bg-gray-200 self-center rounded">
+            <div className={`h-1 transition-all duration-300 ${step === 2 ? "bg-(--color-pagina) w-full" : "bg-(--color-pagina) w-1/2"}`} />
           </div>
-
-          <div className="w-16 h-1 bg-gray-200 rounded">
-            <div
-              className={`h-1 ${
-                step === 2
-                  ? "bg-(--color-pagina) w-full"
-                  : "bg-(--color-pagina) w-1/2"
-              }`}
-            />
-          </div>
-
-          <div
-            className={`w-8 h-8 flex items-center justify-center rounded-full ${
-              step === 2
-                ? "bg-(--color-pagina) text-white"
-                : "bg-gray-200"
-            }`}
-          >
-            2
-          </div>
+          <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 2 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>2</div>
         </div>
 
-        {/* STEP 1 */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <h3 className="font-semibold">
-              Información General
-            </h3>
+        {/* CONTENIDO CON SCROLL */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          
+          {/* STEP 1: GENERAL */}
+          {step === 1 && (
+            <div className="space-y-4 animate-fade-in">
+              <h3 className="font-semibold text-gray-700">Información General</h3>
 
-            {/* CATEGORÍA */}
-            <select
-              value={categoriaSeleccionada}
-              onChange={(e) =>
-                setCategoriaSeleccionada(e.target.value)
-              }
-              className="w-full p-3 border rounded-lg"
-            >
-              <option value="">
-                Seleccionar categoría
-              </option>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-600 block">Nombre del Producto</label>
+                <input
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Escribe el nombre del producto"
+                  className="w-full border p-3 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                />
+              </div>
 
-              {categorias.map((c) => (
-                <option
-                  key={c.idCategoria}
-                  value={c.idCategoria}
+              {/* BUSCADOR CATEGORÍA */}
+              <div className="space-y-1 relative">
+                <label className="text-xs font-semibold text-gray-600 block">Categoría</label>
+                <div
+                  onClick={() => setOpenCatDropdown(!openCatDropdown)}
+                  className="w-full p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                 >
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
+                  <span>{nombreCategoriaActual}</span>
+                  <Search className="w-4 h-4 text-gray-400" />
+                </div>
 
-            {/* MARCAS */}
-            <div className="flex gap-2">
-              <select
-                value={marcaSeleccionada}
-                onChange={(e) =>
-                  setMarcaSeleccionada(e.target.value)
-                }
-                className="flex-1 p-3 border rounded-lg"
-              >
-                <option value="">
-                  Seleccionar marca
-                </option>
+                {openCatDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Buscar categoría..."
+                      value={busquedaCat}
+                      onChange={(e) => setBusquedaCat(e.target.value)}
+                      className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-40 overflow-y-auto">
+                      {categoriasFiltradas.map((c) => (
+                        <div
+                          key={c.idCategoria}
+                          onClick={() => {
+                            setCategoriaSeleccionada(c.idCategoria);
+                            setOpenCatDropdown(false);
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
+                        >
+                          {c.nombre}
+                        </div>
+                      ))}
+                      {categoriasFiltradas.length === 0 && (
+                        <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                {marcas.map((m) => (
-                  <option
-                    key={m.idMarca}
-                    value={m.idMarca}
+              {/* BUSCADOR MARCA */}
+              <div className="space-y-1 relative">
+                <label className="text-xs font-semibold text-gray-600 block">Marca</label>
+                <div className="flex gap-2">
+                  <div
+                    onClick={() => setOpenMarcaDropdown(!openMarcaDropdown)}
+                    className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                   >
-                    {m.nombre}
-                  </option>
-                ))}
-              </select>
+                    <span>{nombreMarcaActual}</span>
+                    <Search className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <button
+                    onClick={() => setOpenMarcaModal(true)}
+                    className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {openMarcaDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Buscar marca..."
+                      value={busquedaMarca}
+                      onChange={(e) => setBusquedaMarca(e.target.value)}
+                      className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="max-h-40 overflow-y-auto">
+                      {marcasFiltradas.map((m) => (
+                        <div
+                          key={m.idMarca}
+                          onClick={() => {
+                            setMarcaSeleccionada(m.idMarca);
+                            setOpenMarcaDropdown(false);
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
+                        >
+                          {m.nombre}
+                        </div>
+                      ))}
+                      {marcasFiltradas.length === 0 && (
+                        <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-600 block">Descripción</label>
+                <textarea
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder="Detalles sobre el producto"
+                  className="w-full border p-3 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors min-h-[80px]"
+                />
+              </div>
 
               <button
-                onClick={() =>
-                  setOpenMarcaModal(true)
-                }
-                className="px-3 bg-(--color-pagina-2) text-white rounded-lg"
+                onClick={() => setStep(2)}
+                className="w-full bg-(--color-pagina) text-white py-3 rounded-xl font-medium tracking-wide mt-4 hover:brightness-95 active:scale-[0.99] transition-all cursor-pointer shadow-sm"
               >
-                <Plus />
+                Siguiente paso
               </button>
             </div>
+          )}
 
-            {/* NOMBRE */}
-            <input
-              value={nombre}
-              onChange={(e) =>
-                setNombre(e.target.value)
-              }
-              placeholder="Nombre del producto"
-              className="w-full border p-3 rounded-lg"
-            />
-
-            {/* DESCRIPCIÓN */}
-            <textarea
-              value={descripcion}
-              onChange={(e) =>
-                setDescripcion(e.target.value)
-              }
-              placeholder="Descripción"
-              className="w-full border p-3 rounded-lg"
-            />
-
-            <button
-              onClick={() => setStep(2)}
-              className="w-full bg-(--color-pagina) text-white py-3 rounded-xl"
-            >
-              Siguiente paso
-            </button>
-          </div>
-        )}
-
-        {/* STEP 2 */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <h3 className="font-semibold">
-              Detalles y Variantes
-            </h3>
-
-            {/* PRESENTACIÓN */}
-            <div className="bg-gray-50 p-4 rounded-xl space-y-4">
-              <div className="flex gap-2">
-                <select
-                  value={presentacionSeleccionada}
-                  onChange={(e) =>
-                    setPresentacionSeleccionada(
-                      e.target.value
-                    )
-                  }
-                  className="flex-1 p-3 border rounded-lg"
+          {/* STEP 2: MULTI-VARIANTES CON SUS PROPIOS BUSCADORES */}
+          {step === 2 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="font-semibold text-gray-700">Detalles y Variantes</h3>
+                <button
+                  type="button"
+                  onClick={handleAgregarVariante}
+                  className="flex items-center gap-1 bg-(--color-pagina-2) text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:brightness-90 active:scale-95 transition-all cursor-pointer shadow-sm"
                 >
-                  <option value="">
-                    Presentación
-                  </option>
+                  <Plus className="w-4 h-4" /> Añadir variante
+                </button>
+              </div>
 
-                  {presentaciones.map((p) => (
-                    <option
-                      key={p.idPresentacion}
-                      value={p.idPresentacion}
-                    >
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-6">
+                {variantes.map((v, index) => {
+                  // Filtrados en tiempo real por cada variante individual
+                  const presentacionesFiltradas = presentaciones.filter((p) =>
+                    p.nombre.toLowerCase().includes(v.busquedaPres.toLowerCase())
+                  );
+                  const tallasFiltradas = tallas.filter((t) =>
+                    t.nombre.toLowerCase().includes(v.busquedaTalla.toLowerCase())
+                  );
+                  const ubicacionesFiltradas = ubicaciones.filter((u) =>
+                    u.nombre.toLowerCase().includes(v.busquedaUbic.toLowerCase())
+                  );
+
+                  const nombrePresActual = presentaciones.find((p) => String(p.idPresentacion) === String(v.presentacion))?.nombre || "Seleccionar presentación";
+                  const nombreTallaActual = tallas.find((t) => String(t.idTalla) === String(v.talla))?.nombre || "Talla";
+                  const nombreUbicActual = ubicaciones.find((u) => String(u.idUbicacion) === String(v.ubicacion))?.nombre || "Ubicación";
+
+                  return (
+                    <div key={index} className="bg-gray-50 p-5 rounded-xl border border-gray-200 relative space-y-4 shadow-sm hover:shadow-md transition-shadow">
+                      
+                      {variantes.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarVariante(index)}
+                          className="absolute top-3 right-3 text-red-500 hover:text-red-700 p-1.5 bg-red-50 hover:bg-red-100 rounded-full z-10 transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      <div className="text-xs font-bold text-gray-500 uppercase cursor-default">
+                        Variante #{index + 1}
+                      </div>
+
+                      {/* BUSCADOR PRESENTACIÓN */}
+                      <div className="space-y-1 relative">
+                        <label className="text-xs font-semibold text-gray-600 block">Presentación</label>
+                        <div className="flex gap-2">
+                          <div
+                            onClick={() => handleCambioVariante(index, "openPresDropdown", !v.openPresDropdown)}
+                            className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                          >
+                            <span>{nombrePresActual}</span>
+                            <Search className="w-4 h-4 text-gray-400" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setOpenPresentacionModal(true)}
+                            className="px-3.5 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer font-bold text-lg"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {v.openPresDropdown && (
+                          <div className="absolute z-40 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Buscar presentación..."
+                              value={v.busquedaPres}
+                              onChange={(e) => handleCambioVariante(index, "busquedaPres", e.target.value)}
+                              className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="max-h-32 overflow-y-auto">
+                              {presentacionesFiltradas.map((p) => (
+                                <div
+                                  key={p.idPresentacion}
+                                  onClick={() => {
+                                    handleCambioVariante(index, "presentacion", p.idPresentacion);
+                                    handleCambioVariante(index, "openPresDropdown", false);
+                                  }}
+                                  className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
+                                >
+                                  {p.nombre}
+                                </div>
+                              ))}
+                              {presentacionesFiltradas.length === 0 && (
+                                <div className="p-2 text-xs text-gray-400 text-center cursor-default">No hay resultados</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* PRECIO Y CÓDIGO */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-600 block">Precio Venta</label>
+                          <input
+                            type="number"
+                            value={v.precioVenta}
+                            onChange={(e) => handleCambioVariante(index, "precioVenta", e.target.value)}
+                            placeholder="Precio Venta"
+                            className="w-full border p-3 rounded-lg bg-white outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-600 block">Código de barras</label>
+                          <input
+                            value={v.codigoBarras}
+                            onChange={(e) => handleCambioVariante(index, "codigoBarras", e.target.value)}
+                            placeholder="Código de barras"
+                            className="w-full border p-3 rounded-lg bg-white outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* FILA 3: TALLA, COLOR, UBICACIÓN */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        
+                        {/* BUSCADOR TALLA */}
+                        <div className="space-y-1 relative">
+                          <label className="text-xs font-semibold text-gray-600 block">Talla</label>
+                          <div className="flex gap-1">
+                            <div
+                              onClick={() => handleCambioVariante(index, "openTallaDropdown", !v.openTallaDropdown)}
+                              className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 text-sm overflow-hidden whitespace-nowrap text-ellipsis hover:bg-gray-50 hover:border-gray-300 transition-all"
+                            >
+                              <span>{nombreTallaActual}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setOpenTallaModal(true)}
+                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer font-bold"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {v.openTallaDropdown && (
+                            <div className="absolute z-30 w-56 mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                              <input
+                                type="text"
+                                placeholder="Buscar..."
+                                value={v.busquedaTalla}
+                                onChange={(e) => handleCambioVariante(index, "busquedaTalla", e.target.value)}
+                                className="w-full p-1.5 border rounded text-xs outline-none focus:border-gray-400"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="max-h-28 overflow-y-auto">
+                                {tallasFiltradas.map((t) => (
+                                  <div
+                                    key={t.idTalla}
+                                    onClick={() => {
+                                      handleCambioVariante(index, "talla", t.idTalla);
+                                      handleCambioVariante(index, "openTallaDropdown", false);
+                                    }}
+                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-xs text-gray-700 transition-colors"
+                                  >
+                                    {t.nombre}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* COLOR */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-600 block">Color</label>
+                          <input
+                            value={v.color}
+                            onChange={(e) => handleCambioVariante(index, "color", e.target.value)}
+                            placeholder="Color"
+                            className="w-full border p-3 rounded-lg bg-white outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                          />
+                        </div>
+
+                        {/* BUSCADOR UBICACIÓN */}
+                        <div className="space-y-1 relative">
+                          <label className="text-xs font-semibold text-gray-600 block">Ubicación</label>
+                          <div className="flex gap-1">
+                            <div
+                              onClick={() => handleCambioVariante(index, "openUbicDropdown", !v.openUbicDropdown)}
+                              className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 text-sm overflow-hidden whitespace-nowrap text-ellipsis hover:bg-gray-50 hover:border-gray-300 transition-all"
+                            >
+                              <span>{nombreUbicActual}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setOpenUbicacionModal(true)}
+                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer font-bold"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {v.openUbicDropdown && (
+                            <div className="absolute z-30 w-56 right-0 mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                              <input
+                                type="text"
+                                placeholder="Buscar..."
+                                value={v.busquedaUbic}
+                                onChange={(e) => handleCambioVariante(index, "busquedaUbic", e.target.value)}
+                                className="w-full p-1.5 border rounded text-xs outline-none focus:border-gray-400"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="max-h-28 overflow-y-auto">
+                                {ubicacionesFiltradas.map((u) => (
+                                  <div
+                                    key={u.idUbicacion}
+                                    onClick={() => {
+                                      handleCambioVariante(index, "ubicacion", u.idUbicacion);
+                                      handleCambioVariante(index, "openUbicDropdown", false);
+                                    }}
+                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-xs text-gray-700 transition-colors"
+                                  >
+                                    {u.nombre}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* BOTONES DE PASO */}
+              <div className="flex justify-between pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="border px-6 py-2.5 rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium transition-all cursor-pointer"
+                >
+                  Anterior
+                </button>
 
                 <button
-                  onClick={() =>
-                    setOpenPresentacionModal(true)
-                  }
-                  className="px-3 bg-(--color-pagina-2) text-white rounded-lg"
+                  type="button"
+                  onClick={handleRegistrar}
+                  disabled={loading}
+                  className="bg-(--color-pagina-2) text-white px-6 py-3 rounded-xl disabled:opacity-50 font-medium hover:brightness-90 active:scale-95 transition-all cursor-pointer shadow-sm"
                 >
-                  +
+                  {loading ? "Registrando..." : "Registrar"}
                 </button>
               </div>
             </div>
-
-            {/* VARIANTE */}
-            <div className="bg-gray-50 p-4 rounded-xl space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  value={precioVenta}
-                  onChange={(e) =>
-                    setPrecioVenta(e.target.value)
-                  }
-                  placeholder="Precio Venta"
-                  className="border p-3 rounded-lg"
-                />
-
-                <input
-                  value={codigoBarras}
-                  onChange={(e) =>
-                    setCodigoBarras(e.target.value)
-                  }
-                  placeholder="Código de barras"
-                  className="border p-3 rounded-lg"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                {/* TALLA */}
-                <div className="flex gap-2">
-                  <select
-                    value={tallaSeleccionada}
-                    onChange={(e) =>
-                      setTallaSeleccionada(
-                        e.target.value
-                      )
-                    }
-                    className="flex-1 border p-3 rounded-lg"
-                  >
-                    <option value="">
-                      Talla
-                    </option>
-
-                    {tallas.map((t) => (
-                      <option
-                        key={t.idTalla}
-                        value={t.idTalla}
-                      >
-                        {t.nombre}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    onClick={() =>
-                      setOpenTallaModal(true)
-                    }
-                    className="px-2 bg-(--color-pagina-2) text-white rounded"
-                  >
-                    +
-                  </button>
-                </div>
-
-                {/* COLOR MANUAL */}
-                <input
-                  value={color}
-                  onChange={(e) =>
-                    setColor(e.target.value)
-                  }
-                  placeholder="Color"
-                  className="border p-3 rounded-lg"
-                />
-
-                {/* UBICACIÓN */}
-                <div className="flex gap-2">
-                  <select
-                    value={ubicacionSeleccionada}
-                    onChange={(e) =>
-                      setUbicacionSeleccionada(
-                        e.target.value
-                      )
-                    }
-                    className="flex-1 border p-3 rounded-lg"
-                  >
-                    <option value="">
-                      Ubicación
-                    </option>
-
-                    {ubicaciones.map((u) => (
-                      <option
-                        key={u.idUbicacion}
-                        value={u.idUbicacion}
-                      >
-                        {u.nombre}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    onClick={() =>
-                      setOpenUbicacionModal(true)
-                    }
-                    className="px-2 bg-(--color-pagina-2) text-white rounded"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* BOTONES */}
-            <div className="flex justify-between">
-              <button
-                onClick={() => setStep(1)}
-                className="border px-6 py-2 rounded-xl"
-              >
-                Anterior
-              </button>
-
-              <button
-                onClick={handleRegistrar}
-                disabled={loading}
-                className="bg-(--color-pagina-2) text-white px-6 py-3 rounded-xl disabled:opacity-50"
-              >
-                {loading
-                  ? "Registrando..."
-                  : "Registrar"}
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* MODAL MARCA */}
+      {/* MODAL AUXILIARES CON ACCIONES COMPATIBLES */}
       <ModalNuevaMarca
         open={openMarcaModal}
-        onClose={() =>
-          setOpenMarcaModal(false)
-        }
+        onClose={() => setOpenMarcaModal(false)}
         onSave={(nuevaMarca) => {
-          setMarcas((prev) => [
-            ...prev,
-            nuevaMarca,
-          ]);
-
-          setMarcaSeleccionada(
-            nuevaMarca.idMarca
-          );
+          setMarcas((prev) => [...prev, nuevaMarca]);
+          setMarcaSeleccionada(nuevaMarca.idMarca);
         }}
       />
 
-      {/* MODAL PRESENTACIÓN */}
       <ModalAgregarSimple
         open={openPresentacionModal}
-        onClose={() =>
-          setOpenPresentacionModal(false)
-        }
+        onClose={() => setOpenPresentacionModal(false)}
         titulo="Nueva Presentación"
         placeholder="Ej: Caja"
         onSave={(v) => {
-          setPresentaciones((prev) => [
-            ...prev,
-            v,
-          ]);
-
-          setPresentacionSeleccionada(
-            v.idPresentacion
-          );
+          setPresentaciones((prev) => [...prev, v]);
         }}
       />
 
-      {/* MODAL TALLA */}
       <ModalAgregarSimple
         open={openTallaModal}
-        onClose={() =>
-          setOpenTallaModal(false)
-        }
+        onClose={() => setOpenTallaModal(false)}
         titulo="Nueva Talla"
         placeholder="Ej: M"
         onSave={(v) => {
           setTallas((prev) => [...prev, v]);
-
-          setTallaSeleccionada(v.idTalla);
         }}
       />
 
-      {/* MODAL UBICACIÓN */}
       <ModalAgregarSimple
         open={openUbicacionModal}
-        onClose={() =>
-          setOpenUbicacionModal(false)
-        }
+        onClose={() => setOpenUbicacionModal(false)}
         titulo="Nueva Ubicación"
         placeholder="Ej: Estante 1"
         onSave={(v) => {
-          setUbicaciones((prev) => [
-            ...prev,
-            v,
-          ]);
-
-          setUbicacionSeleccionada(
-            v.idUbicacion
-          );
+          setUbicaciones((prev) => [...prev, v]);
         }}
       />
     </div>
