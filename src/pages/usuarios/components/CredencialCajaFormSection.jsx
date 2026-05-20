@@ -15,6 +15,7 @@ function fmtIso(v) {
 
 const emptyNipFields = {
   nip: "",
+  nipActual: "",
   confirmacionNip: "",
   credencialActivo: true,
 };
@@ -25,19 +26,22 @@ export function getEmptyCredencialCajaForm() {
 
 /**
  * Sección reutilizable para NIP de caja (POS).
- * - create: checkbox para asignar al crear usuario
- * - edit: muestra credencial existente o formulario para crear una nueva
+ * - create: checkbox + NIP con confirmación
+ * - edit: credencial existente → cambiar NIP (nuevo + opcional actual)
  */
 export function CredencialCajaFormSection({
   mode = "create",
   assignNip,
   onAssignNipChange,
   nip,
+  nipActual = "",
   confirmacionNip,
   credencialActivo,
   onNipChange,
+  onNipActualChange,
   onConfirmacionNipChange,
   onCredencialActivoChange,
+  showConfirm = true,
   fieldErrors = {},
   credencial = null,
   credencialLoading = false,
@@ -123,10 +127,30 @@ export function CredencialCajaFormSection({
 
       {showFields ? (
         <div className="grid gap-3">
-          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+          {mode === "edit" && credencial && !showConfirm ? (
+            <div className="grid gap-2">
+              <Label htmlFor="cc-nip-actual" className="text-xs font-bold uppercase text-(--color-pagina)">
+                NIP actual (opcional)
+              </Label>
+              <Input
+                id="cc-nip-actual"
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={10}
+                placeholder="Si lo conoce; si no, se asigna el nuevo directamente"
+                value={nipActual}
+                onChange={(e) => onNipActualChange?.(e.target.value.replace(/\D/g, ""))}
+              />
+              {fieldErrors.nipActual?.[0] ? (
+                <p className="text-xs text-(--color-rojo)">{fieldErrors.nipActual[0]}</p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className={showConfirm ? "grid gap-2 sm:grid-cols-2 sm:gap-3" : "grid gap-2"}>
             <div className="grid gap-2">
               <Label htmlFor="cc-nip" className="text-xs font-bold uppercase text-(--color-pagina)">
-                NIP
+                {mode === "edit" && credencial && !showConfirm ? "Nuevo NIP" : "NIP"}
               </Label>
               <Input
                 id="cc-nip"
@@ -141,31 +165,30 @@ export function CredencialCajaFormSection({
               {fieldErrors.nip?.[0] ? (
                 <p className="text-xs text-(--color-rojo)">{fieldErrors.nip[0]}</p>
               ) : null}
-              {fieldErrors.nipNuevo?.[0] ? (
-                <p className="text-xs text-(--color-rojo)">{fieldErrors.nipNuevo[0]}</p>
+              {fieldErrors.nuevoNip?.[0] ? (
+                <p className="text-xs text-(--color-rojo)">{fieldErrors.nuevoNip[0]}</p>
               ) : null}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="cc-nip2" className="text-xs font-bold uppercase text-(--color-pagina)">
-                Confirmar NIP
-              </Label>
-              <Input
-                id="cc-nip2"
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={10}
-                placeholder="Repetir NIP"
-                value={confirmacionNip}
-                onChange={(e) => onConfirmacionNipChange?.(e.target.value.replace(/\D/g, ""))}
-              />
-              {fieldErrors.confirmacionNip?.[0] ? (
-                <p className="text-xs text-(--color-rojo)">{fieldErrors.confirmacionNip[0]}</p>
-              ) : null}
-              {fieldErrors.confirmacionNipNuevo?.[0] ? (
-                <p className="text-xs text-(--color-rojo)">{fieldErrors.confirmacionNipNuevo[0]}</p>
-              ) : null}
-            </div>
+            {showConfirm ? (
+              <div className="grid gap-2">
+                <Label htmlFor="cc-nip2" className="text-xs font-bold uppercase text-(--color-pagina)">
+                  Confirmar NIP
+                </Label>
+                <Input
+                  id="cc-nip2"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={10}
+                  placeholder="Repetir NIP"
+                  value={confirmacionNip}
+                  onChange={(e) => onConfirmacionNipChange?.(e.target.value.replace(/\D/g, ""))}
+                />
+                {fieldErrors.confirmacionNip?.[0] ? (
+                  <p className="text-xs text-(--color-rojo)">{fieldErrors.confirmacionNip[0]}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           {(mode === "create" && assignNip) || (mode === "edit" && !credencial && assignNip) ? (
             <label className="flex cursor-pointer items-center gap-2 text-sm text-(--color-gris-letra)">

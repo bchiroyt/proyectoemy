@@ -10,13 +10,19 @@ const Inventario = () => {
     useState(false);
 
   return (
-    <div className="bg-(--color-pagina-4) min-h-full w-full p-6 space-y-6">
-
+    <div className="flex h-full flex-col">
+      <div className="sticky top-0 z-10 flex w-full flex-wrap items-center gap-1 border-b border-border bg-(--color-blanco) p-2 shadow-sm">
+        <div className="flex flex-1 justify-start gap-2">
+          <div></div>
+        </div>
+      
       <BarraHerramientas
         onNuevoProducto={() =>
           setOpenModal(true)
         }
       />
+      
+    </div>
 
       <Modulos />
 

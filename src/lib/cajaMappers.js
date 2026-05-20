@@ -151,6 +151,11 @@ export function buildDetallesArqueo(cantidades, denominaciones) {
     }));
 }
 
+/** Solo billetes (apertura: monedas van en totalMonedas) */
+export function buildDetallesApertura(cantidades, denominaciones) {
+  return buildDetallesArqueo(cantidades, denominaciones);
+}
+
 export function calcularTotalArqueo(cantidades, denominaciones) {
   return denominaciones.reduce((acc, d) => {
     const qty = cantidades[d.idDenominacion] ?? 0;

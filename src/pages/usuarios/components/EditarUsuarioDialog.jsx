@@ -13,14 +13,16 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useActualizarEstadoCredencialCajaMutation,
-  useActualizarNipCredencialCajaMutation,
+  useAsignarNipCredencialCajaMutation,
   useCrearCredencialCajaMutation,
   useCredencialCajaPorUsuarioQuery,
+  usePatchCredencialCajaMutation,
 } from "@/hooks/queries/useCredencialCajaQueries";
 import { usePatchUsuarioMutation, useUsuarioQuery } from "@/hooks/queries/useSeguridadQueries";
 import {
-  validateCredencialCajaActualizarNip,
+  validateCredencialCajaAsignarNip,
   validateCredencialCajaCrear,
+  validateCredencialCajaPatch,
 } from "@/lib/credencialCajaValidations";
 import { validateUsuarioEditForm } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
@@ -65,7 +67,8 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
   });
   const patchMut = usePatchUsuarioMutation();
   const crearCredencialMut = useCrearCredencialCajaMutation();
-  const actualizarNipMut = useActualizarNipCredencialCajaMutation();
+  const asignarNipMut = useAsignarNipCredencialCajaMutation();
+  const patchCredencialMut = usePatchCredencialCajaMutation();
   const actualizarEstadoMut = useActualizarEstadoCredencialCajaMutation();
 
   useEffect(() => {
@@ -160,29 +163,38 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
     }
 
     if (credencial && changeNip) {
-      const parsed = validateCredencialCajaActualizarNip({
-        nipNuevo: nipForm.nip,
-        confirmacionNipNuevo: nipForm.confirmacionNip,
-      });
+      const nuevoNip = nipForm.nip.trim();
+      const nipActual = nipForm.nipActual.trim();
+
+      if (nipActual) {
+        const parsed = validateCredencialCajaPatch({ nipActual, nuevoNip });
+        if (!parsed.success) {
+          setNipFieldErrors(parsed.error.flatten().fieldErrors);
+          return;
+        }
+        try {
+          await patchCredencialMut.mutateAsync({ idUsuario, nipActual, nuevoNip });
+          setNipForm((f) => ({ ...f, nip: "", nipActual: "" }));
+          setChangeNip(false);
+          setNipSuccess("NIP de caja actualizado correctamente.");
+        } catch (e) {
+          setLocalError(getApiErrorMessage(e, "No se pudo actualizar el NIP de caja."));
+        }
+        return;
+      }
+
+      const parsed = validateCredencialCajaAsignarNip({ nuevoNip });
       if (!parsed.success) {
-        const fe = parsed.error.flatten().fieldErrors;
-        setNipFieldErrors({
-          nipNuevo: fe.nipNuevo,
-          confirmacionNipNuevo: fe.confirmacionNipNuevo,
-        });
+        setNipFieldErrors(parsed.error.flatten().fieldErrors);
         return;
       }
       try {
-        await actualizarNipMut.mutateAsync({
-          idUsuario,
-          nipNuevo: nipForm.nip,
-          confirmacionNipNuevo: nipForm.confirmacionNip,
-        });
-        setNipForm((f) => ({ ...f, nip: "", confirmacionNip: "" }));
+        await asignarNipMut.mutateAsync({ idUsuario, nuevoNip });
+        setNipForm((f) => ({ ...f, nip: "", nipActual: "" }));
         setChangeNip(false);
-        setNipSuccess("NIP de caja actualizado correctamente.");
+        setNipSuccess("NIP de caja asignado correctamente.");
       } catch (e) {
-        setLocalError(getApiErrorMessage(e, "No se pudo actualizar el NIP de caja."));
+        setLocalError(getApiErrorMessage(e, "No se pudo asignar el NIP de caja."));
       }
     }
   };
@@ -206,9 +218,13 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
   };
 
   const nipBusy =
-    crearCredencialMut.isPending || actualizarNipMut.isPending || actualizarEstadoMut.isPending;
+    crearCredencialMut.isPending ||
+    asignarNipMut.isPending ||
+    patchCredencialMut.isPending ||
+    actualizarEstadoMut.isPending;
   const credencial = credencialQ.data;
-  const showNipAction = (!credencial && nipForm.assignNip) || (credencial && changeNip);
+  const showNipAction =
+    (!credencial && nipForm.assignNip) || (credencial && changeNip && nipForm.nip.length > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -367,9 +383,12 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
                 if (!v) setNipFieldErrors({});
               }}
               nip={nipForm.nip}
+              nipActual={nipForm.nipActual}
               confirmacionNip={nipForm.confirmacionNip}
               credencialActivo={nipForm.credencialActivo}
+              showConfirm={!credencial}
               onNipChange={(v) => setNipForm((f) => ({ ...f, nip: v }))}
+              onNipActualChange={(v) => setNipForm((f) => ({ ...f, nipActual: v }))}
               onConfirmacionNipChange={(v) => setNipForm((f) => ({ ...f, confirmacionNip: v }))}
               onCredencialActivoChange={(v) => setNipForm((f) => ({ ...f, credencialActivo: v }))}
               fieldErrors={nipFieldErrors}
@@ -384,7 +403,7 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
               onChangeNipToggle={(v) => {
                 setChangeNip(v);
                 if (!v) {
-                  setNipForm((f) => ({ ...f, nip: "", confirmacionNip: "" }));
+                  setNipForm((f) => ({ ...f, nip: "", nipActual: "", confirmacionNip: "" }));
                   setNipFieldErrors({});
                 }
               }}

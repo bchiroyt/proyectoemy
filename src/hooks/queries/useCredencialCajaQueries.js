@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   actualizarEstadoCredencialCaja,
-  actualizarNipCredencialCaja,
+  asignarNipCredencialCaja,
   crearCredencialCaja,
   fetchCredencialCajaPorUsuario,
+  patchCredencialCajaUsuario,
 } from "@/services/credencialCajaService";
 
 export const qkCredencialCajaUsuario = (idUsuario) => ["credencial-caja", "usuario", idUsuario];
@@ -29,10 +30,23 @@ export function useCrearCredencialCajaMutation() {
   });
 }
 
-export function useActualizarNipCredencialCajaMutation() {
+/** Admin en módulo usuarios: PUT /nip sin NIP actual */
+export function useAsignarNipCredencialCajaMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ idUsuario, ...body }) => actualizarNipCredencialCaja(idUsuario, body),
+    mutationFn: ({ idUsuario, nuevoNip }) => asignarNipCredencialCaja(idUsuario, nuevoNip),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: qkCredencialCajaUsuario(v.idUsuario) });
+    },
+  });
+}
+
+/** PATCH con nipActual + nuevoNip (perfil / cambio propio) */
+export function usePatchCredencialCajaMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idUsuario, nipActual, nuevoNip }) =>
+      patchCredencialCajaUsuario(idUsuario, { nipActual, nuevoNip }),
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: qkCredencialCajaUsuario(v.idUsuario) });
     },

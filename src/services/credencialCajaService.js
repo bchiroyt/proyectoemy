@@ -43,12 +43,32 @@ export async function crearCredencialCaja(body) {
   return mapCredencialCaja(inner ?? data);
 }
 
-/** PUT /api/credenciales-caja/{idUsuario}/nip */
-export async function actualizarNipCredencialCaja(idUsuario, body) {
-  const { data } = await apiClient.put(`/api/credenciales-caja/${idUsuario}/nip`, body);
+/**
+ * PUT /api/credenciales-caja/{idUsuario}/nip
+ * Admin: asigna NIP nuevo sin pedir el actual (nipNuevo + confirmacionNipNuevo).
+ */
+export async function asignarNipCredencialCaja(idUsuario, nuevoNip) {
+  const { data } = await apiClient.put(`/api/credenciales-caja/${idUsuario}/nip`, {
+    nipNuevo: nuevoNip,
+    confirmacionNipNuevo: nuevoNip,
+  });
   throwIfEnvelopeFailed(data, "No se pudo actualizar el NIP de caja.");
   const inner = pick(data, "data", "Data");
   return mapCredencialCaja(inner ?? data);
+}
+
+/**
+ * PATCH /api/credenciales-caja/{idUsuario}
+ * Requiere NIP actual (flujo “cambiar mi NIP”).
+ */
+export async function patchCredencialCajaUsuario(idUsuario, body) {
+  const { data } = await apiClient.patch(`/api/credenciales-caja/${idUsuario}`, {
+    nipActual: body.nipActual,
+    nuevoNip: body.nuevoNip,
+  });
+  throwIfEnvelopeFailed(data, "No se pudo actualizar la credencial de caja.");
+  const inner = pick(data, "data", "Data");
+  return inner ?? data;
 }
 
 /** PATCH /api/credenciales-caja/{idUsuario}/estado */

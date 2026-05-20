@@ -1,5 +1,6 @@
 import { Minus, Plus, Banknote, Coins } from "lucide-react";
 import { calcularTotalArqueo, fmtQ } from "@/lib/cajaMappers";
+import { parseMontoMonedas } from "@/lib/cajaUtils";
 import { cn } from "@/lib/utils";
 
 function clampCantidad(n) {
@@ -69,6 +70,9 @@ export function ConteoDenominaciones({
   denominaciones = [],
   cantidades,
   onCantidadesChange,
+  monedasModo = "detalle",
+  totalMonedas = "",
+  onTotalMonedasChange,
   observacion = "",
   onObservacionChange,
   showObservacion = true,
@@ -79,16 +83,18 @@ export function ConteoDenominaciones({
 }) {
   const billetes = denominaciones.filter((d) => !d.tipo?.includes("MONEDA"));
   const monedas = denominaciones.filter((d) => d.tipo?.includes("MONEDA"));
+  const usaMonedasTotal = monedasModo === "total";
 
   const setCantidad = (id, qty) => {
     onCantidadesChange({ ...cantidades, [id]: qty });
   };
 
-  const total = calcularTotalArqueo(cantidades, denominaciones);
   const totalBilletes = calcularTotalArqueo(cantidades, billetes.length ? billetes : []);
-  const totalMonedas = calcularTotalArqueo(cantidades, monedas.length ? monedas : []);
+  const totalMonedasDetalle = calcularTotalArqueo(cantidades, monedas.length ? monedas : []);
+  const totalMonedasValor = usaMonedasTotal ? parseMontoMonedas(totalMonedas) || 0 : totalMonedasDetalle;
+  const total = totalBilletes + (Number.isFinite(totalMonedasValor) ? totalMonedasValor : 0);
 
-  if (!denominaciones.length) {
+  if (!denominaciones.length && !usaMonedasTotal) {
     return (
       <p className="text-sm text-(--color-gris-letra) py-6 text-center">
         No hay denominaciones activas configuradas en el sistema.
@@ -114,19 +120,40 @@ export function ConteoDenominaciones({
             </div>
           </div>
         )}
-        {monedas.length > 0 && (
+        {(usaMonedasTotal || monedas.length > 0) && (
           <div className="flex flex-col gap-1.5 lg:w-56 xl:w-64 shrink-0">
             <p className="text-(--color-pagina) font-bold text-xs tracking-wide">MONEDAS</p>
-            <div className="flex flex-col gap-2 rounded-xl border border-(--color-gris-claro-2) bg-(--color-pagina-3)/50 p-2">
-              {monedas.map((d) => (
-                <FilaDenominacion
-                  key={d.idDenominacion}
-                  denominacion={d}
-                  cantidad={cantidades[d.idDenominacion] ?? 0}
-                  onChange={(qty) => setCantidad(d.idDenominacion, qty)}
+            {usaMonedasTotal ? (
+              <div className="flex flex-col gap-2 rounded-xl border border-(--color-gris-claro-2) bg-(--color-pagina-3)/50 p-3">
+                <div className="flex items-center gap-2">
+                  <Coins className="size-5 shrink-0 text-(--color-pagina-2)" />
+                  <p className="text-sm font-semibold text-(--color-negro)">Monto total en monedas</p>
+                </div>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="0.00"
+                  value={totalMonedas}
+                  onChange={(e) => onTotalMonedasChange?.(e.target.value.replace(/[^\d.,]/g, ""))}
+                  className="w-full rounded-lg border border-gray-300 bg-(--color-blanco) px-3 py-2 text-right text-lg font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-(--color-pagina)/40"
                 />
-              ))}
-            </div>
+                <p className="text-xs text-(--color-gris-letra)">
+                  Total acumulado de monedas (no por denominación).
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 rounded-xl border border-(--color-gris-claro-2) bg-(--color-pagina-3)/50 p-2">
+                {monedas.map((d) => (
+                  <FilaDenominacion
+                    key={d.idDenominacion}
+                    denominacion={d}
+                    cantidad={cantidades[d.idDenominacion] ?? 0}
+                    onChange={(qty) => setCantidad(d.idDenominacion, qty)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -160,7 +187,9 @@ export function ConteoDenominaciones({
           <p className="text-2xl font-bold tabular-nums">{fmtQ(total)}</p>
           <div className="mt-1 space-y-0.5 text-xs opacity-95">
             {billetes.length > 0 && <p>Billetes: {fmtQ(totalBilletes)}</p>}
-            {monedas.length > 0 && <p>Monedas: {fmtQ(totalMonedas)}</p>}
+            {(usaMonedasTotal || monedas.length > 0) && (
+              <p>Monedas: {fmtQ(Number.isFinite(totalMonedasValor) ? totalMonedasValor : 0)}</p>
+            )}
           </div>
           {resumenExtra}
         </div>

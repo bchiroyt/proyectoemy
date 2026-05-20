@@ -18,20 +18,35 @@ export const credencialCajaCrearSchema = z
     path: ["confirmacionNip"],
   });
 
-export const credencialCajaActualizarNipSchema = z
+/** Admin: asignar nuevo NIP sin conocer el actual (PUT /nip) */
+export const credencialCajaAsignarNipSchema = z.object({
+  nuevoNip: nipDigitsSchema,
+});
+
+/** Usuario: cambio con NIP actual (PATCH /{idUsuario}) */
+export const credencialCajaPatchSchema = z
   .object({
-    nipNuevo: nipDigitsSchema,
-    confirmacionNipNuevo: z.string().trim(),
+    nipActual: nipDigitsSchema,
+    nuevoNip: nipDigitsSchema,
   })
-  .refine((d) => d.nipNuevo === d.confirmacionNipNuevo, {
-    message: "Los NIP no coinciden",
-    path: ["confirmacionNipNuevo"],
+  .refine((d) => d.nipActual !== d.nuevoNip, {
+    message: "El nuevo NIP debe ser diferente al actual",
+    path: ["nuevoNip"],
   });
 
 export function validateCredencialCajaCrear(input) {
   return credencialCajaCrearSchema.safeParse(input);
 }
 
-export function validateCredencialCajaActualizarNip(input) {
-  return credencialCajaActualizarNipSchema.safeParse(input);
+/** Crear con un solo campo en UI: confirma en cliente duplicando el valor */
+export function validateCredencialCajaCrearSimple(nuevoNip) {
+  return credencialCajaAsignarNipSchema.safeParse({ nuevoNip });
+}
+
+export function validateCredencialCajaAsignarNip(input) {
+  return credencialCajaAsignarNipSchema.safeParse(input);
+}
+
+export function validateCredencialCajaPatch(input) {
+  return credencialCajaPatchSchema.safeParse(input);
 }

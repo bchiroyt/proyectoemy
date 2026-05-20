@@ -8,8 +8,8 @@ import {
 } from "@/hooks/queries/useCajaQueries";
 import { ConteoDenominaciones } from "@/components/caja/ConteoDenominaciones";
 import { NipDialog } from "@/components/caja/NipDialog";
-import { buildDetallesArqueo } from "@/lib/cajaMappers";
-import { initCantidades } from "@/lib/cajaUtils";
+import { buildDetallesApertura } from "@/lib/cajaMappers";
+import { filtrarBilletes, initCantidades, parseMontoMonedas } from "@/lib/cajaUtils";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import Toast from "@/components/ui/Toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,8 +21,10 @@ const AperturaCaja = () => {
   const abrirM = useAbrirCajaMutation();
 
   const denominaciones = denomQ.data?.data ?? [];
+  const billetes = useMemo(() => filtrarBilletes(denominaciones), [denominaciones]);
 
   const [cantidades, setCantidades] = useState({});
+  const [totalMonedas, setTotalMonedas] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [nipOpen, setNipOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
@@ -32,21 +34,31 @@ const AperturaCaja = () => {
   }, [setTitulo]);
 
   useEffect(() => {
-    if (denominaciones.length) {
-      setCantidades(initCantidades(denominaciones));
+    if (billetes.length) {
+      setCantidades(initCantidades(billetes));
     }
-  }, [denominaciones.length]);
+  }, [billetes.length]);
 
-  const detallesValidos = useMemo(
-    () => buildDetallesArqueo(cantidades, denominaciones),
-    [cantidades, denominaciones]
+  const detallesBilletes = useMemo(
+    () => buildDetallesApertura(cantidades, billetes),
+    [cantidades, billetes]
   );
 
+  const montoMonedas = useMemo(() => parseMontoMonedas(totalMonedas), [totalMonedas]);
+
   const handleConfirmarClick = () => {
-    if (!detallesValidos.length) {
+    if (Number.isNaN(montoMonedas)) {
       setToast({
         open: true,
-        message: "Ingrese al menos una denominación con cantidad mayor a cero.",
+        message: "El monto en monedas no es válido.",
+        type: "warning",
+      });
+      return;
+    }
+    if (!detallesBilletes.length && montoMonedas <= 0) {
+      setToast({
+        open: true,
+        message: "Ingrese al menos un billete o un total de monedas mayor a cero.",
         type: "warning",
       });
       return;
@@ -55,11 +67,13 @@ const AperturaCaja = () => {
   };
 
   const handleNipConfirm = async (nip) => {
+    const monedas = Number.isNaN(montoMonedas) ? 0 : montoMonedas;
     try {
       await abrirM.mutateAsync({
         nip,
         observacion: observaciones.trim() || null,
-        detalles: detallesValidos,
+        totalMonedas: monedas,
+        detalles: detallesBilletes,
       });
       setNipOpen(false);
       setToast({ open: true, message: "Caja abierta correctamente.", type: "success" });
@@ -82,6 +96,8 @@ const AperturaCaja = () => {
     minute: "2-digit",
   });
 
+  const puedeContar = billetes.length > 0 || denominaciones.length > 0;
+
   return (
     <div className="h-full min-h-0 flex flex-col overflow-hidden bg-(--color-pagina-4) p-2 sm:p-3">
       <Toast
@@ -99,7 +115,7 @@ const AperturaCaja = () => {
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-(--color-negro)">Conteo inicial</h2>
             <p className="text-sm text-(--color-gris-letra) mt-0.5">
-              Registre el efectivo en caja para iniciar su turno.
+              Billetes por denominación y monedas en un solo monto total.
             </p>
           </div>
           <button
@@ -124,12 +140,19 @@ const AperturaCaja = () => {
             <p className="text-(--color-rojo) text-sm">
               {getApiErrorMessage(denomQ.error, "No se pudieron cargar las denominaciones.")}
             </p>
+          ) : !puedeContar ? (
+            <p className="text-sm text-(--color-gris-letra) py-6 text-center">
+              No hay denominaciones activas configuradas en el sistema.
+            </p>
           ) : (
             <>
               <ConteoDenominaciones
                 denominaciones={denominaciones}
                 cantidades={cantidades}
                 onCantidadesChange={setCantidades}
+                monedasModo="total"
+                totalMonedas={totalMonedas}
+                onTotalMonedasChange={setTotalMonedas}
                 observacion={observaciones}
                 onObservacionChange={setObservaciones}
               />
@@ -137,7 +160,7 @@ const AperturaCaja = () => {
                 <button
                   type="button"
                   onClick={handleConfirmarClick}
-                  disabled={abrirM.isPending || !denominaciones.length}
+                  disabled={abrirM.isPending}
                   className="inline-flex items-center gap-2 rounded-xl bg-(--color-pagina) px-6 py-3 text-sm font-bold text-(--color-blanco) hover:bg-(--color-borde-button) disabled:opacity-50"
                 >
                   <Lock className="size-4" />
