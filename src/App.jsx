@@ -10,6 +10,8 @@ import POS from "./pages/pos/Pos";
 import Apertura from "./pages/pos/AperturaCaja";
 import CierreCaja from "./pages/pos/CierreCaja";
 import Ventas from "./pages/pos/VentasPos";
+import CobroCaja from "./pages/pos/CobroCaja";
+import VentaTicket from "./pages/pos/VentaTicket";
 import Contabilidad from "./pages/contabilidad/Contabilidad";
 import Compras from "./pages/compras/Compras";
 import NuevaCompra from "./pages/compras/NuevaCompra";
@@ -102,6 +104,8 @@ function App() {
           <Route path="apertura" element={<Apertura />} />
           <Route path="cierre" element={<CierreCaja />} />
           <Route path="ventas" element={<Ventas />} />
+          <Route path="cobro" element={<CobroCaja />} />
+          <Route path="ticket" element={<VentaTicket />} />
         </Route>
         <Route path="/caja" element={<Navigate to="/pos" replace />} />
         <Route

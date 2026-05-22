@@ -1,0 +1,142 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { digitoDesdeTecla, esTeclaBorrar } from "@/lib/posTecladoUtils";
+
+/**
+ * Edición de cantidad en carrito POS sin input visible.
+ * Delete: quita dígitos → 0 → elimina línea.
+ */
+export function useCarritoCantidadTeclado(carrito, setCarrito) {
+  const [lineaId, setLineaId] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const overwriteRef = useRef(true);
+
+  const seleccionarLinea = useCallback((id) => {
+    setLineaId(id);
+    setDraft(null);
+    overwriteRef.current = true;
+  }, []);
+
+  const deseleccionar = useCallback(() => {
+    setLineaId(null);
+    setDraft(null);
+    overwriteRef.current = true;
+  }, []);
+
+  const actualizarCantidad = useCallback(
+    (id, cantidad) => {
+      const n = Math.max(0, Math.min(9999, Math.floor(Number(cantidad)) || 0));
+      setCarrito((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, cantidad: n } : p))
+      );
+    },
+    [setCarrito]
+  );
+
+  const eliminarLinea = useCallback(
+    (id) => {
+      setCarrito((prev) => prev.filter((p) => p.id !== id));
+      setLineaId((actual) => (actual === id ? null : actual));
+      setDraft(null);
+      overwriteRef.current = true;
+    },
+    [setCarrito]
+  );
+
+  const cantidadVisible = useCallback(
+    (item) => {
+      if (item.id !== lineaId) return String(item.cantidad);
+      if (draft !== null) return draft === "" ? "0" : draft;
+      return String(item.cantidad);
+    },
+    [lineaId, draft]
+  );
+
+  useEffect(() => {
+    if (lineaId == null) return undefined;
+
+    const handler = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const item = carrito.find((p) => p.id === lineaId);
+      if (!item) {
+        deseleccionar();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        deseleccionar();
+        return;
+      }
+
+      if (esTeclaBorrar(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const current = draft !== null ? draft : String(item.cantidad);
+
+        if (current.length > 1) {
+          const next = current.slice(0, -1);
+          setDraft(next);
+          overwriteRef.current = false;
+          actualizarCantidad(lineaId, parseInt(next, 10) || 0);
+          return;
+        }
+
+        if (item.cantidad > 0 || (current.length === 1 && current !== "0")) {
+          setDraft("0");
+          overwriteRef.current = false;
+          actualizarCantidad(lineaId, 0);
+          return;
+        }
+
+        eliminarLinea(lineaId);
+        return;
+      }
+
+      const digito = digitoDesdeTecla(e);
+      if (!digito) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      let next;
+      if (overwriteRef.current) {
+        next = digito;
+        overwriteRef.current = false;
+      } else {
+        const base = draft !== null ? draft : String(item.cantidad);
+        next = base + digito;
+      }
+
+      if (next.length > 4) return;
+
+      setDraft(next);
+      actualizarCantidad(lineaId, parseInt(next, 10) || 0);
+    };
+
+    document.addEventListener("keydown", handler, true);
+    return () => document.removeEventListener("keydown", handler, true);
+  }, [
+    lineaId,
+    draft,
+    carrito,
+    actualizarCantidad,
+    eliminarLinea,
+    deseleccionar,
+  ]);
+
+  useEffect(() => {
+    if (lineaId != null && !carrito.some((p) => p.id === lineaId)) {
+      deseleccionar();
+    }
+  }, [carrito, lineaId, deseleccionar]);
+
+  return {
+    lineaSeleccionadaId: lineaId,
+    edicionActiva: lineaId != null,
+    seleccionarLinea,
+    deseleccionar,
+    cantidadVisible,
+  };
+}

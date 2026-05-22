@@ -17,6 +17,22 @@ export function filtrarBilletes(denominaciones = []) {
 }
 
 /** Parsea monto de monedas (un solo campo); devuelve NaN si el texto no es válido */
+/** Agrupa movimientos para la pantalla de cierre de caja */
+export function agruparMovimientosCierre(movimientos = []) {
+  const gastos = movimientos.filter((m) => m.naturaleza?.toUpperCase() === "SALIDA");
+  const entradas = movimientos.filter((m) => m.naturaleza?.toUpperCase() === "ENTRADA");
+  const esVenta = (m) => /venta/i.test(m.tipoMovimientoNombre ?? "");
+  const ventasEfectivo = entradas.filter(esVenta).reduce((acc, m) => acc + m.monto, 0);
+  const otrasEntradas = entradas.filter((m) => !esVenta(m)).reduce((acc, m) => acc + m.monto, 0);
+  const totalGastos = gastos.reduce((acc, m) => acc + m.monto, 0);
+  return {
+    gastos,
+    ventasEfectivo: Math.round(ventasEfectivo * 100) / 100,
+    otrasEntradas: Math.round(otrasEntradas * 100) / 100,
+    totalGastos: Math.round(totalGastos * 100) / 100,
+  };
+}
+
 export function parseMontoMonedas(value) {
   const s = String(value ?? "")
     .trim()

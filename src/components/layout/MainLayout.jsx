@@ -22,7 +22,7 @@ const MainLayout = ({ children }) => {
                             </div>
                         </main>
                         */}
-                        <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                        <main className="flex-1 min-h-0 flex flex-col overflow-hidden overflow-auto">
                         {/* Quitamos max-w, mx-auto y los px/py de aquí */}
                             <div className="w-full flex-1 min-h-0 flex flex-col">
                                 {children}

@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  ShoppingCart,
-  Check,
-  Info,
-  RotateCcw,
-  ScanBarcode,
-  Barcode,
-} from "lucide-react";
+import { Check, Info, RotateCcw, ScanBarcode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { cn } from "@/lib/utils";
@@ -14,31 +7,23 @@ import {
   useBarcodeScanner,
   BARCODE_DEFAULT_MAX_INTER_KEY_MS,
 } from "@/hooks/useBarcodeScanner";
-import { fetchProductoByCodigo, getProductosPosDemo } from "@/services/posProductoService";
+import { fetchProductoByCodigo } from "@/services/posProductoService";
 import { useMiCajaActivaQuery } from "@/hooks/queries/useCajaQueries";
+import {
+  useVentaCatalogoQuery,
+  useVentaCategoriasQuery,
+} from "@/hooks/queries/useVentaQueries";
 import { MovimientoCajaDialog } from "@/components/caja/MovimientoCajaDialog";
+import { CatalogoProductoCard } from "@/pages/pos/components/CatalogoProductoCard";
+import { CarritoPanel } from "@/pages/pos/components/CarritoPanel";
+import { useCarritoCantidadTeclado } from "@/hooks/useCarritoCantidadTeclado";
+import { usePosVentaStore } from "@/context/usePosVentaStore";
+import Toast from "@/components/ui/Toast";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-const productosMock = getProductosPosDemo();
-
-const CATEGORIAS = [
-  { id: "todo", label: "Todo" },
-  { id: "zapatos", label: "Zapatos" },
-  { id: "ropa", label: "Ropa" },
-  { id: "cosmeticos", label: "Cosméticos" },
-  { id: "shampoo", label: "Shampoo" },
-];
 
 const PAGE_SIZE = 8;
+const CATEGORIA_TODO = "todo";
 
 const VentasPOS = () => {
   const setTitulo = useNavigationStore((state) => state.setTitulo);
@@ -50,15 +35,55 @@ const VentasPOS = () => {
 
   const [carrito, setCarrito] = useState([]);
   const [busqueda, setBusqueda] = useState("");
-  const [categoriaId, setCategoriaId] = useState("todo");
+  const [debouncedCriterio, setDebouncedCriterio] = useState("");
+  const [categoriaId, setCategoriaId] = useState(CATEGORIA_TODO);
   const [pagina, setPagina] = useState(1);
   const [flashRowId, setFlashRowId] = useState(null);
   const [scanFeedback, setScanFeedback] = useState(null);
   const [gastosOpen, setGastosOpen] = useState(false);
+  const [toast, setToast] = useState({ open: false, message: "", type: "success" });
+  const setPendiente = usePosVentaStore((s) => s.setPendiente);
+
+  const {
+    lineaSeleccionadaId,
+    edicionActiva,
+    seleccionarLinea,
+    deseleccionar,
+    cantidadVisible,
+  } = useCarritoCantidadTeclado(carrito, setCarrito);
 
   useEffect(() => {
     setTitulo("POS · Ventas");
   }, [setTitulo]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedCriterio(busqueda.trim()), 350);
+    return () => window.clearTimeout(t);
+  }, [busqueda]);
+
+  const categoriasQ = useVentaCategoriasQuery({ enabled: !!idCaja });
+
+  const categoriaLabel =
+    categoriaId === CATEGORIA_TODO
+      ? ""
+      : categoriasQ.data?.find((c) => c.id === categoriaId)?.label ?? "";
+
+  const criterioApi = debouncedCriterio || categoriaLabel || undefined;
+
+  const catalogoQ = useVentaCatalogoQuery(
+    { page: pagina, pageSize: PAGE_SIZE, criterio: criterioApi },
+    { enabled: !!idCaja }
+  );
+
+  const productosPagina = catalogoQ.data?.items ?? [];
+  const totalCount = catalogoQ.data?.totalCount ?? 0;
+  const totalPaginas = catalogoQ.data?.totalPages ?? 1;
+  const paginaSegura = Math.min(pagina, Math.max(1, totalPaginas));
+  const sliceStart = totalCount === 0 ? 0 : (paginaSegura - 1) * PAGE_SIZE;
+
+  useEffect(() => {
+    setPagina(1);
+  }, [debouncedCriterio, categoriaId]);
 
   useEffect(() => {
     if (!miCajaQ.isLoading && !miCajaQ.data?.data) {
@@ -66,25 +91,23 @@ const VentasPOS = () => {
     }
   }, [miCajaQ.isLoading, miCajaQ.data, navigate]);
 
-  const agregarProducto = useCallback((producto, notaLinea) => {
-    setCarrito((prev) => {
-      const existe = prev.find((p) => p.id === producto.id);
-      if (existe) {
-        return prev.map((p) =>
-          p.id === producto.id ? { ...p, cantidad: p.cantidad + 1 } : p
-        );
-      }
-      const base = { ...producto, cantidad: 1 };
-      if (producto.id === 7) {
-        return [...prev, { ...base, notaLinea: "5% de descuento Q5.00" }];
-      }
-      if (producto.notaCatalogo) {
-        return [...prev, { ...base, notaLinea: producto.notaCatalogo }];
-      }
-      if (notaLinea) return [...prev, { ...base, notaLinea }];
-      return [...prev, base];
-    });
-  }, []);
+  const agregarProducto = useCallback(
+    (producto, notaLinea) => {
+      setCarrito((prev) => {
+        const existe = prev.find((p) => p.id === producto.id);
+        if (existe) {
+          return prev.map((p) =>
+            p.id === producto.id ? { ...p, cantidad: p.cantidad + 1 } : p
+          );
+        }
+        const base = { ...producto, cantidad: 1 };
+        if (notaLinea) return [...prev, { ...base, notaLinea }];
+        return [...prev, base];
+      });
+      seleccionarLinea(producto.id);
+    },
+    [seleccionarLinea]
+  );
 
   const dispararFlash = useCallback((productoId) => {
     setFlashRowId(productoId);
@@ -119,7 +142,7 @@ const VentasPOS = () => {
   useBarcodeScanner(handleBarcodeScan, {
     maxInterKeyMs: BARCODE_DEFAULT_MAX_INTER_KEY_MS,
     minLength: 3,
-    enabled: true,
+    enabled: !edicionActiva,
   });
 
   useEffect(
@@ -132,23 +155,34 @@ const VentasPOS = () => {
 
   const total = carrito.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
 
-  const productosFiltrados = productosMock.filter((p) => {
-    const matchCat = categoriaId === "todo" || p.categoria === categoriaId;
-    const q = busqueda.trim().toLowerCase();
-    const matchText =
-      !q ||
-      p.nombre.toLowerCase().includes(q) ||
-      (p.codigo && p.codigo.includes(q));
-    return matchCat && matchText;
-  });
+  const irACobro = () => {
+    const lineas = carrito.filter((p) => p.cantidad > 0);
+    if (!lineas.length) {
+      setToast({
+        open: true,
+        message: "Agregue al menos un producto con cantidad mayor a cero.",
+        type: "warning",
+      });
+      return;
+    }
+    const totalLineas = lineas.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+    if (totalLineas <= 0) {
+      setToast({
+        open: true,
+        message: "El total de la venta debe ser mayor que cero.",
+        type: "warning",
+      });
+      return;
+    }
+    deseleccionar();
+    setPendiente(lineas, totalLineas);
+    navigate("/pos/cobro");
+  };
 
-  const totalPaginas = Math.max(1, Math.ceil(productosFiltrados.length / PAGE_SIZE));
-  const paginaSegura = Math.min(pagina, totalPaginas);
-  const sliceStart = (paginaSegura - 1) * PAGE_SIZE;
-  const productosPagina = productosFiltrados.slice(
-    sliceStart,
-    sliceStart + PAGE_SIZE
-  );
+  const categoriasFiltro = [
+    { id: CATEGORIA_TODO, label: "Todo" },
+    ...(categoriasQ.data ?? []),
+  ];
 
   if (miCajaQ.isLoading) {
     return (
@@ -164,85 +198,16 @@ const VentasPOS = () => {
 
   return (
     <div className="flex h-full min-h-0 bg-(--color-pos-fondo) text-foreground">
-      <aside className="w-[min(100%,22rem)] shrink-0 bg-(--color-pos-panel) border-r border-(--color-pos-borde-suave) flex flex-col min-h-0 shadow-sm">
-        <div className="p-4 border-b border-(--color-pos-borde-suave) flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-(--color-pagina)">
-            <ShoppingCart className="w-5 h-5" />
-            <h2 className="font-bold text-lg">Carrito</h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCarrito([])}
-            className="text-xs font-semibold text-(--color-pagina) hover:underline"
-          >
-            Limpiar todo
-          </button>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto p-2">
-          {carrito.length === 0 ? (
-            <div className="flex flex-col items-center justify-center text-center px-3 py-12 text-(--color-pos-texto-muted)">
-              <Barcode className="size-12 mb-3 opacity-25 text-(--color-pagina)" strokeWidth={1.25} />
-              <p className="text-sm leading-relaxed">
-                Pase un producto por el escáner para comenzar, o agréguelo desde la cuadrícula.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-(--color-pos-texto-muted) whitespace-normal min-w-0">
-                    Producto
-                  </TableHead>
-                  <TableHead className="text-(--color-pos-texto-muted) text-right w-12">
-                    Cant.
-                  </TableHead>
-                  <TableHead className="text-(--color-pos-texto-muted) text-right w-16">
-                    P.u.
-                  </TableHead>
-                  <TableHead className="text-(--color-pos-texto-muted) text-right w-20">
-                    Subt.
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {carrito.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className={cn(
-                      flashRowId === item.id && "animate-pos-scan-flash"
-                    )}
-                  >
-                    <TableCell className="whitespace-normal align-top">
-                      <span className="font-medium text-foreground">{item.nombre}</span>
-                      {item.notaLinea && (
-                        <p className="text-xs font-medium text-(--color-pagina) mt-1 leading-snug">
-                          {item.notaLinea}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums align-top">
-                      {item.cantidad}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-(--color-pos-texto-muted) align-top">
-                      {item.precio}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums align-top">
-                      {item.precio * item.cantidad}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-
-        <div className="p-3 border-t border-(--color-pos-borde-suave) space-y-2 bg-(--color-pos-panel)">
-          <div className="flex justify-between items-baseline px-1">
-            <span className="text-lg font-bold">Total</span>
-            <span className="text-xl font-bold tabular-nums">Q {total}</span>
-          </div>
-
+      <CarritoPanel
+        carrito={carrito}
+        setCarrito={setCarrito}
+        flashRowId={flashRowId}
+        total={total}
+        lineaSeleccionadaId={lineaSeleccionadaId}
+        seleccionarLinea={seleccionarLinea}
+        deseleccionar={deseleccionar}
+        cantidadVisible={cantidadVisible}
+      >
           <button
             type="button"
             className="w-full text-sm font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
@@ -281,13 +246,14 @@ const VentasPOS = () => {
 
           <button
             type="button"
-            className="w-full mt-1 flex items-center justify-center gap-2 bg-(--color-pos-boton-primario) text-(--color-blanco) font-bold py-3 rounded-xl hover:bg-(--color-pos-boton-primario-hover) transition-colors"
+            onClick={irACobro}
+            disabled={carrito.every((p) => p.cantidad <= 0)}
+            className="w-full mt-1 flex items-center justify-center gap-2 bg-(--color-pos-boton-primario) text-(--color-blanco) font-bold py-3 rounded-xl hover:bg-(--color-pos-boton-primario-hover) transition-colors disabled:opacity-50"
           >
             <Check className="w-5 h-5" />
             Confirmar compra
           </button>
-        </div>
-      </aside>
+      </CarritoPanel>
 
       <section className="flex-1 flex flex-col min-w-0 min-h-0">
         <div className="shrink-0 p-3 sm:p-4 space-y-3 border-b border-(--color-pos-borde-suave) bg-(--color-pos-panel)/95">
@@ -322,7 +288,7 @@ const VentasPOS = () => {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {CATEGORIAS.map((c) => (
+            {categoriasFiltro.map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -344,42 +310,50 @@ const VentasPOS = () => {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
-            {productosPagina.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => agregarProducto(p)}
-                className="text-left bg-(--color-pos-panel) rounded-xl p-3 shadow-sm border border-(--color-pos-borde-suave) hover:shadow-md hover:border-(--color-pagina)/35 transition cursor-pointer"
-              >
-                <div className="h-24 bg-(--color-pagina-3) rounded-lg mb-2 overflow-hidden flex items-center justify-center text-[10px] text-(--color-pos-texto-muted) px-1 text-center">
-                  Imagen
-                </div>
-                <p className="text-sm font-semibold leading-snug">{p.nombre}</p>
-                <p className="text-sm text-(--color-pos-texto-muted) mt-1 tabular-nums">
-                  Q {p.precio.toFixed(2)}
-                </p>
-                {p.notaCatalogo && (
-                  <p className="text-xs text-(--color-pagina) font-medium mt-1">
-                    {p.notaCatalogo}
-                  </p>
-                )}
-              </button>
-            ))}
-          </div>
+          {catalogoQ.isLoading && (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
+              {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                <Skeleton key={i} className="h-[9.5rem] rounded-xl" />
+              ))}
+            </div>
+          )}
 
-          {productosFiltrados.length === 0 && (
+          {catalogoQ.isError && (
+            <div className="text-center py-12 px-4 max-w-md mx-auto">
+              <p className="text-(--color-rojo-obscuro) text-sm font-medium">
+                {catalogoQ.error?.message ?? "No se pudo cargar el catálogo."}
+              </p>
+              {String(catalogoQ.error?.message ?? "").includes("permiso") && (
+                <p className="text-(--color-pos-texto-muted) text-xs mt-2 leading-relaxed">
+                  En Usuarios → Roles, asigne al menos <strong>CAJAS · Leer</strong> o{" "}
+                  <strong>VENTAS · Leer</strong> al rol del cajero. Reinicie el backend si acaba de
+                  actualizar permisos.
+                </p>
+              )}
+            </div>
+          )}
+
+          {!catalogoQ.isLoading && !catalogoQ.isError && (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
+              {productosPagina.map((p) => (
+                <CatalogoProductoCard
+                  key={p.idVariante}
+                  producto={p}
+                  onAgregar={agregarProducto}
+                />
+              ))}
+            </div>
+          )}
+
+          {!catalogoQ.isLoading && !catalogoQ.isError && totalCount === 0 && (
             <p className="text-center text-(--color-pos-texto-muted) py-12">Sin resultados.</p>
           )}
 
           <div className="flex justify-end items-center gap-3 mt-4 text-sm text-(--color-pos-texto-muted)">
             <span className="tabular-nums">
-              {productosFiltrados.length === 0
+              {totalCount === 0
                 ? "0 / 0"
-                : `${sliceStart + 1}-${Math.min(
-                    sliceStart + PAGE_SIZE,
-                    productosFiltrados.length
-                  )} / ${productosFiltrados.length}`}
+                : `${sliceStart + 1}-${Math.min(sliceStart + PAGE_SIZE, totalCount)} / ${totalCount}`}
             </span>
             <div className="flex gap-1">
               <button
@@ -432,8 +406,7 @@ const VentasPOS = () => {
               )}
               {!scanFeedback && (
                 <p className="text-(--color-pos-texto-muted) text-xs sm:text-sm">
-                  Demo: código <span className="font-mono font-semibold">7501001001001</span> (Labial
-                  Mate).
+                  Escanee el código de barras o SKU del producto para agregarlo al carrito.
                 </p>
               )}
             </div>
@@ -446,6 +419,13 @@ const VentasPOS = () => {
         onOpenChange={setGastosOpen}
         idCaja={idCaja}
         dialogTitle="Registrar gasto de caja"
+      />
+
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
       />
     </div>
   );
