@@ -1,19 +1,7 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import { CalendarDays, Store, FileText, Printer, Download, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -56,21 +44,21 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        showCloseButton={false}
-        className="max-h-[min(90vh,800px)] w-[min(100vw-1rem,920px)] gap-0 overflow-hidden p-0 flex flex-col"
-      >
-        <DialogHeader className="border-b border-slate-100 px-5 py-4 text-left shrink-0">
+  showCloseButton={false}
+  className="h-[95vh] sm:h-[90vh] w-[95vw] sm:max-w-[1100px] sm:w-full gap-0 overflow-hidden p-0 flex flex-col transition-all duration-300"
+>
+        <DialogHeader className="border-b border-(--color-gris-claro-2) px-5 py-4 text-left shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <DialogTitle className="text-lg font-bold text-slate-800">
+                <DialogTitle className="text-lg font-bold text-(--color-negro)">
                   Detalle de Compra
                 </DialogTitle>
                 <Badge className={estadoBadge(compra.estado)} variant="secondary">
                   {compra.estado}
                 </Badge>
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-(--color-gris-letra)">
                 <span className="inline-flex items-center gap-1 font-medium">
                   <FileText className="size-3.5 shrink-0" /># {compra.id}
                 </span>

@@ -1,7 +1,6 @@
 import React from "react";
 import { useAuthStore } from "@/context/useAuthStore";
-import { Search, Bell, User } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Bell, User } from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
 
 const Header = () => {

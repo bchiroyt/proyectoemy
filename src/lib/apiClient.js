@@ -1,7 +1,19 @@
 import axios from "axios";
 import { useAuthStore } from "@/context/useAuthStore";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || "https://localhost:7199";
+const fromEnv = import.meta.env.VITE_API_BASE_URL?.trim?.() ?? "";
+
+const baseURL = fromEnv;
+if (!baseURL) {
+  throw new Error(
+    "Falta VITE_API_BASE_URL. Crea frontendemy/.env con VITE_API_BASE_URL=https://tu-api (sin barra final)."
+  );
+}
+if (import.meta.env.DEV && !fromEnv) {
+  console.warn(
+    "[apiClient] VITE_API_BASE_URL no está en .env; usando URL por defecto solo en desarrollo."
+  );
+}
 
 export const apiClient = axios.create({
   baseURL,

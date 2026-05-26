@@ -11,11 +11,21 @@ export async function createUsuario(body) {
   return pick(data, "data", "Data") ?? data;
 }
 
-/** GET /api/Usuarios (paginado; pide hasta 100 por página) */
-export async function fetchUsuarios(params = { page: 1, pageSize: 100 }) {
+/** GET /api/Usuarios (paginado) */
+export async function fetchUsuarios(params = { page: 1, pageSize: 10 }) {
   const { data } = await apiClient.get("/api/Usuarios", { params });
   throwIfEnvelopeFailed(data, "No se pudieron obtener los usuarios.");
-  return unwrapList(data).map(mapUsuario).filter((u) => u?.idUsuario != null);
+  const inner = pick(data, "data", "Data") ?? data;
+  const items = unwrapList(data).map(mapUsuario).filter((u) => u?.idUsuario != null);
+  const page = Number(pick(inner, "page", "Page") ?? params.page ?? 1) || 1;
+  const pageSize = Number(pick(inner, "pageSize", "PageSize") ?? params.pageSize ?? 10) || 10;
+  const totalCount =
+    Number(pick(inner, "totalCount", "TotalCount", "totalRecords", "TotalRecords") ?? items.length) ||
+    items.length;
+  const totalPages =
+    Number(pick(inner, "totalPages", "TotalPages") ?? Math.max(1, Math.ceil(totalCount / pageSize))) ||
+    1;
+  return { items, page, pageSize, totalCount, totalPages };
 }
 
 /**
