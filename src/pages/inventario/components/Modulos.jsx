@@ -13,9 +13,8 @@ const Modulos = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col items-center">
-
-      
+    /* MÓDULOS layout */
+    <div className="flex flex-col items-center my-3">
 
       <div className="flex flex-wrap justify-center gap-4 max-w-4xl">
         {items.map((item, i) => {

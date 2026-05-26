@@ -120,7 +120,7 @@ const GestionMarcas = () => {
 
           <thead className="bg-gray-100 text-gray-600 font-medium">
             <tr>
-              <th className="p-4">ID</th>
+              <th className="p-4">#</th>
               <th className="p-4">Nombre</th>
               <th className="p-4">Descripción</th>
               <th className="p-4">Estado</th>
@@ -140,9 +140,9 @@ const GestionMarcas = () => {
                 </td>
               </tr>
             ) : marcas.length > 0 ? (
-              marcas.map((m) => (
+              marcas.map((m, index) => (
                 <tr
-                  key={m.idMarca}
+                  key={index + 1}
                   className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="p-4 font-medium">

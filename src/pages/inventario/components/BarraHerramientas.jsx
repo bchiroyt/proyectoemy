@@ -17,6 +17,7 @@ import Paginacion from "@/components/shared/Paginacion";
 
 const BarraHerramientas = ({
   onNuevoProducto,
+  pagination,
 }) => {
   const [openConfig, setOpenConfig] =
     useState(false);
@@ -50,14 +51,14 @@ const BarraHerramientas = ({
   }, []);
 
   return (
-    <div className="flex items-center w-full gap-4">
+    <div className="flex items-center w-full gap-4 flex-wrap">
 
       {/* IZQUIERDA */}
       <div className="flex items-center gap-3 flex-1">
 
         <button
           onClick={onNuevoProducto}
-          className="bg-(--color-pagina) text-white px-5 py-2 rounded-xl hover:opacity-90 transition cursor-pointer"
+          className="xl:text-sm  bg-(--color-pagina) text-white px-5 py-2 rounded-xl hover:opacity-90 transition cursor-pointer"
         >
           + Crear Producto
         </button>
@@ -66,7 +67,7 @@ const BarraHerramientas = ({
           onClick={() =>
             navigate("/inventario/compras")
           }
-          className="bg-(--color-pagina-2) text-white px-5 py-2 rounded-xl hover:opacity-90 transition cursor-pointer"
+          className="xl:text-sm bg-(--color-pagina-2) text-white px-5 py-2 rounded-xl hover:opacity-90 transition cursor-pointer"
         >
           Nueva Compra
         </button>
@@ -84,7 +85,7 @@ const BarraHerramientas = ({
       {/* DERECHA */}
       <div className="flex items-center gap-3 flex-1 justify-end">
 
-      <Paginacion />
+      <Paginacion {...pagination} />
       
         {/* CONFIGURACIÓN */}
         <div

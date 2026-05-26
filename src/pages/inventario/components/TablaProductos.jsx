@@ -1,44 +1,52 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, PackageSearch, Clock } from "lucide-react";
-
-import { obtenerProductos } from "@/services/productos";
 
 import ModalDetalleProducto from "./ModalDetalleProducto";
 import ModalVariantesProducto from "./ModalVariantesProducto";
 import ModalKardexProducto from "./ModalKardexProducto";
 
-const TablaProductos = () => {
-  const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(false);
+const obtenerSkuProducto = (producto) =>
+  producto.sku || producto.variantes?.[0]?.sku || "Sin SKU";
 
+// FUNCION PARA OBTENER EL STOCK TOTAL DE UN PRODUCTO SUMANDO LAS VARIANTES
+const obtenerStockProducto = (producto) =>
+  producto.variantes?.reduce(
+    (total, variante) => total + Number(variante.stockActual ?? variante.stock ?? 0),
+    0
+  ) ?? 0;
+
+  // FUNCION PARA OBTENER EL ESTADO DEL STOCK
+const obtenerEstadoStock = (stock) => {
+  if (stock <= 10) {
+    return {
+      barra: "bg-red-500",
+      texto: "text-red-700",
+      fondo: "bg-red-100",
+    };
+  }
+
+  if (stock <= 15) {
+    return {
+      barra: "bg-orange-500",
+      texto: "text-orange-700",
+      fondo: "bg-orange-100",
+    };
+  }
+
+  return {
+    barra: "bg-green-500",
+    texto: "text-green-700",
+    fondo: "bg-green-100",
+  };
+};
+
+const TablaProductos = ({ productos = [], loading = false }) => {
   // MODALES
   const [openDetalle, setOpenDetalle] = useState(false);
   const [openVariantes, setOpenVariantes] = useState(false);
   const [openKardex, setOpenKardex] = useState(false);
 
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
-
-  // OBTENER PRODUCTOS
-  const fetchProductos = async () => {
-    try {
-      setLoading(true);
-
-      const data = await obtenerProductos({
-        Page: 1,
-        PageSize: 50,
-      });
-
-      setProductos(data.items || []);
-    } catch (error) {
-      console.error("Error obteniendo productos:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProductos();
-  }, []);
 
   // DETALLE
   const handleDetalle = (producto) => {
@@ -60,17 +68,19 @@ const TablaProductos = () => {
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+      <div className="mx-6 bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
 
         <table className="w-full text-sm">
 
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
+              {/* <th className="p-4 text-left">No.</th> */}
               <th className="p-4 text-left">Producto</th>
               <th className="p-4 text-left">Categoría</th>
               <th className="p-4 text-left">Marca</th>
               <th className="p-4 text-left">Estado</th>
               <th className="p-4 text-left">Variantes</th>
+              <th className="p-4 text-left">Stock</th>
               <th className="p-4 text-left">Fecha</th>
               <th className="p-4 text-left">Acciones</th>
             </tr>
@@ -81,7 +91,7 @@ const TablaProductos = () => {
             {loading ? (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan="9"
                   className="p-10 text-center text-gray-400"
                 >
                   Cargando productos...
@@ -90,18 +100,29 @@ const TablaProductos = () => {
             ) : productos.length === 0 ? (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan="9"
                   className="p-10 text-center text-gray-400"
                 >
                   No hay productos registrados.
                 </td>
               </tr>
             ) : (
-              productos.map((item) => (
-                <tr
-                  key={item.idProducto}
-                  className="border-t hover:bg-gray-50 transition"
-                >
+              productos.map((item, index) => {
+                const skuProducto = obtenerSkuProducto(item);
+                const stockProducto = obtenerStockProducto(item);
+                const estadoStock = obtenerEstadoStock(stockProducto);
+                const progresoStock = Math.min((stockProducto / 15) * 100, 100);
+
+                return (
+                  <tr
+                    key={item.idProducto}
+                    className="border-t hover:bg-gray-50 transition"
+                  >
+
+                  {/* NO. */}
+                  {/* <td className="p-4 font-medium text-gray-500">
+                    {index + 1}
+                  </td> */}
 
                   {/* PRODUCTO */}
                   <td className="p-4">
@@ -111,8 +132,8 @@ const TablaProductos = () => {
                         {item.nombre}
                       </span>
 
-                      <span className="text-xs text-gray-400">
-                        ID: {item.idProducto}
+                      <span className="font-mono text-xs text-gray-400">
+                        SKU: {skuProducto}
                       </span>
                     </div>
 
@@ -153,6 +174,26 @@ const TablaProductos = () => {
                     <span className="font-semibold text-(--color-pagina)">
                       {item.variantes?.length || 0}
                     </span>
+
+                  </td>
+
+                  {/* STOCK */}
+                  <td className="p-4">
+
+                    <div className="min-w-28 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-xs font-semibold ${estadoStock.texto}`}>
+                          {stockProducto} uds.
+                        </span>
+                      </div>
+
+                      <div className={`h-2 w-full overflow-hidden rounded-full ${estadoStock.fondo}`}>
+                        <div
+                          className={`h-full rounded-full transition-all ${estadoStock.barra}`}
+                          style={{ width: `${progresoStock}%` }}
+                        />
+                      </div>
+                    </div>
 
                   </td>
 
@@ -202,7 +243,8 @@ const TablaProductos = () => {
                   </td>
 
                 </tr>
-              ))
+                );
+              })
             )}
 
           </tbody>

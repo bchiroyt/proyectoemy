@@ -130,7 +130,7 @@ const GestionUbicaciones = () => {
 
           <thead className="bg-gray-100 text-gray-600 font-medium">
             <tr>
-              <th className="p-4">ID</th>
+              <th className="p-4">#</th>
               <th className="p-4">Nombre</th>
               <th className="p-4">Descripción</th>
               <th className="p-4 text-center">Estado</th>
@@ -150,13 +150,13 @@ const GestionUbicaciones = () => {
                 </td>
               </tr>
             ) : ubicaciones.length > 0 ? (
-              ubicaciones.map((u) => (
+              ubicaciones.map((u, index) => (
                 <tr
                   key={u.idUbicacion}
                   className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="p-4 font-medium text-gray-700">
-                    {u.idUbicacion}
+                    { index + 1}
                   </td>
 
                   <td className="p-4 font-medium">

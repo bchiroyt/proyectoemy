@@ -136,7 +136,7 @@ const GestionCategorias = () => {
 
           <thead className="bg-gray-100">
             <tr>
-              <th className="p-4">ID</th>
+              <th className="p-4">#</th>
               <th className="p-4">Nombre</th>
               <th className="p-4">Descripción</th>
               <th className="p-4">Estado</th>
@@ -153,9 +153,9 @@ const GestionCategorias = () => {
                 </td>
               </tr>
             ) : categorias.length > 0 ? (
-              categorias.map((cat) => (
+              categorias.map((cat, index) => (
                 <tr
-                  key={cat.idCategoria}
+                  key={index + 1}
                   className="border-t hover:bg-gray-50"
                 >
 
