@@ -1,5 +1,5 @@
-import { useState } from "react";
-
+import React, { useEffect, useState } from "react";
+import { useNavigationStore } from "@/context/useNavigationStore";
 import BarraHerramientas from "./components/BarraHerramientas";
 import Modulos from "./components/Modulos";
 import TablaProductos from "./components/TablaProductos";
@@ -8,6 +8,11 @@ import ModalNuevoProducto from "./components/ModalNuevoProducto";
 const Inventario = () => {
   const [openModal, setOpenModal] =
     useState(false);
+    const setTitulo = useNavigationStore((state) => state.setTitulo);
+
+    useEffect(() => {
+        setTitulo("Inventario");
+      }, [setTitulo]);
 
   return (
     <div className="flex h-full flex-col">

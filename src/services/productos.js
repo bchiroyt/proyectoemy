@@ -19,3 +19,9 @@ export const crearProducto = async (data) => {
 
   return res.data?.data;
 };
+
+// ACTUALIZAR VARIANTE DE PRODUCTO
+export const actualizarVariante = async (idVariante, data) => {
+  const res = await apiClient.patch(`/api/Productos/variantes/${idVariante}`, data);
+  return res.data;
+};

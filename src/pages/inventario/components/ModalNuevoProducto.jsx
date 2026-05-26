@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { X, ArrowLeft, Plus, Trash2, Search, CheckCircle, AlertCircle } from "lucide-react";
 
 import ModalNuevaMarca from "./ModalNuevaMarca";
+import ModalCategoria from "./ModalCategoria"; 
 import ModalAgregarSimple from "./ModalAgregarSimple";
 
 import { obtenerMarcas } from "@/services/marcas";
-import { obtenerCategorias } from "@/services/categorias";
+// IMPORTAMOS crearCategoria PARA SOLUCIONAR EL GUARDADO EN BD
+import { obtenerCategorias, crearCategoria } from "@/services/categorias";
 import { obtenerPresentaciones } from "@/services/presentaciones";
 import { obtenerTallas } from "@/services/tallas";
 import { obtenerUbicaciones } from "@/services/ubicaciones";
@@ -38,7 +40,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [tallas, setTallas] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
 
-  // ARRAY DINÁMICO DE VARIANTES (Cada una con sus propios estados de buscador)
+  // ARRAY DINÁMICO DE VARIANTES
   const [variantes, setVariantes] = useState([
     {
       talla: "",
@@ -61,6 +63,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
   // MODALES AUXILIARES
   const [openMarcaModal, setOpenMarcaModal] = useState(false);
+  const [openCategoriaModal, setOpenCategoriaModal] = useState(false);
   const [openPresentacionModal, setOpenPresentacionModal] = useState(false);
   const [openTallaModal, setOpenTallaModal] = useState(false);
   const [openUbicacionModal, setOpenUbicacionModal] = useState(false);
@@ -68,7 +71,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   // FUNCIÓN PARA MOSTRAR AVISOS
   const mostrarAviso = (tipo, mensaje) => {
     setNotificacion({ mostrar: true, tipo, mensaje });
-    // Si es un éxito, se cierra solo en 3 segundos
     if (tipo === "exito") {
       setTimeout(() => {
         setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
@@ -94,11 +96,11 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }),
         ]);
 
-        setMarcas(marcasData.items || []);
-        setCategorias(categoriasData.items || []);
-        setPresentaciones(presentacionesData.items || []);
-        setTallas(tallasData.items || []);
-        setUbicaciones(ubicacionesData.items || []);
+        setMarcas(marcasData?.items || []);
+        setCategorias(categoriasData?.items || []);
+        setPresentaciones(presentacionesData?.items || []);
+        setTallas(tallasData?.items || []);
+        setUbicaciones(ubicacionesData?.items || []);
       } catch (error) {
         console.error("Error al cargar datos iniciales:", error);
       }
@@ -175,7 +177,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     onClose();
   };
 
-  // REGISTRAR
+  // REGISTRAR PRODUCTO FINAL
   const handleRegistrar = async () => {
     try {
       if (!nombre.trim()) return mostrarAviso("error", "Debes ingresar un nombre para el producto.");
@@ -185,7 +187,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       for (let i = 0; i < variantes.length; i++) {
         const v = variantes[i];
         if (!v.talla && !v.presentacion && !v.color.trim()) {
-          return mostrarAviso("error", `En la variante #${i + 1}, debes ingresar al menos talla, presentación o color.`);
+          return mostrarAviso("error", ` En la variante #${i + 1}, debes ingresar al menos talla, presentación o color.`);
         }
       }
 
@@ -232,16 +234,16 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   };
 
   // FILTRADOS STEP 1
-  const categoriasFiltradas = categorias.filter((c) =>
-    c.nombre.toLowerCase().includes(busquedaCat.toLowerCase())
+  const categoriasFiltradas = (categorias || []).filter((c) =>
+    c?.nombre?.toLowerCase().includes((busquedaCat || "").toLowerCase())
   );
 
-  const marcasFiltradas = marcas.filter((m) =>
-    m.nombre.toLowerCase().includes(busquedaMarca.toLowerCase())
+  const marcasFiltradas = (marcas || []).filter((m) =>
+    m?.nombre?.toLowerCase().includes((busquedaMarca || "").toLowerCase())
   );
 
-  const nombreCategoriaActual = categorias.find((c) => String(c.idCategoria) === String(categoriaSeleccionada))?.nombre || "Seleccionar categoría";
-  const nombreMarcaActual = marcas.find((m) => String(m.idMarca) === String(marcaSeleccionada))?.nombre || "Seleccionar marca";
+  const nombreCategoriaActual = (categorias || []).find((c) => String(c?.idCategoria) === String(categoriaSeleccionada))?.nombre || "Seleccionar categoría";
+  const nombreMarcaActual = (marcas || []).find((m) => String(m?.idMarca) === String(marcaSeleccionada))?.nombre || "Seleccionar marca";
 
   if (!open) return null;
 
@@ -249,7 +251,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 transition-all">
       <div className="bg-white w-full max-w-4xl rounded-2xl shadow-lg flex flex-col max-h-[90vh] border-t-4 border-(--color-pagina) relative">
         
-        {/* SISTEMA DE AVISOS PROPIOS (TOAST INTERNO) */}
+        {/* TOAST INTERNO */}
         {notificacion.mostrar && (
           <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all max-w-md w-11/12 animate-bounce ${
             notificacion.tipo === "exito" 
@@ -288,7 +290,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 2 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>2</div>
         </div>
 
-        {/* CONTENIDO CON SCROLL */}
+        {/* CONTENIDO */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           
           {/* STEP 1: GENERAL */}
@@ -309,12 +311,21 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
               {/* BUSCADOR CATEGORÍA */}
               <div className="space-y-1 relative">
                 <label className="text-xs font-semibold text-gray-600 block">Categoría</label>
-                <div
-                  onClick={() => setOpenCatDropdown(!openCatDropdown)}
-                  className="w-full p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                >
-                  <span>{nombreCategoriaActual}</span>
-                  <Search className="w-4 h-4 text-gray-400" />
+                <div className="flex gap-2">
+                  <div
+                    onClick={() => setOpenCatDropdown(!openCatDropdown)}
+                    className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                  >
+                    <span>{nombreCategoriaActual}</span>
+                    <Search className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenCategoriaModal(true)}
+                    className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
                 </div>
 
                 {openCatDropdown && (
@@ -330,14 +341,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                     <div className="max-h-40 overflow-y-auto">
                       {categoriasFiltradas.map((c) => (
                         <div
-                          key={c.idCategoria}
+                          key={c?.idCategoria}
                           onClick={() => {
-                            setCategoriaSeleccionada(c.idCategoria);
+                            setCategoriaSeleccionada(c?.idCategoria);
                             setOpenCatDropdown(false);
                           }}
                           className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                         >
-                          {c.nombre}
+                          {c?.nombre}
                         </div>
                       ))}
                       {categoriasFiltradas.length === 0 && (
@@ -360,6 +371,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                     <Search className="w-4 h-4 text-gray-400" />
                   </div>
                   <button
+                    type="button"
                     onClick={() => setOpenMarcaModal(true)}
                     className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                   >
@@ -380,14 +392,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                     <div className="max-h-40 overflow-y-auto">
                       {marcasFiltradas.map((m) => (
                         <div
-                          key={m.idMarca}
+                          key={m?.idMarca}
                           onClick={() => {
-                            setMarcaSeleccionada(m.idMarca);
+                            setMarcaSeleccionada(m?.idMarca);
                             setOpenMarcaDropdown(false);
                           }}
                           className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                         >
-                          {m.nombre}
+                          {m?.nombre}
                         </div>
                       ))}
                       {marcasFiltradas.length === 0 && (
@@ -417,7 +429,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* STEP 2: MULTI-VARIANTES CON SUS PROPIOS BUSCADORES */}
+          {/* STEP 2: MULTI-VARIANTES */}
           {step === 2 && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex justify-between items-center border-b pb-3">
@@ -433,20 +445,19 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
               <div className="space-y-6">
                 {variantes.map((v, index) => {
-                  // Filtrados en tiempo real por cada variante individual
-                  const presentacionesFiltradas = presentaciones.filter((p) =>
-                    p.nombre.toLowerCase().includes(v.busquedaPres.toLowerCase())
+                  const presentacionesFiltradas = (presentaciones || []).filter((p) =>
+                    p?.nombre?.toLowerCase().includes((v.busquedaPres || "").toLowerCase())
                   );
-                  const tallasFiltradas = tallas.filter((t) =>
-                    t.nombre.toLowerCase().includes(v.busquedaTalla.toLowerCase())
+                  const tallasFiltradas = (tallas || []).filter((t) =>
+                    t?.nombre?.toLowerCase().includes((v.busquedaTalla || "").toLowerCase())
                   );
-                  const ubicacionesFiltradas = ubicaciones.filter((u) =>
-                    u.nombre.toLowerCase().includes(v.busquedaUbic.toLowerCase())
+                  const ubicacionesFiltradas = (ubicaciones || []).filter((u) =>
+                    u?.nombre?.toLowerCase().includes((v.busquedaUbic || "").toLowerCase())
                   );
 
-                  const nombrePresActual = presentaciones.find((p) => String(p.idPresentacion) === String(v.presentacion))?.nombre || "Seleccionar presentación";
-                  const nombreTallaActual = tallas.find((t) => String(t.idTalla) === String(v.talla))?.nombre || "Talla";
-                  const nombreUbicActual = ubicaciones.find((u) => String(u.idUbicacion) === String(v.ubicacion))?.nombre || "Ubicación";
+                  const nombrePresActual = (presentaciones || []).find((p) => String(p?.idPresentacion) === String(v.presentacion))?.nombre || "Seleccionar presentación";
+                  const nombreTallaActual = (tallas || []).find((t) => String(t?.idTalla) === String(v.talla))?.nombre || "Talla";
+                  const nombreUbicActual = (ubicaciones || []).find((u) => String(u?.idUbicacion) === String(v.ubicacion))?.nombre || "Ubicación";
 
                   return (
                     <div key={index} className="bg-gray-50 p-5 rounded-xl border border-gray-200 relative space-y-4 shadow-sm hover:shadow-md transition-shadow">
@@ -465,7 +476,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         Variante #{index + 1}
                       </div>
 
-                      {/* BUSCADOR PRESENTACIÓN */}
+                      {/* PRESENTACIÓN */}
                       <div className="space-y-1 relative">
                         <label className="text-xs font-semibold text-gray-600 block">Presentación</label>
                         <div className="flex gap-2">
@@ -498,19 +509,16 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             <div className="max-h-32 overflow-y-auto">
                               {presentacionesFiltradas.map((p) => (
                                 <div
-                                  key={p.idPresentacion}
+                                  key={p?.idPresentacion}
                                   onClick={() => {
-                                    handleCambioVariante(index, "presentacion", p.idPresentacion);
+                                    handleCambioVariante(index, "presentacion", p?.idPresentacion);
                                     handleCambioVariante(index, "openPresDropdown", false);
                                   }}
                                   className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                                 >
-                                  {p.nombre}
+                                  {p?.nombre}
                                 </div>
                               ))}
-                              {presentacionesFiltradas.length === 0 && (
-                                <div className="p-2 text-xs text-gray-400 text-center cursor-default">No hay resultados</div>
-                              )}
                             </div>
                           </div>
                         )}
@@ -540,10 +548,10 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         </div>
                       </div>
 
-                      {/* FILA 3: TALLA, COLOR, UBICACIÓN */}
+                      {/* TALLA, COLOR, UBICACIÓN */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         
-                        {/* BUSCADOR TALLA */}
+                        {/* TALLA */}
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Talla</label>
                           <div className="flex gap-1">
@@ -575,14 +583,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                               <div className="max-h-28 overflow-y-auto">
                                 {tallasFiltradas.map((t) => (
                                   <div
-                                    key={t.idTalla}
+                                    key={t?.idTalla}
                                     onClick={() => {
-                                      handleCambioVariante(index, "talla", t.idTalla);
+                                      handleCambioVariante(index, "talla", t?.idTalla);
                                       handleCambioVariante(index, "openTallaDropdown", false);
                                     }}
                                     className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-xs text-gray-700 transition-colors"
                                   >
-                                    {t.nombre}
+                                    {t?.nombre}
                                   </div>
                                 ))}
                               </div>
@@ -601,7 +609,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                           />
                         </div>
 
-                        {/* BUSCADOR UBICACIÓN */}
+                        {/* UBICACIÓN */}
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Ubicación</label>
                           <div className="flex gap-1">
@@ -633,14 +641,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                               <div className="max-h-28 overflow-y-auto">
                                 {ubicacionesFiltradas.map((u) => (
                                   <div
-                                    key={u.idUbicacion}
+                                    key={u?.idUbicacion}
                                     onClick={() => {
-                                      handleCambioVariante(index, "ubicacion", u.idUbicacion);
+                                      handleCambioVariante(index, "ubicacion", u?.idUbicacion);
                                       handleCambioVariante(index, "openUbicDropdown", false);
                                     }}
                                     className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-xs text-gray-700 transition-colors"
                                   >
-                                    {u.nombre}
+                                    {u?.nombre}
                                   </div>
                                 ))}
                               </div>
@@ -678,43 +686,107 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         </div>
       </div>
 
-      {/* MODAL AUXILIARES CON ACCIONES COMPATIBLES */}
+      {/* ==========================================
+          MODALES AUXILIARES INTERCEPTADOS
+         ========================================== */}
+
+      {/* 1. MARCAS: Como onSave no envía argumentos, refrescamos la lista y buscamos el nuevo ID por texto */}
       <ModalNuevaMarca
         open={openMarcaModal}
         onClose={() => setOpenMarcaModal(false)}
-        onSave={(nuevaMarca) => {
-          setMarcas((prev) => [...prev, nuevaMarca]);
-          setMarcaSeleccionada(nuevaMarca.idMarca);
+        onSave={async () => {
+          try {
+            // Traemos las marcas actualizadas desde la BD
+            const marcasData = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
+            const listaActualizada = marcasData?.items || [];
+            setMarcas(listaActualizada);
+
+            // Vinculamos de inmediato buscando por el texto que el usuario ingresó
+            const marcaReciente = listaActualizada.find(
+              (m) => m?.nombre?.toLowerCase() === busquedaMarca.trim().toLowerCase()
+            );
+
+            if (marcaReciente) {
+              setMarcaSeleccionada(marcaReciente.idMarca);
+            }
+          } catch (error) {
+            console.error("Error al refrescar marcas en el producto:", error);
+          }
+          setBusquedaMarca(""); // Limpiamos para evitar problemas con filtros
+          setOpenMarcaModal(false);
         }}
       />
 
+      {/* 2. CATEGORÍAS: Interceptamos el form local, guardamos en la BD y asignamos el ID al dropdown */}
+      <ModalCategoria
+        open={openCategoriaModal}
+        onClose={() => setOpenCategoriaModal(false)}
+        onSave={async (formLocal) => {
+          try {
+            // 1. Guardamos realmente en la base de datos
+            const payload = {
+              nombre: formLocal.nombre,
+              descripcion: formLocal.descripcion,
+              estado: formLocal.estado,
+            };
+            
+            const respuestaApi = await crearCategoria(payload);
+            const dataReal = respuestaApi?.data || respuestaApi;
+            
+            // 2. Extraemos el ID generado por el servidor
+            const idFinal = dataReal?.idCategoria || dataReal?.id || Date.now();
+
+            const categoriaFormateada = {
+              idCategoria: idFinal,
+              nombre: formLocal.nombre,
+              descripcion: formLocal.descripcion,
+              estado: formLocal.estado
+            };
+
+            // 3. Impactamos el estado local del dropdown
+            setCategorias((prev) => [...prev, categoriaFormateada]);
+            setCategoriaSeleccionada(idFinal);
+            setBusquedaCat(""); 
+            
+          } catch (error) {
+            console.error("Error al guardar categoría en BD desde el producto:", error);
+            alert("No se pudo registrar la categoría en el servidor.");
+          } finally {
+            setOpenCategoriaModal(false);
+          }
+        }}
+      />
+
+      {/* 3. PRESENTACIÓN */}
       <ModalAgregarSimple
         open={openPresentacionModal}
         onClose={() => setOpenPresentacionModal(false)}
         titulo="Nueva Presentación"
         placeholder="Ej: Caja"
         onSave={(v) => {
-          setPresentaciones((prev) => [...prev, v]);
+          if (v) setPresentaciones((prev) => [...prev, v]);
         }}
       />
 
+      {/* 4. TALLA */}
       <ModalAgregarSimple
         open={openTallaModal}
         onClose={() => setOpenTallaModal(false)}
         titulo="Nueva Talla"
         placeholder="Ej: M"
         onSave={(v) => {
-          setTallas((prev) => [...prev, v]);
+          if (v) setTallas((prev) => [...prev, v]);
         }}
       />
 
+      {/* 5. UBICACIÓN */}
       <ModalAgregarSimple
         open={openUbicacionModal}
         onClose={() => setOpenUbicacionModal(false)}
         titulo="Nueva Ubicación"
         placeholder="Ej: Estante 1"
         onSave={(v) => {
-          setUbicaciones((prev) => [...prev, v]);
+          if (v) setUbicaciones((prev) => [...prev, v]);
         }}
       />
     </div>
