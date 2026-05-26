@@ -117,7 +117,7 @@ const GestionPresentacion = () => {
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-50 text-gray-600 font-medium border-b">
             <tr>
-              <th className="p-4">ID</th>
+              <th className="p-4">#</th>
               <th className="p-4">Nombre</th>
               <th className="p-4">Descripción</th>
               <th className="p-4">Estado</th>
@@ -139,7 +139,7 @@ const GestionPresentacion = () => {
                   className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="p-4 font-medium">
-                    {p.idPresentacion}
+                    {index + 1}
                   </td>
 
                   <td className="p-4">

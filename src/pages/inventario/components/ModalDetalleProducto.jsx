@@ -11,24 +11,63 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+const obtenerDetalleProducto = (producto) => producto?.data ?? producto;
+
+// validacion para evitar errores en caso de que no se reciba un producto o tenga una estructura diferente a la esperada
+const obtenerSkuProducto = (producto) =>
+  producto?.sku || producto?.variantes?.[0]?.sku || "N/A";
+
+const formatearFecha = (fecha) => {
+  if (!fecha) return "---";
+
+  const fechaObj = new Date(fecha);
+  if (Number.isNaN(fechaObj.getTime())) return "---";
+
+  return fechaObj.toLocaleDateString();
+};
+
+const formatearMonto = (monto) => {
+  const numero = Number(monto);
+  if (!Number.isFinite(numero)) return "0.00";
+
+  return numero.toFixed(2);
+};
+
+const obtenerPrecioCompra = (variante) =>
+  variante?.precioCompraActual ?? variante?.precio_compra ?? variante?.precioCompra;
+
+const obtenerPrecioVenta = (variante) =>
+  variante?.precioVentaActual ?? variante?.precio_venta ?? variante?.precioVenta;
+
+const obtenerStock = (variante) =>
+  variante?.stockActual ?? variante?.stock ?? 0;
+
 const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
   const [editandoId, setEditandoId] = useState(null);
-  
+
   const [colorInput, setColorInput] = useState("");
   const [tallaInput, setTallaInput] = useState("");
   const [precioVentaInput, setPrecioVentaInput] = useState("");
   const [codigoBarrasInput, setCodigoBarrasInput] = useState("");
-  
+
   const [cargando, setCargando] = useState(false);
 
-  if (!producto) return null;
+  useEffect(() => {
+    if (open && producto) {
+      console.info("[ModalDetalleProducto] Producto recibido:", producto);
+    }
+  }, [open, producto]);
+
+  const detalleProducto = obtenerDetalleProducto(producto);
+
+  if (!detalleProducto) return null;
 
   const iniciarEdicion = (v, idActual) => {
     setEditandoId(idActual);
     setColorInput(v.color || "");
     setTallaInput(v.talla || "");
-    setPrecioVentaInput(v.precio_venta || v.precioVenta || "");
-    setCodigoBarrasInput(v.codigo_barras || "");
+    setPrecioVentaInput(obtenerPrecioVenta(v) ?? "");
+    setCodigoBarrasInput(v.codigo_barras || v.codigoPrincipal || "");
   };
 
   const cancelarEdicion = () => {
@@ -42,8 +81,8 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
   const verificarCambios = (v) => {
     const colorOriginal = v.color || "";
     const tallaOriginal = v.talla || "";
-    const precioOriginal = String(v.precio_venta || v.precioVenta || "");
-    const codigoOriginal = v.codigo_barras || "";
+    const precioOriginal = String(obtenerPrecioVenta(v) ?? "");
+    const codigoOriginal = v.codigo_barras || v.codigoPrincipal || "";
 
     return (
       colorInput !== colorOriginal ||
@@ -68,17 +107,17 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
       codigosExternos: [
         {
           codigo: codigoBarrasInput,
-          esPrincipal: true
-        }
-      ]
+          esPrincipal: true,
+        },
+      ],
     };
 
     try {
       // Ejemplo con fetch/axios:
       // await axios.put(`/api/Productos/variantes/${idVariante}`, payload);
-      
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      
+
       if (onRefresh) onRefresh();
       setEditandoId(null);
     } catch (error) {
@@ -90,27 +129,28 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent 
+      <DialogContent
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         className="w-[95vw] md:w-[90vw] !max-w-[1100px] p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white max-h-[90vh] flex flex-col"
       >
-        
         {/* Cabecera Principal */}
         <div className="p-6 md:p-8 pb-4 flex flex-col justify-start shrink-0">
           <div className="flex items-center gap-3 mb-1.5 flex-wrap">
             <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-              {producto.estado_catalogo || "ACTIVO"}
+              {detalleProducto.estadoCatalogo || detalleProducto.estado_catalogo || "ACTIVO"}
             </Badge>
-            <span className="text-slate-400 text-xs font-mono">ID: #{producto.id_producto || "N/A"}</span>
+            <span className="text-slate-400 text-xs font-mono">
+              ID: #{detalleProducto.idProducto || detalleProducto.id_producto || "N/A"}
+            </span>
           </div>
-          
+
           <DialogTitle className="text-xl md:text-2xl font-bold text-slate-900 truncate">
-            {producto.nombre}
+            {detalleProducto.nombre || "Producto sin nombre"}
           </DialogTitle>
-          
+
           <p className="text-slate-500 text-xs md:text-sm mt-1 truncate max-w-2xl">
-            {producto.descripcion || "Sin descripción disponible."}
+            {detalleProducto.descripcion || "Sin descripcion disponible."}
           </p>
         </div>
 
@@ -119,62 +159,60 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
           <div className="grid grid-cols-5 gap-2 md:gap-4 px-6 md:px-8 py-3.5 text-left">
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">SKU Maestro</p>
-              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{producto.sku || "Sin SKU"}</p>
+              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{obtenerSkuProducto(detalleProducto)}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Categoría</p>
-              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{producto.categoriaNombre || "---"}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Categoria</p>
+              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{detalleProducto.categoriaNombre || detalleProducto.categoria || "---"}</p>
             </div>
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Marca</p>
-              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{producto.marcaNombre || "---"}</p>
+              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{detalleProducto.marcaNombre || detalleProducto.marca || "---"}</p>
             </div>
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Fecha Registro</p>
               <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">
-                {producto.fecha_creacion ? new Date(producto.fecha_creacion).toLocaleDateString() : "---"}
+                {formatearFecha(detalleProducto.fechaCreacion || detalleProducto.fecha_creacion)}
               </p>
             </div>
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Proveedor</p>
-              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{producto.proveedorNombre || "General"}</p>
+              <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">{detalleProducto.proveedorNombre || "General"}</p>
             </div>
           </div>
         </div>
 
-        {/* Sección de Variantes */}
+        {/* Seccion de Variantes */}
         <div className="p-6 md:p-8 flex-1 flex flex-col min-h-0">
           <div className="mb-4 shrink-0">
             <span className="text-pink-600 font-bold text-sm border-b-2 border-pink-500 pb-2 inline-block">
-              Variantes ({producto.variantes?.length || 0})
+              Variantes ({detalleProducto.variantes?.length || 0})
             </span>
           </div>
 
           <ScrollArea className="flex-1 pr-2">
             <div className="space-y-3 pb-2">
-              {producto.variantes?.map((v, index) => {
-                const idActual = v.id_variante || index;
+              {detalleProducto.variantes?.map((v, index) => {
+                const idActual = v.idVariante || v.id_variante || index;
                 const esModoEdicion = editandoId === idActual;
                 const tieneCambios = verificarCambios(v);
 
                 return (
-                  <Card key={idActual} className={`border transition-all ${esModoEdicion ? 'border-pink-300 shadow-md ring-1 ring-pink-100' : 'border-slate-100 shadow-sm'} overflow-hidden bg-white`}>
+                  <Card key={idActual} className={`border transition-all ${esModoEdicion ? "border-pink-300 shadow-md ring-1 ring-pink-100" : "border-slate-100 shadow-sm"} overflow-hidden bg-white`}>
                     <CardContent className="p-4">
-                      
                       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center text-left">
-                        
-                        {/* 1. Color y Talla (Asignado a las columnas correctas) */}
+                        {/* 1. Color y Talla */}
                         <div className="lg:col-span-3 min-w-0 space-y-1">
                           <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Color / Talla</p>
                           {esModoEdicion ? (
                             <div className="space-y-1">
-                              <Input 
-                                className="h-8 text-xs font-bold uppercase bg-white border-slate-200 focus-visible:ring-pink-500" 
+                              <Input
+                                className="h-8 text-xs font-bold uppercase bg-white border-slate-200 focus-visible:ring-pink-500"
                                 value={colorInput}
                                 onChange={(e) => setColorInput(e.target.value)}
                               />
-                              <Input 
-                                className="h-8 text-xs font-semibold bg-white border-slate-200 focus-visible:ring-pink-500 w-full" 
+                              <Input
+                                className="h-8 text-xs font-semibold bg-white border-slate-200 focus-visible:ring-pink-500 w-full"
                                 value={tallaInput}
                                 onChange={(e) => setTallaInput(e.target.value)}
                               />
@@ -191,14 +229,14 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
                           )}
                         </div>
 
-                        {/* 2. Código de Barras */}
+                        {/* 2. Codigo de Barras */}
                         <div className="lg:col-span-3 min-w-0 space-y-1">
-                          <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">EAN-13</p>
+                          <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Codigo (EAN-13)</p>
                           {esModoEdicion ? (
                             <div className="flex items-center gap-2 relative">
                               <Barcode className="w-4 h-4 absolute left-2 text-slate-400" />
-                              <Input 
-                                className="h-8 pl-8 text-xs font-mono bg-white border-slate-200 focus-visible:ring-pink-500" 
+                              <Input
+                                className="h-8 pl-8 text-xs font-mono bg-white border-slate-200 focus-visible:ring-pink-500"
                                 value={codigoBarrasInput}
                                 onChange={(e) => setCodigoBarrasInput(e.target.value)}
                               />
@@ -206,7 +244,7 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
                           ) : (
                             <div className="flex items-center gap-2 text-slate-600 py-1">
                               <Barcode className="w-4 h-4 shrink-0 text-slate-400" />
-                              <span className="text-xs font-mono tracking-tight truncate">{v.codigo_barras || "Sin Código"}</span>
+                              <span className="text-xs font-mono tracking-tight truncate">{v.codigoPrincipal || v.codigo_barras || "N/A"}</span>
                             </div>
                           )}
                         </div>
@@ -215,7 +253,7 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
                         <div className="lg:col-span-1 space-y-1">
                           <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Compra</p>
                           <p className="text-xs font-medium text-slate-400 font-mono py-1">
-                            Q {v.precio_compra ? Number(v.precio_compra).toFixed(2) : (v.precioCompra ? Number(v.precioCompra).toFixed(2) : "0.00")}
+                            Q {formatearMonto(obtenerPrecioCompra(v))}
                           </p>
                         </div>
 
@@ -225,16 +263,16 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
                           {esModoEdicion ? (
                             <div className="flex items-center gap-1 relative">
                               <span className="text-xs font-bold text-pink-600 absolute left-2">Q</span>
-                              <Input 
+                              <Input
                                 type="number"
-                                className="h-8 pl-6 text-xs font-bold text-pink-600 font-mono bg-white border-slate-200 focus-visible:ring-pink-500" 
+                                className="h-8 pl-6 text-xs font-bold text-pink-600 font-mono bg-white border-slate-200 focus-visible:ring-pink-500"
                                 value={precioVentaInput}
                                 onChange={(e) => setPrecioVentaInput(e.target.value)}
                               />
                             </div>
                           ) : (
                             <p className="text-sm font-bold text-pink-600 font-mono py-1">
-                              Q {v.precio_venta ? Number(v.precio_venta).toFixed(2) : (v.precioVenta ? Number(v.precioVenta).toFixed(2) : "0.00")}
+                              Q {formatearMonto(obtenerPrecioVenta(v))}
                             </p>
                           )}
                         </div>
@@ -242,8 +280,8 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
                         {/* 5. Stock */}
                         <div className="lg:col-span-1 space-y-1 lg:text-center">
                           <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Stock</p>
-                          <p className={`text-base font-black leading-none py-1 ${v.stock <= 5 ? 'text-red-500' : 'text-slate-900'}`}>
-                            {v.stock || 0}
+                          <p className={`text-base font-black leading-none py-1 ${obtenerStock(v) <= 5 ? "text-red-500" : "text-slate-900"}`}>
+                            {obtenerStock(v)}
                           </p>
                         </div>
 
@@ -285,7 +323,6 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
                             </Button>
                           )}
                         </div>
-
                       </div>
                     </CardContent>
                   </Card>
@@ -294,7 +331,6 @@ const ModalDetalleProducto = ({ open, onClose, producto, onRefresh }) => {
             </div>
           </ScrollArea>
         </div>
-        
       </DialogContent>
     </Dialog>
   );

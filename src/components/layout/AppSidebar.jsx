@@ -11,6 +11,7 @@ import {
     Settings,
     LogOut,
     Store,
+    PanelLeft,
 } from "lucide-react";
 import {
     Sidebar,
@@ -20,7 +21,6 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarTrigger,
     useSidebar,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -57,7 +57,7 @@ const isRouteActive = (pathname, to) => {
 };
 
 const AppSidebar = () => {
-    const { setOpenMobile } = useSidebar();
+    const { setOpenMobile, state, toggleSidebar } = useSidebar();
     const location = useLocation();
     const navigate = useNavigate();
     const logout = useAuthStore((s) => s.logout);
@@ -71,26 +71,54 @@ const AppSidebar = () => {
 
     return (
         <>
-            <Sidebar collapsible="icon" className="bg-(--color-blanco) border-r">
+            <button
+                type="button"
+                aria-label="Toggle Sidebar"
+                onClick={toggleSidebar}
+                className={cn(
+                    "fixed left-4 top-4 z-50 inline-flex size-9 items-center justify-center rounded-full border border-(--color-gris-claro-2) bg-(--color-blanco) p-0 text-(--color-gris-letra) shadow-lg md:hidden",
+                    "transition-[background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                    "hover:bg-(--color-pagina) hover:text-(--color-blanco) hover:shadow-xl",
+                    "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    "[&_svg]:size-4"
+                )}
+            >
+                <PanelLeft aria-hidden="true" />
+            </button>
+
+            <Sidebar collapsible="icon" className="z-30 bg-(--color-blanco) border-r">
+
+                <button
+                    type="button"
+                    aria-label="Toggle Sidebar"
+                    onClick={toggleSidebar}
+                    className={cn(
+                        "absolute right-0 top-10 z-50 hidden size-9 translate-x-1/2 items-center justify-center rounded-full border border-(--color-gris-claro-2) bg-(--color-blanco) p-0 text-(--color-gris-letra) shadow-lg md:inline-flex",
+                        "transition-[background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                        "hover:bg-(--color-pagina) hover:text-(--color-blanco) hover:shadow-xl",
+                        "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                        "[&_svg]:size-4 [&_svg]:transition-transform [&_svg]:duration-300 [&_svg]:ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:[&_svg]:transition-none",
+                        state === "collapsed" && "[&_svg]:rotate-180"
+                    )}
+                >
+                    <PanelLeft aria-hidden="true" />
+                </button>
+
                 <SidebarHeader className="p-1 flex items-center justify-center h-[80px]">
-                    <img
-                        src={logoImg}
-                        alt="Logo"
-                        className="h-20 w-auto object-contain group-data-[collapsible=icon]:hidden"
-                    />
+                    <div className="relative flex h-20 w-full items-center justify-center overflow-hidden">
+                        <img
+                            src={logoImg}
+                            alt="Logo"
+                            className="absolute h-20 w-auto object-contain transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[state=collapsed]:scale-95 group-data-[state=collapsed]:opacity-0"
+                        />
 
-                    <img
-                        src={logo1Img}
-                        alt="Logo2"
-                        className="h-6 w-auto object-contain hidden group-data-[state=collapsed]:block"
-                    />
+                        <img
+                            src={logo1Img}
+                            alt="Logo2"
+                            className="absolute h-6 w-auto object-contain opacity-0 scale-95 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[state=collapsed]:scale-100 group-data-[state=collapsed]:opacity-100"
+                        />
+                    </div>
                 </SidebarHeader>
-
-                <SidebarMenu className="px-2 mt-2">
-                    <SidebarMenuItem>
-                        <SidebarTrigger className="w-full justify-center hover:bg-(--color-pagina) hover:text-(--color-blanco)" />
-                    </SidebarMenuItem>
-                </SidebarMenu>
 
                 <Separator />
 
@@ -114,7 +142,7 @@ const AppSidebar = () => {
                                         className="flex w-full items-center gap-2 outline-none ring-sidebar-ring [&_svg]:size-7"
                                     >
                                         <item.icon className="size-8 shrink-0" />
-                                        <span className="group-data-[collapsible=icon]:hidden">
+                                        <span className="overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] max-w-40 opacity-100 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:-translate-x-1 group-data-[state=collapsed]:opacity-0">
                                             {item.label}
                                         </span>
                                     </NavLink>
@@ -132,7 +160,7 @@ const AppSidebar = () => {
                                 className="min-h-12 py-3 hover:bg-(--color-pagina) hover:text-(--color-blanco)"
                             >
                                 <Settings className="size-7 shrink-0" />
-                                <span>Configuraciones</span>
+                                <span className="overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] max-w-40 opacity-100 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:-translate-x-1 group-data-[state=collapsed]:opacity-0">Configuraciones</span>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
 
@@ -143,7 +171,7 @@ const AppSidebar = () => {
                                 onClick={() => setLogoutOpen(true)}
                             >
                                 <LogOut className="size-7 shrink-0" />
-                                <span className="font-bold">Salir del Sistema</span>
+                                <span className="overflow-hidden whitespace-nowrap font-bold transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] max-w-40 opacity-100 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:-translate-x-1 group-data-[state=collapsed]:opacity-0">Salir del Sistema</span>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     </SidebarMenu>
