@@ -325,9 +325,9 @@ const VentasPOS = () => {
               </p>
               {String(catalogoQ.error?.message ?? "").includes("permiso") && (
                 <p className="text-(--color-pos-texto-muted) text-xs mt-2 leading-relaxed">
-                  En Usuarios → Roles, asigne al menos <strong>CAJAS · Leer</strong> o{" "}
-                  <strong>VENTAS · Leer</strong> al rol del cajero. Reinicie el backend si acaba de
-                  actualizar permisos.
+                  En Usuarios → Roles, asigne al rol del cajero permisos de <strong>CAJAS</strong>:
+                  Leer (catálogo y ticket), Actualizar (cobrar) y Crear (abrir caja). Los cambios
+                  aplican al siguiente request; no hace falta reiniciar el servidor.
                 </p>
               )}
             </div>

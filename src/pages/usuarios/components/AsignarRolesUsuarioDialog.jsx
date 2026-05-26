@@ -7,8 +7,17 @@ import { useAsignarRolesUsuarioMutation } from "@/hooks/queries/useSeguridadQuer
 import { validateAsignarRoles } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
 
+function setsIguales(a, b) {
+  if (a.size !== b.size) return false;
+  for (const id of a) {
+    if (!b.has(id)) return false;
+  }
+  return true;
+}
+
 export function AsignarRolesUsuarioDialog({ open, onOpenChange, usuario, rolesCatalogo }) {
   const [selected, setSelected] = useState(() => new Set());
+  const [initialSelected, setInitialSelected] = useState(() => new Set());
   const [localError, setLocalError] = useState("");
   const mut = useAsignarRolesUsuarioMutation();
 
@@ -16,8 +25,11 @@ export function AsignarRolesUsuarioDialog({ open, onOpenChange, usuario, rolesCa
     if (!open || !usuario) return;
     const ids = new Set((usuario.roles ?? []).map((r) => r.idRol).filter(Boolean));
     setSelected(ids);
+    setInitialSelected(new Set(ids));
     setLocalError("");
   }, [open, usuario]);
+
+  const hayCambios = useMemo(() => !setsIguales(selected, initialSelected), [selected, initialSelected]);
 
   const toggle = (idRol) => {
     setSelected((prev) => {
@@ -34,6 +46,8 @@ export function AsignarRolesUsuarioDialog({ open, onOpenChange, usuario, rolesCa
   );
 
   const handleGuardar = async () => {
+    if (!hayCambios) return;
+
     setLocalError("");
     const idRoles = [...selected];
     const parsed = validateAsignarRoles({ idUsuario: usuario?.idUsuario, idRoles });
@@ -60,7 +74,8 @@ export function AsignarRolesUsuarioDialog({ open, onOpenChange, usuario, rolesCa
             <span className="font-semibold text-foreground">
               {usuario?.nombres} {usuario?.apellidos}
             </span>
-            . Los cambios se envían a la API solo si la validación es correcta.
+            . Al guardar, se eliminan los <strong>permisos excepcionales</strong> y solo aplican los permisos de los
+            roles seleccionados.
           </DialogDescription>
         </DialogHeader>
 
@@ -102,7 +117,7 @@ export function AsignarRolesUsuarioDialog({ open, onOpenChange, usuario, rolesCa
           </Button>
           <Button
             type="button"
-            disabled={mut.isPending}
+            disabled={mut.isPending || !hayCambios}
             className="bg-(--color-pagina-2) text-(--color-blanco) hover:bg-(--color-pagina-2)/90"
             onClick={handleGuardar}
           >

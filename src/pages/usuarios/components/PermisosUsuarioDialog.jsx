@@ -1,49 +1,114 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePermisosCatalogoQuery, useUsuarioPermisosExcepcionalesMutation, useUsuarioQuery } from "@/hooks/queries/useSeguridadQueries";
+import { PermisosMatrizGrid } from "./PermisosMatrizGrid";
+import {
+  usePermisosCatalogoQuery,
+  useUsuarioPermisosExcepcionalesMutation,
+  useUsuarioQuery,
+  qkPermisosRol,
+} from "@/hooks/queries/useSeguridadQueries";
 import { validateActualizarPermisosUsuario } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
-import { buildUsuarioExcepcionRows, permisosMapFromUsuarioExcepciones, permKey, sortAcciones } from "@/pages/usuarios/permisosMatrix";
+import { fetchPermisosByRol } from "@/services/permisosService";
+import {
+  buildPermisosExcepcionalesPayload,
+  buildUsuarioExcepcionRows,
+  excepcionKeysFromUsuario,
+  permisosExcepcionalesPayloadEqual,
+  permisosMapFromRoles,
+  permisosMapFromUsuarioExcepciones,
+  permisosMapsEqual,
+  permKey,
+  sortAcciones,
+} from "@/pages/usuarios/permisosMatrix";
 
 const EMPTY = [];
 
-function mapsEqual(a, b) {
-  if (a.size !== b.size) return false;
-  for (const [k, v] of a) {
-    if (b.get(k) !== v) return false;
-  }
-  return true;
-}
-
 export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
   const [localMap, setLocalMap] = useState(() => new Map());
+  const [initialPayload, setInitialPayload] = useState([]);
   const [permError, setPermError] = useState("");
   const userQ = useUsuarioQuery(idUsuario, { enabled: open && Number(idUsuario) > 0 });
   const catQ = usePermisosCatalogoQuery({ enabled: open });
   const saveMut = useUsuarioPermisosExcepcionalesMutation();
 
+  const roleIds = useMemo(
+    () => (userQ.data?.roles ?? []).map((r) => r.idRol).filter((id) => Number(id) > 0),
+    [userQ.data?.roles]
+  );
+
+  const rolPermsQueries = useQueries({
+    queries: roleIds.map((idRol) => ({
+      queryKey: qkPermisosRol(idRol),
+      queryFn: () => fetchPermisosByRol(idRol),
+      enabled: open && Number(idUsuario) > 0,
+      staleTime: 15_000,
+    })),
+  });
+
   const acciones = useMemo(() => sortAcciones(catQ.data?.acciones ?? []), [catQ.data?.acciones]);
   const modulos = catQ.data?.modulos ?? EMPTY;
   const rows = useMemo(() => buildUsuarioExcepcionRows(modulos, acciones), [modulos, acciones]);
 
+  const rolPermsLists = useMemo(
+    () => rolPermsQueries.map((q) => q.data ?? []),
+    [roleIds, rolPermsQueries.map((q) => q.dataUpdatedAt).join(",")]
+  );
+
+  const rolBaseMap = useMemo(() => permisosMapFromRoles(rolPermsLists), [rolPermsLists]);
+
+  const excepcionKeys = useMemo(
+    () => excepcionKeysFromUsuario(userQ.data?.permisosExcepcionales ?? []),
+    [userQ.data?.permisosExcepcionales]
+  );
+
+  const rolPermsLoading = rolPermsQueries.some((q) => q.isLoading);
+  const rolPermsError = rolPermsQueries.find((q) => q.error)?.error;
+
   useEffect(() => {
-    if (!open || !rows.length) {
+    if (!open) {
+      setLocalMap((prev) => (prev.size === 0 ? prev : new Map()));
+      setInitialPayload((prev) => (prev.length === 0 ? prev : []));
       return;
     }
-    const fromServer = permisosMapFromUsuarioExcepciones(userQ.data?.permisosExcepcionales ?? []);
+
+    if (!rows.length || userQ.isLoading || rolPermsLoading) {
+      return;
+    }
+
+    const excepciones = permisosMapFromUsuarioExcepciones(userQ.data?.permisosExcepcionales ?? []);
     const next = new Map();
+
     for (const row of rows) {
       const k = permKey(row.idModulo, row.idSubmodulo, row.idAccion);
-      next.set(k, fromServer.has(k) ? fromServer.get(k) ?? false : false);
+      if (excepcionKeys.has(k)) {
+        next.set(k, Boolean(excepciones.get(k)));
+      } else {
+        next.set(k, Boolean(rolBaseMap.get(k)));
+      }
     }
-    queueMicrotask(() => {
-      setLocalMap((prev) => (mapsEqual(prev, next) ? prev : next));
-    });
-  }, [open, rows, userQ.data?.permisosExcepcionales]);
+
+    const payloadInicial = buildPermisosExcepcionalesPayload(rows, next, rolBaseMap);
+
+    setLocalMap((prev) => (permisosMapsEqual(prev, next) ? prev : next));
+    setInitialPayload((prev) =>
+      permisosExcepcionalesPayloadEqual(prev, payloadInicial) ? prev : payloadInicial
+    );
+  }, [open, rows, userQ.data?.permisosExcepcionales, userQ.isLoading, rolPermsLoading, rolBaseMap, excepcionKeys]);
+
+  const payloadActual = useMemo(
+    () => buildPermisosExcepcionalesPayload(rows, localMap, rolBaseMap),
+    [rows, localMap, rolBaseMap]
+  );
+
+  const hayCambios = useMemo(
+    () => !permisosExcepcionalesPayloadEqual(initialPayload, payloadActual),
+    [initialPayload, payloadActual]
+  );
 
   const toggle = (row) => {
     const k = permKey(row.idModulo, row.idSubmodulo, row.idAccion);
@@ -65,12 +130,17 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
   }, [rows]);
 
   const handleGuardar = async () => {
+    if (!hayCambios) return;
+
     setPermError("");
-    const permisosExcepcionales = rows.map((row) => ({
-      idModulo: row.idModulo,
-      idAccion: row.idAccion,
-      permitido: localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion)) ?? false,
-    }));
+
+    if (rolPermsLoading) {
+      setPermError("Espere a que carguen los permisos del rol antes de guardar.");
+      return;
+    }
+
+    const permisosExcepcionales = payloadActual;
+
     const parsed = validateActualizarPermisosUsuario({ idUsuario, permisosExcepcionales });
     if (!parsed.success) {
       const first = Object.values(parsed.error.flatten().fieldErrors).flat()[0];
@@ -88,18 +158,27 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
     }
   };
 
-  const loading = userQ.isLoading || catQ.isLoading;
-  const loadErr = userQ.error || catQ.error;
+  const loading = userQ.isLoading || catQ.isLoading || rolPermsLoading;
+  const loadErr = userQ.error || catQ.error || rolPermsError;
+
+  const rolesLabel = (userQ.data?.roles ?? []).map((r) => r.nombre).filter(Boolean).join(", ");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(92vh,760px)] overflow-hidden bg-(--color-blanco) sm:max-w-2xl">
+      <DialogContent className="max-h-[min(92vh,760px)] overflow-hidden bg-(--color-blanco) sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="text-(--color-pagina-2)">Permisos por usuario (excepciones)</DialogTitle>
+          <DialogTitle className="text-(--color-pagina-2)">Permisos por usuario</DialogTitle>
           <DialogDescription className="text-(--color-gris-letra)">
-            Matriz <strong>módulo × acción</strong> (CREATE, READ, UPDATE, DELETE) al nivel de módulo, compatible con{" "}
-            <code className="text-xs">PUT /api/Usuarios/{"{id}"}/permisos-excepcionales</code>. Los roles siguen definiendo
-            permisos base; aquí ajustas excepciones solo para este usuario.
+            Los permisos del <strong>rol</strong> se aplican automáticamente
+            {rolesLabel ? (
+              <>
+                {" "}
+                (<span className="font-medium">{rolesLabel}</span>)
+              </>
+            ) : (
+              " (asigne un rol al usuario si aún no tiene)"
+            )}
+            . Aquí solo guarda <strong>excepciones</strong> que sumen o quiten permisos respecto al rol.
           </DialogDescription>
         </DialogHeader>
 
@@ -112,45 +191,31 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
           <p className="text-sm text-(--color-rojo)">{getApiErrorMessage(loadErr)}</p>
         ) : !rows.length ? (
           <p className="text-sm text-muted-foreground">
-            No hay catálogo de módulos/acciones (GET /api/Permisos/catalogo). La estructura quedará lista cuando el
-            backend exponga datos.
+            No hay catálogo de módulos/acciones (GET /api/Permisos/catalogo).
           </p>
         ) : (
           <>
-            <ScrollArea className="h-[min(55vh,420px)] pr-3">
-              <div className="space-y-4">
-                {groupedRows.map(({ meta, acciones: ars }) => (
-                  <div key={meta.idModulo} className="rounded-lg border border-border">
-                    <div className="bg-(--color-pagina-4) px-3 py-2 text-sm font-semibold text-foreground">
-                      {meta.etiquetaModulo}
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">Módulo · acciones</span>
-                    </div>
-                    <Separator />
-                    <ul className="divide-y divide-border">
-                      {ars.map((row) => (
-                        <li
-                          key={permKey(row.idModulo, row.idSubmodulo, row.idAccion)}
-                          className="flex items-center justify-between gap-3 px-3 py-2"
-                        >
-                          <div>
-                            <span className="text-sm font-medium text-foreground">{row.etiquetaAccion}</span>
-                            <span className="ml-2 text-xs text-muted-foreground">{row.codigoAccion}</span>
-                          </div>
-                          <label className="flex cursor-pointer items-center gap-2 text-sm text-(--color-gris-letra)">
-                            <span className="text-xs uppercase">Permitido</span>
-                            <input
-                              type="checkbox"
-                              className="size-4 accent-(--color-pagina-2)"
-                              checked={localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion)) ?? false}
-                              onChange={() => toggle(row)}
-                            />
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
+            <ScrollArea className="h-[min(55vh,480px)] pr-2">
+              <PermisosMatrizGrid
+                groupedRows={groupedRows}
+                localMap={localMap}
+                onToggle={toggle}
+                renderAccionExtra={(row, k, checked) => {
+                  const desdeRol = Boolean(rolBaseMap.get(k));
+                  const esExcepcion = checked !== desdeRol;
+                  const viaRol = desdeRol && checked && !esExcepcion;
+                  if (!viaRol && !esExcepcion) return null;
+                  return (
+                    <span className="mt-0.5 block text-[10px] leading-tight text-muted-foreground">
+                      {viaRol ? (
+                        <span className="text-(--color-pagina-2)">Del rol</span>
+                      ) : (
+                        <span className="text-amber-700">Excepción</span>
+                      )}
+                    </span>
+                  );
+                }}
+              />
             </ScrollArea>
             {permError ? <p className="text-sm text-(--color-rojo)">{permError}</p> : null}
           </>
@@ -162,11 +227,11 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
           </Button>
           <Button
             type="button"
-            disabled={saveMut.isPending || !rows.length}
+            disabled={saveMut.isPending || !rows.length || rolPermsLoading || !hayCambios}
             className="bg-(--color-pagina) text-(--color-blanco) hover:bg-(--color-borde-button)"
             onClick={handleGuardar}
           >
-            {saveMut.isPending ? "Guardando…" : "Guardar permisos del usuario"}
+            {saveMut.isPending ? "Guardando…" : "Guardar excepciones"}
           </Button>
         </DialogFooter>
       </DialogContent>

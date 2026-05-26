@@ -4,7 +4,7 @@ import { mapVentaCreada, mapVentaTicket, unwrapVentaPaged } from "@/lib/ventaMap
 
 /**
  * Catálogo de variantes para POS.
- * GET /api/Ventas/catalogo — page, pageSize, criterio
+ * GET /api/Ventas/catalogo — requiere CAJAS·Leer o VENTAS·Leer (cualquiera).
  */
 export async function fetchVentaCatalogo({ page = 1, pageSize = 8, criterio } = {}) {
   const params = { page, pageSize };
@@ -19,7 +19,7 @@ export async function fetchVentaCatalogo({ page = 1, pageSize = 8, criterio } = 
     if (err.response?.status === 403) {
       const msg = getApiErrorMessage(
         err,
-        "Sin permiso para ver el catálogo (se requiere CAJAS o VENTAS con lectura)."
+        "Sin permiso para ver el catálogo (asigne CAJAS · Leer al rol del cajero)."
       );
       throw new Error(msg);
     }
@@ -27,7 +27,7 @@ export async function fetchVentaCatalogo({ page = 1, pageSize = 8, criterio } = 
   }
 }
 
-/** POST /api/Ventas — requiere permiso VENTAS · Crear (o el que tenga su rol). */
+/** POST /api/Ventas — requiere CAJAS·Actualizar o VENTAS·Crear (cualquiera). */
 export async function crearVenta(body) {
   try {
     const { data } = await apiClient.post("/api/Ventas", body);
@@ -42,7 +42,7 @@ export async function crearVenta(body) {
       throw new Error(
         getApiErrorMessage(
           err,
-          "Sin permiso para cobrar (se requiere CAJAS · Actualizar o VENTAS · Crear)."
+          "Sin permiso para cobrar (asigne CAJAS · Actualizar al rol del cajero)."
         )
       );
     }
@@ -65,7 +65,7 @@ export async function fetchVentaTicket(idVenta) {
       throw new Error(
         getApiErrorMessage(
           err,
-          "Sin permiso para ver el ticket (se requiere CAJAS o VENTAS con lectura)."
+          "Sin permiso para ver el ticket (asigne CAJAS · Leer al rol del cajero)."
         )
       );
     }
