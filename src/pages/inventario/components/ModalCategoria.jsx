@@ -1,0 +1,119 @@
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
+
+const ModalCategoria = ({ open, onClose, onSave, data }) => {
+  const [form, setForm] = useState({
+    nombre: "",
+    descripcion: "",
+    estado: true,
+  });
+
+  useEffect(() => {
+    if (data) {
+      setForm({
+        nombre: data.nombre || "",
+        descripcion: data.descripcion || "",
+        estado: data.estado ?? true,
+      });
+    } else {
+      setForm({
+        nombre: "",
+        descripcion: "",
+        estado: true,
+      });
+    }
+  }, [data, open]);
+
+  if (!open) return null;
+
+  const handleChange = (campo, valor) => {
+    setForm({
+      ...form,
+      [campo]: valor,
+    });
+  };
+
+  const handleSave = () => {
+    if (!form.nombre.trim()) return;
+
+    onSave(form);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+
+      <div className="bg-white w-full max-w-md rounded-2xl p-6 border-t-4 border-(--color-pagina)">
+
+        <div className="flex justify-between items-center mb-4">
+
+          <h2 className="font-semibold">
+            {data ? "Editar Categoría" : "Nueva Categoría"}
+          </h2>
+
+          <button onClick={onClose}>
+            <X />
+          </button>
+
+        </div>
+
+        <div className="space-y-4">
+
+          <input
+            value={form.nombre}
+            onChange={(e) =>
+              handleChange("nombre", e.target.value)
+            }
+            placeholder="Nombre"
+            className="w-full border p-3 rounded-lg"
+          />
+
+          <textarea
+            value={form.descripcion}
+            onChange={(e) =>
+              handleChange("descripcion", e.target.value)
+            }
+            placeholder="Descripción"
+            className="w-full border p-3 rounded-lg"
+          />
+
+          <select
+            value={form.estado ? "Activo" : "Inactivo"}
+            onChange={(e) =>
+              handleChange(
+                "estado",
+                e.target.value === "Activo"
+              )
+            }
+            className="w-full border p-3 rounded-lg"
+          >
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
+
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6">
+
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border rounded-lg"
+          >
+            Cancelar
+          </button>
+
+          <button
+            onClick={handleSave}
+            className="bg-(--color-pagina-2) text-white px-5 py-2 rounded-lg"
+          >
+            Guardar
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+};
+
+export default ModalCategoria;

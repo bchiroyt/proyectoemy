@@ -18,10 +18,10 @@ export const QK_ROLES = ["seguridad", "roles"];
 export const QK_CATALOGO_PERMISOS = ["seguridad", "permisos", "catalogo"];
 export const qkPermisosRol = (idRol) => ["seguridad", "permisos", "rol", idRol];
 
-export function useUsuariosQuery(options = {}) {
+export function useUsuariosQuery({ page = 1, pageSize = 10, search = "", ...options } = {}) {
   return useQuery({
-    queryKey: QK_USUARIOS,
-    queryFn: fetchUsuarios,
+    queryKey: [...QK_USUARIOS, { page, pageSize, search }],
+    queryFn: () => fetchUsuarios({ page, pageSize, search }),
     staleTime: 30_000,
     ...options,
   });
