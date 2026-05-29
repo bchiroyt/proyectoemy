@@ -119,6 +119,18 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
     });
   };
 
+  const setRowsChecked = (targetRows, value) => {
+    setLocalMap((prev) => {
+      const n = new Map(prev);
+      for (const row of targetRows) {
+        n.set(permKey(row.idModulo, row.idSubmodulo, row.idAccion), value);
+      }
+      return n;
+    });
+  };
+
+  const toggleGroup = (groupRows, value) => setRowsChecked(groupRows, value);
+
   const groupedRows = useMemo(() => {
     const m = new Map();
     for (const row of rows) {
@@ -200,6 +212,7 @@ export function PermisosUsuarioDialog({ open, onOpenChange, idUsuario }) {
                 groupedRows={groupedRows}
                 localMap={localMap}
                 onToggle={toggle}
+                onToggleGroup={toggleGroup}
                 renderAccionExtra={(row, k, checked) => {
                   const desdeRol = Boolean(rolBaseMap.get(k));
                   const esExcepcion = checked !== desdeRol;

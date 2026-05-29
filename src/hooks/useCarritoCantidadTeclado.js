@@ -2,6 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { digitoDesdeTecla, esTeclaBorrar } from "@/lib/posTecladoUtils";
 
 /**
+ * Teclas que llegan más rápido que esto (ms) se consideran parte de una ráfaga del
+ * lector de código, no escritura manual. La escritura humana de una cantidad supera
+ * ampliamente este valor; un lector envía cada carácter casi instantáneamente.
+ */
+const RAFAGA_LECTOR_MS = 80;
+
+/**
  * Edición de cantidad en carrito POS sin input visible.
  * Delete: quita dígitos → 0 → elimina línea.
  */
@@ -9,6 +16,7 @@ export function useCarritoCantidadTeclado(carrito, setCarrito) {
   const [lineaId, setLineaId] = useState(null);
   const [draft, setDraft] = useState(null);
   const overwriteRef = useRef(true);
+  const lastKeyTimeRef = useRef(0);
 
   const seleccionarLinea = useCallback((id) => {
     setLineaId(id);
@@ -57,6 +65,11 @@ export function useCarritoCantidadTeclado(carrito, setCarrito) {
     const handler = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+      // Medimos el hueco respecto a la tecla anterior para distinguir lector vs. teclado.
+      const ahora = Date.now();
+      const gap = ahora - lastKeyTimeRef.current;
+      lastKeyTimeRef.current = ahora;
+
       const item = carrito.find((p) => p.id === lineaId);
       if (!item) {
         deseleccionar();
@@ -96,6 +109,10 @@ export function useCarritoCantidadTeclado(carrito, setCarrito) {
 
       const digito = digitoDesdeTecla(e);
       if (!digito) return;
+
+      // Ráfaga del lector: no es edición manual de cantidad. La dejamos pasar para que
+      // el escáner arme el código; así escanear con una línea seleccionada no la pone en 0.
+      if (gap < RAFAGA_LECTOR_MS) return;
 
       e.preventDefault();
       e.stopPropagation();

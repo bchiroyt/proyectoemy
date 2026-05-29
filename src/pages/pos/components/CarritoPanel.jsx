@@ -18,6 +18,7 @@ export function CarritoPanel({
   seleccionarLinea,
   deseleccionar,
   cantidadVisible,
+  tabsSlot,
   children,
 }) {
 
@@ -28,6 +29,8 @@ export function CarritoPanel({
         if (e.target === e.currentTarget) deseleccionar();
       }}
     >
+      {tabsSlot}
+
       <div className="p-4 border-b border-(--color-pos-borde-suave) flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-(--color-pagina)">
           <ShoppingCart className="w-5 h-5" />

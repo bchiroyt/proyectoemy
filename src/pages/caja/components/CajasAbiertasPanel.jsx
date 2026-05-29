@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { LayoutDashboard, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Paginacion from "@/components/shared/Paginacion";
-import { NipDialog } from "@/components/caja/NipDialog";
+import { NipDialog } from "@/pages/caja/components/NipDialog";
 import { fmtQ } from "@/lib/cajaMappers";
 import Toast from "@/components/ui/Toast";
 

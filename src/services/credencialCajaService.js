@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/apiClient";
-import { pick, throwIfEnvelopeFailed, toNumberOrNull } from "@/lib/apiNormalizer";
+import { pick, throwIfEnvelopeFailed, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
 
 function mapCredencialCaja(raw) {
   if (!raw) return null;
@@ -20,6 +20,15 @@ function mapCredencialCaja(raw) {
     fechaCreacion: pick(raw, "fechaCreacion", "FechaCreacion"),
     fechaActualizacion: pick(raw, "fechaActualizacion", "FechaActualizacion"),
   };
+}
+
+/** GET /api/credenciales-caja — lista de operadores con credencial de caja (para cambio de cajero). */
+export async function fetchCredencialesCaja({ page = 1, pageSize = 100 } = {}) {
+  const { data } = await apiClient.get("/api/credenciales-caja", {
+    params: { page, pageSize },
+  });
+  throwIfEnvelopeFailed(data, "No se pudieron cargar las credenciales de caja.");
+  return unwrapList(data).map(mapCredencialCaja).filter(Boolean);
 }
 
 /** GET /api/credenciales-caja/{idUsuario} — null si no existe (404) */

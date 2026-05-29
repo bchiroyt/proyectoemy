@@ -231,9 +231,6 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
       <DialogContent className="max-h-[min(90vh,720px)] overflow-y-auto bg-(--color-blanco) sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-(--color-pagina-2)">Editar usuario</DialogTitle>
-          <DialogDescription className="text-(--color-gris-letra)">
-            Datos completos desde la API. Los cambios se envían con PATCH (parcial).
-          </DialogDescription>
         </DialogHeader>
 
         {userQ.isLoading ? (
@@ -245,11 +242,11 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
         ) : userQ.isError ? (
           <p className="text-sm text-(--color-rojo)">{getApiErrorMessage(userQ.error, "Error al cargar usuario.")}</p>
         ) : (
-          <div className="grid gap-3 py-2">
+          <div className="grid gap-3">
             <div className="rounded-md border border-border bg-(--color-pagina-4) px-3 py-2 text-xs text-(--color-gris-letra)">
-              <p>
+              {/*<p>
                 <span className="font-semibold text-foreground">ID:</span> {idUsuario}
-              </p>
+              </p>*/}
               <p>
                 <span className="font-semibold text-foreground">Último acceso:</span>{" "}
                 {fmtIso(userQ.data?.ultimoAcceso)}
@@ -263,7 +260,7 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
               </p>
             </div>
 
-            <div className="grid gap-2">
+            {/*<div className="grid gap-2">
               <Label htmlFor="eu-tipo" className="text-xs font-bold uppercase text-(--color-pagina)">
                 Id tipo usuario
               </Label>
@@ -277,7 +274,7 @@ export function EditarUsuarioDialog({ open, onOpenChange, idUsuario }) {
               {fieldErrors.idTipoUsuario?.[0] ? (
                 <p className="text-xs text-(--color-rojo)">{fieldErrors.idTipoUsuario[0]}</p>
               ) : null}
-            </div>
+            </div>*/}
 
             <div className="grid gap-2">
               <Label htmlFor="eu-user" className="text-xs font-bold uppercase text-(--color-pagina)">

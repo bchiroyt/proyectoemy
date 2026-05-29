@@ -80,7 +80,7 @@ export function roundVenta(n) {
 }
 
 /** Arma el body de POST /api/Ventas */
-export function buildVentaCrearBody(carrito, pagos, observaciones = null) {
+export function buildVentaCrearBody(carrito, pagos, { observaciones = null, idCaja = null } = {}) {
   const detalles = carrito
     .filter((l) => l.cantidad > 0)
     .map((l) => ({
@@ -91,6 +91,7 @@ export function buildVentaCrearBody(carrito, pagos, observaciones = null) {
     }));
 
   return {
+    idCaja: idCaja ?? null,
     idCliente: null,
     observaciones: observaciones?.trim() || null,
     detalles,

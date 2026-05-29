@@ -8,7 +8,8 @@ import {
   useCajaMovimientosQuery,
   useMiCajaActivaQuery,
 } from "@/hooks/queries/useCajaQueries";
-import { NipDialog } from "@/components/caja/NipDialog";
+import { NipDialog } from "@/pages/caja/components/NipDialog";
+import { usePosTicketsStore } from "@/context/usePosTicketsStore";
 import { fmtQ } from "@/lib/cajaMappers";
 import { agruparMovimientosCierre, parseMontoMonedas } from "@/lib/cajaUtils";
 import { getApiErrorMessage } from "@/lib/apiClient";
@@ -38,6 +39,12 @@ const CierreCaja = () => {
 
   const resumen = resumenQ.data?.data;
   const movimientos = movQ.data?.data ?? [];
+
+  const ticketsEnEspera = usePosTicketsStore((s) => s.tickets);
+  const ticketsPendientes = useMemo(
+    () => ticketsEnEspera.filter((t) => t.carrito.some((p) => p.cantidad > 0)).length,
+    [ticketsEnEspera]
+  );
 
   const [montoContado, setMontoContado] = useState("");
   const [observaciones, setObservaciones] = useState("");
@@ -71,6 +78,14 @@ const CierreCaja = () => {
   const loading = resumenQ.isLoading || movQ.isLoading;
 
   const handleConfirmar = () => {
+    if (ticketsPendientes > 0) {
+      setToast({
+        open: true,
+        message: `Tiene ${ticketsPendientes} venta(s) en espera sin cobrar. Cóbrelas o ciérrelas en Ventas antes de cerrar el turno.`,
+        type: "warning",
+      });
+      return;
+    }
     if (Number.isNaN(montoContadoNum) || montoContadoNum <= 0) {
       setToast({
         open: true,
@@ -330,11 +345,32 @@ const CierreCaja = () => {
                 ) : null}
               </Seccion>
 
+              {ticketsPendientes > 0 ? (
+                <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                  <AlertTriangle className="size-5 shrink-0 text-amber-600" />
+                  <div className="flex-1 text-sm text-amber-950">
+                    <p className="font-bold">
+                      Tiene {ticketsPendientes} venta(s) en espera sin cobrar
+                    </p>
+                    <p className="text-xs mt-0.5 leading-relaxed">
+                      Debe cobrarlas o cerrarlas antes de cerrar el turno para no dejar ventas a medias.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/pos/ventas")}
+                    className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-(--color-blanco) hover:bg-amber-700"
+                  >
+                    Ir a Ventas
+                  </button>
+                </div>
+              ) : null}
+
               <div className="pt-2 space-y-2">
                 <button
                   type="button"
                   onClick={handleConfirmar}
-                  disabled={cerrarM.isPending}
+                  disabled={cerrarM.isPending || ticketsPendientes > 0}
                   className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-(--color-rojo) px-6 py-4 text-base font-bold text-(--color-blanco) hover:bg-(--color-rojo-obscuro) disabled:opacity-50 shadow-md"
                 >
                   <Lock className="size-5" />

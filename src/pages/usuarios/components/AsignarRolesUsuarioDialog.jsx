@@ -32,13 +32,9 @@ export function AsignarRolesUsuarioDialog({ open, onOpenChange, usuario, rolesCa
   const hayCambios = useMemo(() => !setsIguales(selected, initialSelected), [selected, initialSelected]);
 
   const toggle = (idRol) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(idRol)) next.delete(idRol);
-      else next.add(idRol);
-      return next;
-    });
+    setSelected(new Set([idRol]));  
   };
+  
 
   const rolesActivos = useMemo(
     () => (rolesCatalogo ?? []).filter((r) => r.activo !== false),
@@ -87,7 +83,8 @@ export function AsignarRolesUsuarioDialog({ open, onOpenChange, usuario, rolesCa
                 <li key={r.idRol}>
                   <label className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-muted/80">
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="rol"
                       className="mt-1 size-4 accent-(--color-pagina-2) shrink-0"
                       checked={selected.has(r.idRol)}
                       onChange={() => toggle(r.idRol)}
