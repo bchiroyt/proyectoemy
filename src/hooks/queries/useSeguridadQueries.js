@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { loginRequest } from "@/services/authService";
+import { loginRequest, loginNipRequest } from "@/services/authService";
 import {
   createUsuario,
   desactivarUsuario,
@@ -157,5 +157,12 @@ export function useActualizarPermisosRolMutation() {
 export function useLoginMutation() {
   return useMutation({
     mutationFn: ({ email, password }) => loginRequest({ email, password }),
+  });
+}
+
+/** Cambio rápido de operador por NIP (requiere sesión válida del terminal). */
+export function useLoginNipMutation() {
+  return useMutation({
+    mutationFn: ({ idUsuario, nip }) => loginNipRequest({ idUsuario, nip }),
   });
 }

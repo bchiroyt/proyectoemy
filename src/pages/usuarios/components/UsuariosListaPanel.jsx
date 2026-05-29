@@ -174,17 +174,29 @@ export function UsuariosListaPanel({
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="border-(--color-pagina-2) text-(--color-pagina-2) hover:bg-(--color-pagina-2)/10"
-                            onClick={() => setRolDialogUser(u)}
+                            disabled={esMiUsuario}
+                            title={
+                              esMiUsuario
+                                ? "No puedes modificar tus propios roles mientras tienes sesión iniciada."
+                                : undefined
+                            }
+                            className="border-(--color-pagina-2) text-(--color-pagina-2) hover:bg-(--color-pagina-2)/10 disabled:opacity-50"
+                            onClick={() => !esMiUsuario && setRolDialogUser(u)}
                           >
-                            Roles
+                            Rol
                           </Button>
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="border-(--color-pagina) text-(--color-pagina) hover:bg-(--color-pagina)/10"
-                            onClick={() => setPermisosId(u.idUsuario)}
+                            disabled={esMiUsuario}
+                            title={
+                              esMiUsuario
+                                ? "No puedes modificar tus propios permisos mientras tienes sesión iniciada."
+                                : undefined
+                            }
+                            className="border-(--color-pagina) text-(--color-pagina) hover:bg-(--color-pagina)/10 disabled:opacity-50"
+                            onClick={() => !esMiUsuario && setPermisosId(u.idUsuario)}
                           >
                             <Shield className="size-3.5" />
                           </Button>

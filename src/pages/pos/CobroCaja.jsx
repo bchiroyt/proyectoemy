@@ -3,8 +3,10 @@ import { ArrowLeft, BadgeCheck, Banknote, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
+import { usePosTicketsStore } from "@/context/usePosTicketsStore";
 import { useMontoTeclado } from "@/hooks/useMontoTeclado";
 import { useCrearVentaMutation } from "@/hooks/queries/useVentaQueries";
+import { useMiCajaActivaQuery } from "@/hooks/queries/useCajaQueries";
 import { getMetodosPagoConfig } from "@/constants/metodosPago";
 import { buildVentaCrearBody, roundVenta } from "@/lib/ventaMappers";
 import {
@@ -34,6 +36,7 @@ const CobroCaja = () => {
   const ultimaVenta = usePosVentaStore((s) => s.ultimaVenta);
   const setUltimaVenta = usePosVentaStore((s) => s.setUltimaVenta);
   const clearParaNuevaVenta = usePosVentaStore((s) => s.clearParaNuevaVenta);
+  const limpiarTicketActivo = usePosTicketsStore((s) => s.limpiarTicketActivo);
 
   const [mostrarTicket, setMostrarTicket] = useState(false);
 
@@ -46,6 +49,8 @@ const CobroCaja = () => {
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
 
   const crearM = useCrearVentaMutation();
+  const miCajaQ = useMiCajaActivaQuery();
+  const idCaja = miCajaQ.data?.data?.idCaja ?? null;
   const validarRef = useRef(null);
 
   const lineas = useMemo(
@@ -194,7 +199,7 @@ const CobroCaja = () => {
     }
 
     try {
-      const body = buildVentaCrearBody(lineas, pagosFinales);
+      const body = buildVentaCrearBody(lineas, pagosFinales, { idCaja });
       const res = await crearM.mutateAsync(body);
       setUltimaVenta({
         idVenta: res.data?.idVenta,
@@ -208,6 +213,7 @@ const CobroCaja = () => {
           montoRecibido: p.montoRecibido,
         })),
       });
+      limpiarTicketActivo();
       setTitulo("POS · Ticket");
       setMostrarTicket(true);
     } catch (err) {
@@ -232,9 +238,10 @@ const CobroCaja = () => {
     deudaTotal,
     lineas,
     crearM,
+    idCaja,
     setUltimaVenta,
+    limpiarTicketActivo,
     setTitulo,
-    deudaTotal,
   ]);
 
   validarRef.current = () => {

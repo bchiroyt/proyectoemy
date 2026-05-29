@@ -8,7 +8,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Lock, Banknote, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { fmtQ } from "@/lib/cajaMappers";
-import { ArqueoParcialDialog } from "@/components/caja/ArqueoParcialDialog";
+import { ArqueoParcialDialog } from "@/pages/caja/components/ArqueoParcialDialog";
 import { Badge } from "@/components/ui/badge";
 
 export function MiCajaPanel() {

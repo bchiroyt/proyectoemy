@@ -4,10 +4,22 @@ import {
   asignarNipCredencialCaja,
   crearCredencialCaja,
   fetchCredencialCajaPorUsuario,
+  fetchCredencialesCaja,
   patchCredencialCajaUsuario,
 } from "@/services/credencialCajaService";
 
 export const qkCredencialCajaUsuario = (idUsuario) => ["credencial-caja", "usuario", idUsuario];
+export const QK_CREDENCIALES_CAJA = ["credencial-caja", "lista"];
+
+/** Lista de operadores con credencial de caja (para cambio rápido de cajero). */
+export function useCredencialesCajaQuery(options = {}) {
+  return useQuery({
+    queryKey: QK_CREDENCIALES_CAJA,
+    queryFn: () => fetchCredencialesCaja({ page: 1, pageSize: 100 }),
+    staleTime: 30_000,
+    ...options,
+  });
+}
 
 export function useCredencialCajaPorUsuarioQuery(idUsuario, options = {}) {
   return useQuery({

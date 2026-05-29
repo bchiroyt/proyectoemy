@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Check, Info, RotateCcw, ScanBarcode } from "lucide-react";
+import { Check, Info, Plus, RotateCcw, ScanBarcode, ScanLine, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { cn } from "@/lib/utils";
@@ -13,14 +13,29 @@ import {
   useVentaCatalogoQuery,
   useVentaCategoriasQuery,
 } from "@/hooks/queries/useVentaQueries";
-import { MovimientoCajaDialog } from "@/components/caja/MovimientoCajaDialog";
+import { MovimientoCajaDialog } from "@/pages/caja/components/MovimientoCajaDialog";
+import { CambiarCajeroDialog } from "@/pages/caja/components/CambiarCajeroDialog";
+import { useHeaderUserActionStore } from "@/context/useHeaderUserActionStore";
 import { CatalogoProductoCard } from "@/pages/pos/components/CatalogoProductoCard";
 import { CarritoPanel } from "@/pages/pos/components/CarritoPanel";
 import { useCarritoCantidadTeclado } from "@/hooks/useCarritoCantidadTeclado";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
+import {
+  usePosTicketsStore,
+  LIMITE_TICKETS_ESPERA,
+} from "@/context/usePosTicketsStore";
 import Toast from "@/components/ui/Toast";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 8;
 const CATEGORIA_TODO = "todo";
@@ -33,20 +48,32 @@ const VentasPOS = () => {
   const flashTimerRef = useRef(0);
   const scanMsgTimerRef = useRef(0);
 
-  const [carrito, setCarrito] = useState([]);
+  const tickets = usePosTicketsStore((s) => s.tickets);
+  const activeId = usePosTicketsStore((s) => s.activeId);
+  const setActivo = usePosTicketsStore((s) => s.setActivo);
+  const nuevoTicket = usePosTicketsStore((s) => s.nuevoTicket);
+  const cerrarTicket = usePosTicketsStore((s) => s.cerrarTicket);
+  const setCarrito = usePosTicketsStore((s) => s.setCarritoActivo);
+
+  const ticketActivo = tickets.find((t) => t.id === activeId) ?? tickets[0];
+  const carrito = ticketActivo?.carrito ?? [];
+
   const [busqueda, setBusqueda] = useState("");
   const [debouncedCriterio, setDebouncedCriterio] = useState("");
   const [categoriaId, setCategoriaId] = useState(CATEGORIA_TODO);
   const [pagina, setPagina] = useState(1);
   const [flashRowId, setFlashRowId] = useState(null);
   const [scanFeedback, setScanFeedback] = useState(null);
+  const [scanModal, setScanModal] = useState(null);
   const [gastosOpen, setGastosOpen] = useState(false);
+  const [cambiarCajeroOpen, setCambiarCajeroOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
   const setPendiente = usePosVentaStore((s) => s.setPendiente);
+  const setHeaderAction = useHeaderUserActionStore((s) => s.setAction);
+  const clearHeaderAction = useHeaderUserActionStore((s) => s.clearAction);
 
   const {
     lineaSeleccionadaId,
-    edicionActiva,
     seleccionarLinea,
     deseleccionar,
     cantidadVisible,
@@ -55,6 +82,11 @@ const VentasPOS = () => {
   useEffect(() => {
     setTitulo("POS · Ventas");
   }, [setTitulo]);
+
+  useEffect(() => {
+    setHeaderAction(() => setCambiarCajeroOpen(true), "Cambiar cajero / operador");
+    return () => clearHeaderAction();
+  }, [setHeaderAction, clearHeaderAction]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedCriterio(busqueda.trim()), 350);
@@ -92,7 +124,8 @@ const VentasPOS = () => {
   }, [miCajaQ.isLoading, miCajaQ.data, navigate]);
 
   const agregarProducto = useCallback(
-    (producto, notaLinea) => {
+    (producto, notaLinea, opts = {}) => {
+      const { seleccionar = true } = opts;
       setCarrito((prev) => {
         const existe = prev.find((p) => p.id === producto.id);
         if (existe) {
@@ -104,9 +137,13 @@ const VentasPOS = () => {
         if (notaLinea) return [...prev, { ...base, notaLinea }];
         return [...prev, base];
       });
-      seleccionarLinea(producto.id);
+      // El escaneo NO selecciona la línea: si lo hiciera, se activaría la edición
+      // de cantidad por teclado y el siguiente escaneo se interpretaría como cantidad.
+      if (seleccionar) {
+        seleccionarLinea(producto.id);
+      }
     },
-    [seleccionarLinea]
+    [seleccionarLinea, setCarrito]
   );
 
   const dispararFlash = useCallback((productoId) => {
@@ -121,18 +158,19 @@ const VentasPOS = () => {
         try {
           const producto = await fetchProductoByCodigo(codigo);
           if (producto) {
-            agregarProducto(producto);
+            agregarProducto(producto, undefined, { seleccionar: false });
             dispararFlash(producto.id);
+            setScanModal(null);
             setScanFeedback({ type: "ok", nombre: producto.nombre });
+            window.clearTimeout(scanMsgTimerRef.current);
+            scanMsgTimerRef.current = window.setTimeout(() => setScanFeedback(null), 2200);
           } else {
-            setScanFeedback({ type: "no-encontrado", codigo });
+            setScanFeedback(null);
+            setScanModal({ type: "no-encontrado", codigo });
           }
-          window.clearTimeout(scanMsgTimerRef.current);
-          scanMsgTimerRef.current = window.setTimeout(() => setScanFeedback(null), 2200);
         } catch {
-          setScanFeedback({ type: "error", codigo });
-          window.clearTimeout(scanMsgTimerRef.current);
-          scanMsgTimerRef.current = window.setTimeout(() => setScanFeedback(null), 2800);
+          setScanFeedback(null);
+          setScanModal({ type: "error", codigo });
         }
       })();
     },
@@ -142,7 +180,9 @@ const VentasPOS = () => {
   useBarcodeScanner(handleBarcodeScan, {
     maxInterKeyMs: BARCODE_DEFAULT_MAX_INTER_KEY_MS,
     minLength: 3,
-    enabled: !edicionActiva,
+    // Siempre activo: aunque haya una línea seleccionada para editar cantidad, el
+    // editor de cantidad ignora las ráfagas del lector, así que no hay conflicto.
+    enabled: true,
   });
 
   useEffect(
@@ -179,6 +219,101 @@ const VentasPOS = () => {
     navigate("/pos/cobro");
   };
 
+  const handleNuevoTicket = () => {
+    deseleccionar();
+    const creado = nuevoTicket();
+    if (!creado) {
+      setToast({
+        open: true,
+        message: `Máximo ${LIMITE_TICKETS_ESPERA} ventas en espera. Cobre o cierre una antes de abrir otra.`,
+        type: "warning",
+      });
+    }
+  };
+
+  const handleCambiarTicket = (id) => {
+    if (id === activeId) return;
+    deseleccionar();
+    setActivo(id);
+  };
+
+  const handleCerrarTicket = (id) => {
+    deseleccionar();
+    cerrarTicket(id);
+  };
+
+  const ticketsTabs = (
+    <div className="flex items-center gap-1 overflow-x-auto border-b border-(--color-pos-borde-suave) bg-(--color-pos-panel) px-2 py-1.5">
+      {tickets.map((t, idx) => {
+        const activo = t.id === activeId;
+        const numLineas = t.carrito.filter((p) => p.cantidad > 0).length;
+        return (
+          <div
+            key={t.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => handleCambiarTicket(t.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleCambiarTicket(t.id);
+              }
+            }}
+            className={cn(
+              "group flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors",
+              activo
+                ? "bg-(--color-pagina) text-(--color-blanco)"
+                : "bg-(--color-gris-claro-2) text-foreground hover:opacity-90"
+            )}
+          >
+            <span className="whitespace-nowrap">Venta {idx + 1}</span>
+            {numLineas > 0 && (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 text-[10px] tabular-nums",
+                  activo
+                    ? "bg-(--color-blanco)/25 text-(--color-blanco)"
+                    : "bg-(--color-pagina)/15 text-(--color-pagina)"
+                )}
+              >
+                {numLineas}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCerrarTicket(t.id);
+              }}
+              aria-label={`Cerrar venta ${idx + 1}`}
+              className={cn(
+                "ml-0.5 rounded p-0.5 transition-colors",
+                activo
+                  ? "text-(--color-blanco) hover:bg-(--color-blanco)/20"
+                  : "text-(--color-pos-texto-muted) hover:bg-black/10"
+              )}
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={handleNuevoTicket}
+        disabled={tickets.length >= LIMITE_TICKETS_ESPERA}
+        title={
+          tickets.length >= LIMITE_TICKETS_ESPERA
+            ? `Máximo ${LIMITE_TICKETS_ESPERA} ventas en espera`
+            : "Nueva venta en espera"
+        }
+        className="shrink-0 rounded-lg p-1.5 text-(--color-pagina) transition-colors hover:bg-(--color-pos-accent-suave) disabled:opacity-40"
+      >
+        <Plus className="size-4" />
+      </button>
+    </div>
+  );
+
   const categoriasFiltro = [
     { id: CATEGORIA_TODO, label: "Todo" },
     ...(categoriasQ.data ?? []),
@@ -207,6 +342,7 @@ const VentasPOS = () => {
         seleccionarLinea={seleccionarLinea}
         deseleccionar={deseleccionar}
         cantidadVisible={cantidadVisible}
+        tabsSlot={ticketsTabs}
       >
           <button
             type="button"
@@ -269,7 +405,7 @@ const VentasPOS = () => {
                 className="max-w-none"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setGastosOpen(true)}
@@ -348,69 +484,7 @@ const VentasPOS = () => {
           {!catalogoQ.isLoading && !catalogoQ.isError && totalCount === 0 && (
             <p className="text-center text-(--color-pos-texto-muted) py-12">Sin resultados.</p>
           )}
-
-          <div className="flex justify-end items-center gap-3 mt-4 text-sm text-(--color-pos-texto-muted)">
-            <span className="tabular-nums">
-              {totalCount === 0
-                ? "0 / 0"
-                : `${sliceStart + 1}-${Math.min(sliceStart + PAGE_SIZE, totalCount)} / ${totalCount}`}
-            </span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                disabled={paginaSegura <= 1}
-                onClick={() => setPagina((x) => Math.max(1, x - 1))}
-                className="px-2 py-1 rounded-lg bg-(--color-pos-boton-primario) text-(--color-blanco) disabled:opacity-40 hover:bg-(--color-pos-boton-primario-hover)"
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                disabled={paginaSegura >= totalPaginas}
-                onClick={() => setPagina((x) => Math.min(totalPaginas, x + 1))}
-                className="px-2 py-1 rounded-lg bg-(--color-pos-boton-primario) text-(--color-blanco) disabled:opacity-40 hover:bg-(--color-pos-boton-primario-hover)"
-              >
-                ›
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="shrink-0 border-t-2 border-(--color-pagina)/35 bg-(--color-pos-scan-banner) px-3 py-3 sm:px-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 max-w-4xl">
-            <div className="flex items-center gap-2 text-(--color-pagina) shrink-0">
-              <ScanBarcode className="w-5 h-5 shrink-0" />
-              <div>
-                <p className="text-sm font-bold leading-tight">Escáner listo (Emy-POS)</p>
-                <p className="text-xs text-(--color-pos-texto-muted) leading-snug mt-0.5">
-                  No hace falta hacer clic: el lector envía el código y se agrega al carrito. El buscador de arriba no se mezcla con el escáner.
-                </p>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0 text-sm">
-              {scanFeedback?.type === "ok" && (
-                <p className="font-semibold text-(--color-esmeralda-hover)">
-                  Agregado: {scanFeedback.nombre}
-                </p>
-              )}
-              {scanFeedback?.type === "no-encontrado" && (
-                <p className="font-medium text-(--color-rojo-obscuro)">
-                  Código no encontrado:{" "}
-                  <span className="font-mono tabular-nums">{scanFeedback.codigo}</span>
-                </p>
-              )}
-              {scanFeedback?.type === "error" && (
-                <p className="font-medium text-(--color-rojo-obscuro)">
-                  Error al buscar el producto. Intente de nuevo.
-                </p>
-              )}
-              {!scanFeedback && (
-                <p className="text-(--color-pos-texto-muted) text-xs sm:text-sm">
-                  Escanee el código de barras o SKU del producto para agregarlo al carrito.
-                </p>
-              )}
-            </div>
-          </div>
+          
         </div>
       </section>
 
@@ -420,6 +494,54 @@ const VentasPOS = () => {
         idCaja={idCaja}
         dialogTitle="Registrar gasto de caja"
       />
+
+      <CambiarCajeroDialog
+        open={cambiarCajeroOpen}
+        onOpenChange={setCambiarCajeroOpen}
+        idCaja={idCaja}
+        onChanged={(nuevo) => {
+          deseleccionar();
+          setToast({
+            open: true,
+            message: `Ahora opera ${nuevo?.nombreMostrar ?? "el nuevo cajero"}. Las ventas se registrarán a su nombre.`,
+            type: "success",
+          });
+        }}
+      />
+
+      <Dialog open={!!scanModal} onOpenChange={(v) => !v && setScanModal(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-(--color-rojo-obscuro)">
+              <ScanLine className="size-5" />
+              {scanModal?.type === "error"
+                ? "No se pudo leer el código"
+                : "Código no encontrado"}
+            </DialogTitle>
+            <DialogDescription className="pt-1">
+              {scanModal?.type === "error" ? (
+                <>Ocurrió un error al buscar el producto. Verifique su conexión e intente escanear de nuevo.</>
+              ) : (
+                <>
+                  El código{" "}
+                  <span className="font-mono font-semibold text-foreground">{scanModal?.codigo}</span>{" "}
+                  no está asociado a ningún producto en el sistema.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              autoFocus
+              onClick={() => setScanModal(null)}
+              className="bg-(--color-pagina) text-(--color-blanco) hover:bg-(--color-borde-button)"
+            >
+              Volver al carrito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Toast
         open={toast.open}

@@ -7,15 +7,8 @@ import { useActualizarPermisosRolMutation, usePermisosCatalogoQuery, useRolPermi
 useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
 import { validateActualizarPermisosRol } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
-import {
-  buildPermisoRows,
-  buildPermisosRolPayload,
-  permisosMapFromServer,
-  permisosMapsEqual,
-  permisosRolPayloadEqual,
-  permKey,
-  sortAcciones,
-} from "@/pages/usuarios/permisosMatrix";
+import { buildPermisoRows, buildPermisosRolPayload, permisosMapFromServer, permisosMapsEqual,
+  permisosRolPayloadEqual, permKey, sortAcciones } from "@/pages/usuarios/permisosMatrix";
 import { CopiarRolDialog } from "./CopiarRolDialog";
 import { NuevoRolDialog } from "./NuevoRolDialog";
 import { PermisosMatrizGrid } from "./PermisosMatrizGrid";
@@ -82,6 +75,26 @@ export function RolesYPermisosPanel() {
       return n;
     });
   };
+
+  const setRowsChecked = (targetRows, value) => {
+    setLocalMap((prev) => {
+      const n = new Map(prev);
+      for (const row of targetRows) {
+        n.set(permKey(row.idModulo, row.idSubmodulo, row.idAccion), value);
+      }
+      return n;
+    });
+  };
+
+  const allChecked = useMemo(
+    () =>
+      rows.length > 0 &&
+      rows.every((r) => Boolean(localMap.get(permKey(r.idModulo, r.idSubmodulo, r.idAccion)))),
+    [rows, localMap]
+  );
+
+  const toggleAll = () => setRowsChecked(rows, !allChecked);
+  const toggleGroup = (groupRows, value) => setRowsChecked(groupRows, value);
 
   const handleGuardarPermisos = async () => {
     if (!hayCambios) return;
@@ -180,7 +193,20 @@ export function RolesYPermisosPanel() {
 
       <Card className="border-border bg-(--color-blanco) shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base text-(--color-pagina-2)">Permisos del rol</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base text-(--color-pagina-2)">Permisos del rol</CardTitle>
+            {selectedRolId && !permsQ.isLoading && !permsQ.isError && rows.length ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="border-(--color-pagina) text-(--color-pagina) hover:bg-(--color-pagina)/10"
+                onClick={toggleAll}
+              >
+                {allChecked ? "Desmarcar todo" : "Marcar todo"}
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="pt-0">
           {!selectedRolId ? (
@@ -203,6 +229,7 @@ export function RolesYPermisosPanel() {
                   groupedRows={groupedRows}
                   localMap={localMap}
                   onToggle={toggle}
+                  onToggleGroup={toggleGroup}
                 />
               </ScrollArea>
               {permError ? <p className="mt-3 text-sm text-(--color-rojo)">{permError}</p> : null}

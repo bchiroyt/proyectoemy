@@ -1,7 +1,13 @@
 import { useEffect, useRef } from "react";
 
-/** Ráfaga típica Zebra/USB: huecos entre teclas por debajo de ~40 ms; por encima se asume escritura humana. */
-export const BARCODE_DEFAULT_MAX_INTER_KEY_MS = 40;
+/**
+ * Hueco máximo entre teclas para considerarlas parte de la misma ráfaga del lector.
+ * Antes era 40 ms, pero los Zebra (sobre todo Bluetooth, y al alternar entre letras
+ * con Shift y dígitos) tienen picos de 50-90 ms que partían el código a la mitad y
+ * enviaban una lectura incompleta. 120 ms sigue muy por debajo de la escritura humana
+ * sostenida y, como el escucha ignora inputs, no se mezcla con la escritura manual.
+ */
+export const BARCODE_DEFAULT_MAX_INTER_KEY_MS = 120;
 
 function isTypingTarget(target) {
   if (!target || typeof target !== "object") return false;
@@ -46,7 +52,10 @@ export function useBarcodeScanner(onScan, options = {}) {
     let lastKeyTime = Date.now();
 
     const handleKeyDown = (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // AltGr (Windows = Ctrl+Alt) produce caracteres válidos como @ # ~ en teclados
+      // en español; no debe descartarse. Solo ignoramos atajos reales (Ctrl/Meta/Alt solos).
+      const esAltGr = e.ctrlKey && e.altKey;
+      if ((e.ctrlKey || e.metaKey || e.altKey) && !esAltGr) return;
       if (isTypingTarget(e.target)) return;
 
       const currentTime = Date.now();
@@ -69,6 +78,8 @@ export function useBarcodeScanner(onScan, options = {}) {
           const code = buffer;
           buffer = "";
           onScanRef.current(code);
+        } else {
+          buffer = "";
         }
         return;
       }

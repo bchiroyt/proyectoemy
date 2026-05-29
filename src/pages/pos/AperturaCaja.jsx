@@ -6,8 +6,8 @@ import {
   useDenominacionesActivasQuery,
   useAbrirCajaMutation,
 } from "@/hooks/queries/useCajaQueries";
-import { ConteoDenominaciones } from "@/components/caja/ConteoDenominaciones";
-import { NipDialog } from "@/components/caja/NipDialog";
+import { ConteoDenominaciones } from "@/pages/caja/components/ConteoDenominaciones";
+import { NipDialog } from "@/pages/caja/components/NipDialog";
 import { buildDetallesApertura } from "@/lib/cajaMappers";
 import { filtrarBilletes, initCantidades, parseMontoMonedas } from "@/lib/cajaUtils";
 import { getApiErrorMessage } from "@/lib/apiClient";
