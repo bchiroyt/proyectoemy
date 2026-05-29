@@ -1,14 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, ArrowLeft, Plus, Trash2, Search, CheckCircle, AlertCircle } from "lucide-react";
 
 import ModalNuevaMarca from "./ModalNuevaMarca";
-import ModalAgregarSimple from "./ModalAgregarSimple";
+import ModalCategoria from "./ModalCategoria"; 
+import ModalPresentacion from "./ModalPresentacion";
+import ModalTalla from "./ModalTalla";
+import ModalUbicacion from "./ModalUbicacion";
 
 import { obtenerMarcas } from "@/services/marcas";
-import { obtenerCategorias } from "@/services/categorias";
-import { obtenerPresentaciones } from "@/services/presentaciones";
-import { obtenerTallas } from "@/services/tallas";
-import { obtenerUbicaciones } from "@/services/ubicaciones";
+import { obtenerCategorias, crearCategoria } from "@/services/categorias";
+import { obtenerPresentaciones, crearPresentacion } from "@/services/presentaciones";
+import { obtenerTallas, crearTalla } from "@/services/tallas";
+import { obtenerUbicaciones, crearUbicacion } from "@/services/ubicaciones";
 
 import { crearProducto } from "@/services/productos";
 
@@ -16,29 +19,29 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // ESTADO PARA AVISOS/NOTIFICACIONES PERSONALIZADAS
+  // Estado para avisos flotantes de éxito/error
   const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
 
-  // DATOS GENERALES
+  // Estado para controlar la apertura del modal personalizado de confirmación de salida
+  const [openConfirmarSalida, setOpenConfirmarSalida] = useState(false);
+
+  // Datos del formulario
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
   const [marcaSeleccionada, setMarcaSeleccionada] = useState("");
 
-  // ESTADOS PARA LOS BUSCADORES DE STEP 1
   const [busquedaCat, setBusquedaCat] = useState("");
   const [openCatDropdown, setOpenCatDropdown] = useState(false);
   const [busquedaMarca, setBusquedaMarca] = useState("");
   const [openMarcaDropdown, setOpenMarcaDropdown] = useState(false);
 
-  // LISTAS DE LA BASE DE DATOS
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [presentaciones, setPresentaciones] = useState([]);
   const [tallas, setTallas] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
 
-  // ARRAY DINÁMICO DE VARIANTES (Cada una con sus propios estados de buscador)
   const [variantes, setVariantes] = useState([
     {
       talla: "",
@@ -59,16 +62,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     },
   ]);
 
-  // MODALES AUXILIARES
   const [openMarcaModal, setOpenMarcaModal] = useState(false);
+  const [openCategoriaModal, setOpenCategoriaModal] = useState(false);
   const [openPresentacionModal, setOpenPresentacionModal] = useState(false);
   const [openTallaModal, setOpenTallaModal] = useState(false);
   const [openUbicacionModal, setOpenUbicacionModal] = useState(false);
 
-  // FUNCIÓN PARA MOSTRAR AVISOS
   const mostrarAviso = (tipo, mensaje) => {
     setNotificacion({ mostrar: true, tipo, mensaje });
-    // Si es un éxito, se cierra solo en 3 segundos
     if (tipo === "exito") {
       setTimeout(() => {
         setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
@@ -76,40 +77,133 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     }
   };
 
-  // CARGAR DATOS
-  useEffect(() => {
-    const fetchData = async () => {
+  const toggleCategoriasDropdown = async () => {
+    const nuevoEstado = !openCatDropdown;
+    setOpenCatDropdown(nuevoEstado);
+    if (nuevoEstado) {
       try {
-        const [
-          marcasData,
-          categoriasData,
-          presentacionesData,
-          tallasData,
-          ubicacionesData,
-        ] = await Promise.all([
-          obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 }),
-          obtenerCategorias({ Activo: true, Page: 1, PageSize: 500 }),
-          obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
-          obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
-          obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }),
-        ]);
-
-        setMarcas(marcasData.items || []);
-        setCategorias(categoriasData.items || []);
-        setPresentaciones(presentacionesData.items || []);
-        setTallas(tallasData.items || []);
-        setUbicaciones(ubicacionesData.items || []);
+        const data = await obtenerCategorias({ Activo: true, Page: 1, PageSize: 500 });
+        setCategorias(data?.items || []);
       } catch (error) {
-        console.error("Error al cargar datos iniciales:", error);
+        console.error("Error al cargar categorías en demanda:", error);
       }
-    };
-
-    if (open) {
-      fetchData();
     }
-  }, [open]);
+  };
 
-  // MANEJO DE VARIANTES DINÁMICAS
+  const toggleMarcasDropdown = async () => {
+    const nuevoEstado = !openMarcaDropdown;
+    setOpenMarcaDropdown(nuevoEstado);
+    if (nuevoEstado) {
+      try {
+        const data = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
+        setMarcas(data?.items || []);
+      } catch (error) {
+        console.error("Error al cargar marcas en demanda:", error);
+      }
+    }
+  };
+
+  const togglePresentacionesDropdown = async (index) => {
+    const nuevasVariantes = [...variantes];
+    const nuevoEstado = !nuevasVariantes[index].openPresDropdown;
+    
+    variantes.forEach((_, i) => {
+      if (i !== index) nuevasVariantes[i].openPresDropdown = false;
+      nuevasVariantes[i].openTallaDropdown = false;
+      nuevasVariantes[i].openUbicDropdown = false;
+    });
+
+    nuevasVariantes[index].openPresDropdown = nuevoEstado;
+    setVariantes(nuevasVariantes);
+
+    if (nuevoEstado) {
+      try {
+        const data = await obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 });
+        setPresentaciones(data?.items || []);
+      } catch (error) {
+        console.error("Error al cargar presentaciones en demanda:", error);
+      }
+    }
+  };
+
+  const toggleTallasDropdown = async (index) => {
+    const nuevasVariantes = [...variantes];
+    const nuevoEstado = !nuevasVariantes[index].openTallaDropdown;
+    
+    variantes.forEach((_, i) => {
+      nuevasVariantes[i].openPresDropdown = false;
+      if (i !== index) nuevasVariantes[i].openTallaDropdown = false;
+      nuevasVariantes[i].openUbicDropdown = false;
+    });
+
+    nuevasVariantes[index].openTallaDropdown = nuevoEstado;
+    setVariantes(nuevasVariantes);
+
+    if (nuevoEstado) {
+      try {
+        const data = await obtenerTallas({ Activo: true, Page: 1, PageSize: 500 });
+        setTallas(data?.items || []);
+      } catch (error) {
+        console.error("Error al cargar tallas en demanda:", error);
+      }
+    }
+  };
+
+  const toggleUbicacionesDropdown = async (index) => {
+    const nuevasVariantes = [...variantes];
+    const nuevoEstado = !nuevasVariantes[index].openUbicDropdown;
+    
+    variantes.forEach((_, i) => {
+      nuevasVariantes[i].openPresDropdown = false;
+      nuevasVariantes[i].openTallaDropdown = false;
+      if (i !== index) nuevasVariantes[i].openUbicDropdown = false;
+    });
+
+    nuevasVariantes[index].openUbicDropdown = nuevoEstado;
+    setVariantes(nuevasVariantes);
+
+    if (nuevoEstado) {
+      try {
+        const data = await obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 });
+        setUbicaciones(data?.items || []);
+      } catch (error) {
+        console.error("Error al cargar ubicaciones en demanda:", error);
+      }
+    }
+  };
+
+  const formularioTieneDatos = () => {
+    if (nombre.trim() || descripcion.trim() || categoriaSeleccionada || marcaSeleccionada) {
+      return true;
+    }
+    const algunaVarianteModificada = variantes.some((v) => 
+      v.talla || v.presentacion || v.color.trim() || v.precioVenta || v.codigoBarras || v.ubicacion
+    );
+    return algunaVarianteModificada || variantes.length > 1;
+  };
+
+  const handleIntentoCierre = () => {
+    if (formularioTieneDatos()) {
+      setOpenConfirmarSalida(true);
+    } else {
+      handleClose();
+    }
+  };
+
+  const formularioInvalido = () => {
+    if (!nombre.trim() || !categoriaSeleccionada || !marcaSeleccionada) {
+      return true; 
+    }
+
+    const tieneVariantesInvalidas = variantes.some((v) => {
+      const tieneEspecificacion = !!v.talla || !!v.presentacion || !!v.color.trim();
+      const precioInvalido = v.precioVenta !== "" && Number(v.precioVenta) < 0;
+      return !tieneEspecificacion || precioInvalido;
+    });
+
+    return tieneVariantesInvalidas;
+  };
+
   const handleAgregarVariante = () => {
     setVariantes([
       ...variantes,
@@ -142,7 +236,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     setVariantes(nuevasVariantes);
   };
 
-  // RESET
   const resetForm = () => {
     setStep(1);
     setNombre("");
@@ -151,7 +244,13 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     setMarcaSeleccionada("");
     setBusquedaCat("");
     setBusquedaMarca("");
+    setCategorias([]);
+    setMarcas([]);
+    setPresentaciones([]);
+    setTallas([]);
+    setUbicaciones([]);
     setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
+    setOpenConfirmarSalida(false);
     setVariantes([
       {
         talla: "",
@@ -175,20 +274,10 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     onClose();
   };
 
-  // REGISTRAR
   const handleRegistrar = async () => {
+    if (formularioInvalido()) return;
+
     try {
-      if (!nombre.trim()) return mostrarAviso("error", "Debes ingresar un nombre para el producto.");
-      if (!categoriaSeleccionada) return mostrarAviso("error", "Debes seleccionar una categoría.");
-      if (!marcaSeleccionada) return mostrarAviso("error", "Debes seleccionar una marca.");
-
-      for (let i = 0; i < variantes.length; i++) {
-        const v = variantes[i];
-        if (!v.talla && !v.presentacion && !v.color.trim()) {
-          return mostrarAviso("error", `En la variante #${i + 1}, debes ingresar al menos talla, presentación o color.`);
-        }
-      }
-
       setLoading(true);
 
       const payload = {
@@ -202,6 +291,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           presentacion: v.presentacion ? Number(v.presentacion) : null,
           color: v.color || null,
           precioVenta: v.precioVenta ? Number(v.precioVenta) : null,
+          idUbicacionDefault: v.ubicacion ? Number(v.ubicacion) : null,
           codigosExternos: v.codigoBarras
             ? [
                 {
@@ -231,17 +321,16 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     }
   };
 
-  // FILTRADOS STEP 1
-  const categoriasFiltradas = categorias.filter((c) =>
-    c.nombre.toLowerCase().includes(busquedaCat.toLowerCase())
+  const categoriasFiltradas = (categorias || []).filter((c) =>
+    c?.nombre?.toLowerCase().includes((busquedaCat || "").toLowerCase())
   );
 
-  const marcasFiltradas = marcas.filter((m) =>
-    m.nombre.toLowerCase().includes(busquedaMarca.toLowerCase())
+  const marcasFiltradas = (marcas || []).filter((m) =>
+    m?.nombre?.toLowerCase().includes((busquedaMarca || "").toLowerCase())
   );
 
-  const nombreCategoriaActual = categorias.find((c) => String(c.idCategoria) === String(categoriaSeleccionada))?.nombre || "Seleccionar categoría";
-  const nombreMarcaActual = marcas.find((m) => String(m.idMarca) === String(marcaSeleccionada))?.nombre || "Seleccionar marca";
+  const nombreCategoriaActual = (categorias || []).find((c) => String(c?.idCategoria) === String(categoriaSeleccionada))?.nombre || "Seleccionar categoría";
+  const nombreMarcaActual = (marcas || []).find((m) => String(m?.idMarca) === String(marcaSeleccionada))?.nombre || "Seleccionar marca";
 
   if (!open) return null;
 
@@ -249,7 +338,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 transition-all">
       <div className="bg-white w-full max-w-4xl rounded-2xl shadow-lg flex flex-col max-h-[90vh] border-t-4 border-(--color-pagina) relative">
         
-        {/* SISTEMA DE AVISOS PROPIOS (TOAST INTERNO) */}
         {notificacion.mostrar && (
           <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all max-w-md w-11/12 animate-bounce ${
             notificacion.tipo === "exito" 
@@ -264,22 +352,20 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           </div>
         )}
 
-        {/* HEADER */}
         <div className="flex justify-between items-center p-6 border-b">
           {step === 2 ? (
-            <button onClick={() => setStep(1)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900 cursor-pointer">
-              <ArrowLeft />
+            <button onClick={() => setStep(1)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900 cursor-pointer group">
+              <ArrowLeft className="group-hover:-translate-x-0.5 transition-transform" />
             </button>
           ) : (
             <div className="w-9" />
           )}
           <h2 className="text-lg font-semibold text-gray-800">Nuevo Producto</h2>
-          <button onClick={handleClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-800 cursor-pointer">
-            <X />
+          <button onClick={handleIntentoCierre} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-800 cursor-pointer group">
+            <X className="group-hover:rotate-90 transition-transform duration-200" />
           </button>
         </div>
 
-        {/* STEPS */}
         <div className="flex justify-center gap-4 py-4 bg-gray-50 border-b">
           <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 1 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>1</div>
           <div className="w-16 h-1 bg-gray-200 self-center rounded">
@@ -288,16 +374,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 2 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>2</div>
         </div>
 
-        {/* CONTENIDO CON SCROLL */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           
-          {/* STEP 1: GENERAL */}
           {step === 1 && (
             <div className="space-y-4 animate-fade-in">
               <h3 className="font-semibold text-gray-700">Información General</h3>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600 block">Nombre del Producto</label>
+                <label className="text-xs font-semibold text-gray-600 block">Nombre del Producto *</label>
                 <input
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
@@ -306,15 +390,23 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                 />
               </div>
 
-              {/* BUSCADOR CATEGORÍA */}
               <div className="space-y-1 relative">
-                <label className="text-xs font-semibold text-gray-600 block">Categoría</label>
-                <div
-                  onClick={() => setOpenCatDropdown(!openCatDropdown)}
-                  className="w-full p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                >
-                  <span>{nombreCategoriaActual}</span>
-                  <Search className="w-4 h-4 text-gray-400" />
+                <label className="text-xs font-semibold text-gray-600 block">Categoría *</label>
+                <div className="flex gap-2">
+                  <div
+                    onClick={toggleCategoriasDropdown}
+                    className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                  >
+                    <span>{nombreCategoriaActual}</span>
+                    <Search className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenCategoriaModal(true)}
+                    className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
                 </div>
 
                 {openCatDropdown && (
@@ -330,14 +422,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                     <div className="max-h-40 overflow-y-auto">
                       {categoriasFiltradas.map((c) => (
                         <div
-                          key={c.idCategoria}
+                          key={c?.idCategoria}
                           onClick={() => {
-                            setCategoriaSeleccionada(c.idCategoria);
+                            setCategoriaSeleccionada(c?.idCategoria);
                             setOpenCatDropdown(false);
                           }}
                           className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                         >
-                          {c.nombre}
+                          {c?.nombre}
                         </div>
                       ))}
                       {categoriasFiltradas.length === 0 && (
@@ -348,18 +440,18 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                 )}
               </div>
 
-              {/* BUSCADOR MARCA */}
               <div className="space-y-1 relative">
-                <label className="text-xs font-semibold text-gray-600 block">Marca</label>
+                <label className="text-xs font-semibold text-gray-600 block">Marca *</label>
                 <div className="flex gap-2">
                   <div
-                    onClick={() => setOpenMarcaDropdown(!openMarcaDropdown)}
+                    onClick={toggleMarcasDropdown}
                     className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                   >
                     <span>{nombreMarcaActual}</span>
                     <Search className="w-4 h-4 text-gray-400" />
                   </div>
                   <button
+                    type="button"
                     onClick={() => setOpenMarcaModal(true)}
                     className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                   >
@@ -380,14 +472,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                     <div className="max-h-40 overflow-y-auto">
                       {marcasFiltradas.map((m) => (
                         <div
-                          key={m.idMarca}
+                          key={m?.idMarca}
                           onClick={() => {
-                            setMarcaSeleccionada(m.idMarca);
+                            setMarcaSeleccionada(m?.idMarca);
                             setOpenMarcaDropdown(false);
                           }}
                           className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                         >
-                          {m.nombre}
+                          {m?.nombre}
                         </div>
                       ))}
                       {marcasFiltradas.length === 0 && (
@@ -410,14 +502,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
               <button
                 onClick={() => setStep(2)}
-                className="w-full bg-(--color-pagina) text-white py-3 rounded-xl font-medium tracking-wide mt-4 hover:brightness-95 active:scale-[0.99] transition-all cursor-pointer shadow-sm"
+                disabled={!nombre.trim() || !categoriaSeleccionada || !marcaSeleccionada}
+                className="w-full bg-(--color-pagina) text-white py-3 rounded-xl font-medium tracking-wide mt-4 hover:brightness-95 active:scale-[0.99] transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group flex items-center justify-center gap-2"
               >
                 Siguiente paso
               </button>
             </div>
           )}
 
-          {/* STEP 2: MULTI-VARIANTES CON SUS PROPIOS BUSCADORES */}
           {step === 2 && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex justify-between items-center border-b pb-3">
@@ -433,20 +525,19 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
               <div className="space-y-6">
                 {variantes.map((v, index) => {
-                  // Filtrados en tiempo real por cada variante individual
-                  const presentacionesFiltradas = presentaciones.filter((p) =>
-                    p.nombre.toLowerCase().includes(v.busquedaPres.toLowerCase())
+                  const presentacionesFiltradas = (presentaciones || []).filter((p) =>
+                    p?.nombre?.toLowerCase().includes((v.busquedaPres || "").toLowerCase())
                   );
-                  const tallasFiltradas = tallas.filter((t) =>
-                    t.nombre.toLowerCase().includes(v.busquedaTalla.toLowerCase())
+                  const tallasFiltradas = (tallas || []).filter((t) =>
+                    t?.nombre?.toLowerCase().includes((v.busquedaTalla || "").toLowerCase())
                   );
-                  const ubicacionesFiltradas = ubicaciones.filter((u) =>
-                    u.nombre.toLowerCase().includes(v.busquedaUbic.toLowerCase())
+                  const ubicacionesFiltradas = (ubicaciones || []).filter((u) =>
+                    u?.nombre?.toLowerCase().includes((v.busquedaUbic || "").toLowerCase())
                   );
 
-                  const nombrePresActual = presentaciones.find((p) => String(p.idPresentacion) === String(v.presentacion))?.nombre || "Seleccionar presentación";
-                  const nombreTallaActual = tallas.find((t) => String(t.idTalla) === String(v.talla))?.nombre || "Talla";
-                  const nombreUbicActual = ubicaciones.find((u) => String(u.idUbicacion) === String(v.ubicacion))?.nombre || "Ubicación";
+                  const nombrePresActual = (presentaciones || []).find((p) => String(p?.idPresentacion) === String(v.presentacion))?.nombre || "Seleccionar presentación";
+                  const nombreTallaActual = (tallas || []).find((t) => String(t?.idTalla) === String(v.talla))?.nombre || "Seleccionar talla";
+                  const nombreUbicActual = (ubicaciones || []).find((u) => String(u?.idUbicacion) === String(v.ubicacion))?.nombre || "Seleccionar ubicación";
 
                   return (
                     <div key={index} className="bg-gray-50 p-5 rounded-xl border border-gray-200 relative space-y-4 shadow-sm hover:shadow-md transition-shadow">
@@ -455,22 +546,26 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         <button
                           type="button"
                           onClick={() => handleEliminarVariante(index)}
-                          className="absolute top-3 right-3 text-red-500 hover:text-red-700 p-1.5 bg-red-50 hover:bg-red-100 rounded-full z-10 transition-all cursor-pointer"
+                          className="absolute top-3 right-3 text-red-500 hover:text-red-700 p-1.5 bg-red-50 hover:bg-red-100 rounded-full z-10 transition-all cursor-pointer flex items-center justify-center group"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
                         </button>
                       )}
 
-                      <div className="text-xs font-bold text-gray-500 uppercase cursor-default">
-                        Variante #{index + 1}
+                      <div className="text-xs font-bold text-gray-500 uppercase cursor-default flex justify-between">
+                        <span>Variante #{index + 1}</span>
+                        {(!v.talla && !v.presentacion && !v.color.trim()) && (
+                          <span className="text-red-500 normal-case font-normal text-xs animate-pulse">
+                            * Requiere al menos Talla, Presentación o Color
+                          </span>
+                        )}
                       </div>
 
-                      {/* BUSCADOR PRESENTACIÓN */}
                       <div className="space-y-1 relative">
                         <label className="text-xs font-semibold text-gray-600 block">Presentación</label>
                         <div className="flex gap-2">
                           <div
-                            onClick={() => handleCambioVariante(index, "openPresDropdown", !v.openPresDropdown)}
+                            onClick={() => togglePresentacionesDropdown(index)}
                             className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                           >
                             <span>{nombrePresActual}</span>
@@ -479,14 +574,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                           <button
                             type="button"
                             onClick={() => setOpenPresentacionModal(true)}
-                            className="px-3.5 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer font-bold text-lg"
+                            className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                           >
-                            +
+                            <Plus className="w-5 h-5" />
                           </button>
                         </div>
 
                         {v.openPresDropdown && (
-                          <div className="absolute z-40 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
                             <input
                               type="text"
                               placeholder="Buscar presentación..."
@@ -495,28 +590,27 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                               className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
                               onClick={(e) => e.stopPropagation()}
                             />
-                            <div className="max-h-32 overflow-y-auto">
+                            <div className="max-h-40 overflow-y-auto">
                               {presentacionesFiltradas.map((p) => (
                                 <div
-                                  key={p.idPresentacion}
+                                  key={p?.idPresentacion}
                                   onClick={() => {
-                                    handleCambioVariante(index, "presentacion", p.idPresentacion);
+                                    handleCambioVariante(index, "presentacion", p?.idPresentacion);
                                     handleCambioVariante(index, "openPresDropdown", false);
                                   }}
                                   className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                                 >
-                                  {p.nombre}
+                                  {p?.nombre}
                                 </div>
                               ))}
                               {presentacionesFiltradas.length === 0 && (
-                                <div className="p-2 text-xs text-gray-400 text-center cursor-default">No hay resultados</div>
+                                <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
                               )}
                             </div>
                           </div>
                         )}
                       </div>
 
-                      {/* PRECIO Y CÓDIGO */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Precio Venta</label>
@@ -525,7 +619,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             value={v.precioVenta}
                             onChange={(e) => handleCambioVariante(index, "precioVenta", e.target.value)}
                             placeholder="Precio Venta"
-                            className="w-full border p-3 rounded-lg bg-white outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                            className={`w-full border p-3 rounded-lg bg-white outline-none transition-colors ${
+                              v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                            }`}
                           />
                         </div>
 
@@ -540,57 +636,58 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         </div>
                       </div>
 
-                      {/* FILA 3: TALLA, COLOR, UBICACIÓN */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         
-                        {/* BUSCADOR TALLA */}
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Talla</label>
-                          <div className="flex gap-1">
+                          <div className="flex gap-2">
                             <div
-                              onClick={() => handleCambioVariante(index, "openTallaDropdown", !v.openTallaDropdown)}
+                              onClick={() => toggleTallasDropdown(index)}
                               className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 text-sm overflow-hidden whitespace-nowrap text-ellipsis hover:bg-gray-50 hover:border-gray-300 transition-all"
                             >
                               <span>{nombreTallaActual}</span>
+                              <Search className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
                             </div>
                             <button
                               type="button"
                               onClick={() => setOpenTallaModal(true)}
-                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer font-bold"
+                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                             >
-                              +
+                              <Plus className="w-5 h-5" />
                             </button>
                           </div>
 
                           {v.openTallaDropdown && (
-                            <div className="absolute z-30 w-56 mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                            <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
                               <input
                                 type="text"
-                                placeholder="Buscar..."
+                                placeholder="Buscar talla..."
                                 value={v.busquedaTalla}
                                 onChange={(e) => handleCambioVariante(index, "busquedaTalla", e.target.value)}
-                                className="w-full p-1.5 border rounded text-xs outline-none focus:border-gray-400"
+                                className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
                                 onClick={(e) => e.stopPropagation()}
                               />
-                              <div className="max-h-28 overflow-y-auto">
+                              <div className="max-h-40 overflow-y-auto">
                                 {tallasFiltradas.map((t) => (
                                   <div
-                                    key={t.idTalla}
+                                    key={t?.idTalla}
                                     onClick={() => {
-                                      handleCambioVariante(index, "talla", t.idTalla);
+                                      handleCambioVariante(index, "talla", t?.idTalla);
                                       handleCambioVariante(index, "openTallaDropdown", false);
                                     }}
-                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-xs text-gray-700 transition-colors"
+                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                                   >
-                                    {t.nombre}
+                                    {t?.nombre}
                                   </div>
                                 ))}
+                                {tallasFiltradas.length === 0 && (
+                                  <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
+                                )}
                               </div>
                             </div>
                           )}
                         </div>
 
-                        {/* COLOR */}
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Color</label>
                           <input
@@ -601,48 +698,51 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                           />
                         </div>
 
-                        {/* BUSCADOR UBICACIÓN */}
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Ubicación</label>
-                          <div className="flex gap-1">
+                          <div className="flex gap-2">
                             <div
-                              onClick={() => handleCambioVariante(index, "openUbicDropdown", !v.openUbicDropdown)}
+                              onClick={() => toggleUbicacionesDropdown(index)}
                               className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 text-sm overflow-hidden whitespace-nowrap text-ellipsis hover:bg-gray-50 hover:border-gray-300 transition-all"
                             >
                               <span>{nombreUbicActual}</span>
+                              <Search className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
                             </div>
                             <button
                               type="button"
                               onClick={() => setOpenUbicacionModal(true)}
-                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer font-bold"
+                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                             >
-                              +
+                              <Plus className="w-5 h-5" />
                             </button>
                           </div>
 
                           {v.openUbicDropdown && (
-                            <div className="absolute z-30 w-56 right-0 mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
+                            <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
                               <input
                                 type="text"
-                                placeholder="Buscar..."
+                                placeholder="Buscar ubicación..."
                                 value={v.busquedaUbic}
                                 onChange={(e) => handleCambioVariante(index, "busquedaUbic", e.target.value)}
-                                className="w-full p-1.5 border rounded text-xs outline-none focus:border-gray-400"
+                                className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
                                 onClick={(e) => e.stopPropagation()}
                               />
-                              <div className="max-h-28 overflow-y-auto">
+                              <div className="max-h-40 overflow-y-auto">
                                 {ubicacionesFiltradas.map((u) => (
                                   <div
-                                    key={u.idUbicacion}
+                                    key={u?.idUbicacion}
                                     onClick={() => {
-                                      handleCambioVariante(index, "ubicacion", u.idUbicacion);
+                                      handleCambioVariante(index, "ubicacion", u?.idUbicacion);
                                       handleCambioVariante(index, "openUbicDropdown", false);
                                     }}
-                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-xs text-gray-700 transition-colors"
+                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
                                   >
-                                    {u.nombre}
+                                    {u?.nombre}
                                   </div>
                                 ))}
+                                {ubicacionesFiltradas.length === 0 && (
+                                  <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
+                                )}
                               </div>
                             </div>
                           )}
@@ -654,21 +754,20 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                 })}
               </div>
 
-              {/* BOTONES DE PASO */}
               <div className="flex justify-between pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="border px-6 py-2.5 rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium transition-all cursor-pointer"
+                  className="border px-6 py-2.5 rounded-xl text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium transition-all cursor-pointer group flex items-center gap-1"
                 >
-                  Anterior
+                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" /> Anterior
                 </button>
 
                 <button
                   type="button"
                   onClick={handleRegistrar}
-                  disabled={loading}
-                  className="bg-(--color-pagina-2) text-white px-6 py-3 rounded-xl disabled:opacity-50 font-medium hover:brightness-90 active:scale-95 transition-all cursor-pointer shadow-sm"
+                  disabled={loading || formularioInvalido()}
+                  className="bg-(--color-pagina-2) text-white px-6 py-3 rounded-xl font-medium hover:brightness-90 active:scale-95 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
                 >
                   {loading ? "Registrando..." : "Registrar"}
                 </button>
@@ -678,43 +777,200 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         </div>
       </div>
 
-      {/* MODAL AUXILIARES CON ACCIONES COMPATIBLES */}
+      {/* Sub-modal Personalizado de Confirmación de Salida */}
+      {openConfirmarSalida && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl flex flex-col border-t-4 border-(--color-pagina) p-6 space-y-4">
+            <h4 className="text-md font-semibold text-gray-800 text-center">¿Estás seguro de salir?</h4>
+            <p className="text-sm text-gray-500 text-center">No se guardarán los cambios</p>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="w-full bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 active:scale-[0.99] transition-all cursor-pointer text-sm"
+              >
+                Sí, Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpenConfirmarSalida(false)}
+                className="w-full border border-gray-200 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-50 active:scale-[0.99] transition-all cursor-pointer text-sm"
+              >
+                No, continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modales Secundarios de Creación en BD */}
       <ModalNuevaMarca
         open={openMarcaModal}
         onClose={() => setOpenMarcaModal(false)}
-        onSave={(nuevaMarca) => {
-          setMarcas((prev) => [...prev, nuevaMarca]);
-          setMarcaSeleccionada(nuevaMarca.idMarca);
+        onSave={async () => {
+          try {
+            const marcasData = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
+            const listaActualizada = marcasData?.items || [];
+            setMarcas(listaActualizada);
+
+            const marcaReciente = listaActualizada.find(
+              (m) => m?.nombre?.toLowerCase() === busquedaMarca.trim().toLowerCase()
+            );
+
+            if (marcaReciente) {
+              setMarcaSeleccionada(marcaReciente.idMarca);
+            }
+          } catch (error) {
+            console.error("Error al refrescar marcas:", error);
+          }
+          setBusquedaMarca(""); 
+          setOpenMarcaModal(false);
         }}
       />
 
-      <ModalAgregarSimple
+      <ModalCategoria
+        open={openCategoriaModal}
+        onClose={() => setOpenCategoriaModal(false)}
+        onSave={async (formLocal) => {
+          try {
+            const payload = {
+              nombre: formLocal.nombre,
+              descripcion: formLocal.descripcion,
+              estado: formLocal.estado,
+            };
+            
+            const respuestaApi = await crearCategoria(payload);
+            const dataReal = respuestaApi?.data || respuestaApi;
+            
+            const idFinal = dataReal?.idCategoria || dataReal?.id || Date.now();
+
+            const categoriaFormateada = {
+              idCategoria: idFinal,
+              nombre: formLocal.nombre,
+              descripcion: formLocal.descripcion,
+              estado: formLocal.estado
+            };
+
+            setCategorias((prev) => [...prev, categoriaFormateada]);
+            setCategoriaSeleccionada(idFinal);
+            setBusquedaCat(""); 
+            
+          } catch (error) {
+            console.error("Error al guardar categoría:", error);
+          } finally {
+            setOpenCategoriaModal(false);
+          }
+        }}
+      />
+
+      <ModalPresentacion
         open={openPresentacionModal}
         onClose={() => setOpenPresentacionModal(false)}
-        titulo="Nueva Presentación"
-        placeholder="Ej: Caja"
-        onSave={(v) => {
-          setPresentaciones((prev) => [...prev, v]);
+        onSave={async (formLocal) => {
+          try {
+            const payload = {
+              nombre: formLocal.nombre,
+              descripcion: formLocal.descripcion,
+              activo: formLocal.estado === "Activo"
+            };
+            const respuestaApi = await crearPresentacion(payload);
+            const dataReal = respuestaApi?.data || respuestaApi;
+            const idFinal = dataReal?.idPresentacion || dataReal?.id;
+
+            const res = await obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 });
+            const listaActualizada = res?.items || [];
+            setPresentaciones(listaActualizada);
+
+            if (idFinal) {
+              const deLista = listaActualizada.find(p => Number(p.idPresentacion) === Number(idFinal));
+              if (deLista) {
+                const nuevasVariantes = [...variantes];
+                const indexUltimaAbierta = nuevasVariantes.findIndex(v => v.openPresDropdown === true);
+                if (indexUltimaAbierta !== -1) {
+                  nuevasVariantes[indexUltimaAbierta].presentacion = idFinal;
+                }
+                setVariantes(nuevasVariantes);
+              }
+            }
+          } catch (error) {
+            console.error("Error al guardar presentación:", error);
+          } finally {
+            setOpenPresentacionModal(false);
+          }
         }}
       />
 
-      <ModalAgregarSimple
+      <ModalTalla
         open={openTallaModal}
         onClose={() => setOpenTallaModal(false)}
-        titulo="Nueva Talla"
-        placeholder="Ej: M"
-        onSave={(v) => {
-          setTallas((prev) => [...prev, v]);
+        onSave={async (formLocal) => {
+          try {
+            const payload = {
+              nombre: formLocal.nombre,
+              descripcion: formLocal.descripcion,
+              activo: formLocal.activo
+            };
+            const respuestaApi = await crearTalla(payload);
+            const dataReal = respuestaApi?.data || respuestaApi;
+            const idFinal = dataReal?.idTalla || dataReal?.id;
+
+            const res = await obtenerTallas({ Activo: true, Page: 1, PageSize: 500 });
+            const listaActualizada = res?.items || [];
+            setTallas(listaActualizada);
+
+            if (idFinal) {
+              const deLista = listaActualizada.find(t => Number(t.idTalla) === Number(idFinal));
+              if (deLista) {
+                const nuevasVariantes = [...variantes];
+                const indexUltimaAbierta = nuevasVariantes.findIndex(v => v.openTallaDropdown === true);
+                if (indexUltimaAbierta !== -1) {
+                  nuevasVariantes[indexUltimaAbierta].talla = idFinal;
+                }
+                setVariantes(nuevasVariantes);
+              }
+            }
+          } catch (error) {
+            console.error("Error al guardar talla:", error);
+          } finally {
+            setOpenTallaModal(false);
+          }
         }}
       />
 
-      <ModalAgregarSimple
+      <ModalUbicacion
         open={openUbicacionModal}
         onClose={() => setOpenUbicacionModal(false)}
-        titulo="Nueva Ubicación"
-        placeholder="Ej: Estante 1"
-        onSave={(v) => {
-          setUbicaciones((prev) => [...prev, v]);
+        onSave={async (formLocal) => {
+          try {
+            const payload = {
+              nombre: formLocal.nombre,
+              descripcion: formLocal.descripcion,
+              activo: formLocal.activo
+            };
+            const respuestaApi = await crearUbicacion(payload);
+            const dataReal = respuestaApi?.data || respuestaApi;
+            const idFinal = dataReal?.idUbicacion || dataReal?.id;
+
+            const res = await obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 });
+            const listaActualizada = res?.items || [];
+            setUbicaciones(listaActualizada);
+
+            if (idFinal) {
+              const deLista = listaActualizada.find(u => Number(u.idUbicacion) === Number(idFinal));
+              if (deLista) {
+                const nuevasVariantes = [...variantes];
+                const indexUltimaAbierta = nuevasVariantes.findIndex(v => v.openUbicDropdown === true);
+                if (indexUltimaAbierta !== -1) {
+                  nuevasVariantes[indexUltimaAbierta].ubicacion = idFinal;
+                }
+                setVariantes(nuevasVariantes);
+              }
+            }
+          } catch (error) {
+            console.error("Error al guardar ubicación:", error);
+          } finally {
+            setOpenUbicacionModal(false);
+          }
         }}
       />
     </div>

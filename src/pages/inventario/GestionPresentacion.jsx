@@ -133,7 +133,7 @@ const GestionPresentacion = () => {
                 </td>
               </tr>
             ) : presentaciones.length > 0 ? (
-              presentaciones.map((p) => (
+              presentaciones.map((p, index) => (
                 <tr
                   key={p.idPresentacion}
                   className="hover:bg-gray-50 transition-colors"
