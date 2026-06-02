@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Lock, AlertTriangle, Banknote, CreditCard, Wallet } from "lucide-react";
+import { ArrowLeft, Lock, AlertTriangle, Banknote, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import {
@@ -17,14 +17,40 @@ import Toast from "@/components/ui/Toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-function Seccion({ numero, titulo, children, className }) {
+function Kpi({ label, value, icon: Icon, className }) {
   return (
-    <section className={cn("space-y-3", className)}>
-      <h3 className="text-sm font-bold text-(--color-negro)">
-        <span className="text-(--color-pagina)">{numero}.</span> {titulo}
-      </h3>
-      {children}
-    </section>
+    <div
+      className={cn(
+        "rounded-lg border border-(--color-gris-claro-2) bg-(--color-pagina-3)/30 px-2.5 py-2 flex items-center gap-2 min-w-0",
+        className
+      )}
+    >
+      {Icon ? <Icon className="size-4 shrink-0 text-(--color-pagina)" /> : null}
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase text-(--color-gris-letra) truncate">
+          {label}
+        </p>
+        <p className="text-base font-bold tabular-nums text-(--color-negro) leading-tight">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function FilaBalance({ label, value, negativo }) {
+  return (
+    <div className="flex justify-between gap-2 text-xs">
+      <span className="text-emerald-900">{label}</span>
+      <span
+        className={cn(
+          "font-semibold tabular-nums shrink-0",
+          negativo ? "text-(--color-rojo)" : "text-emerald-950"
+        )}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -128,7 +154,7 @@ const CierreCaja = () => {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-(--color-pagina-4) p-2 sm:p-3">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-(--color-pagina-4) p-2">
       <Toast
         open={toast.open}
         message={toast.message}
@@ -136,167 +162,89 @@ const CierreCaja = () => {
         onClose={() => setToast((t) => ({ ...t, open: false }))}
       />
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-lg max-w-4xl mx-auto w-full">
-        <header className="shrink-0 border-b border-(--color-gris-claro-2) px-4 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-(--color-negro)">Cierre de Caja</h2>
-              <p className="text-sm text-(--color-gris-letra) mt-1">
-                Resumen de operaciones y balance final del turno actual
-                {idCaja ? ` · Caja #${idCaja}` : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate("/pos/ventas")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-(--color-gris-claro-2) bg-(--color-pagina-3) px-2.5 py-1.5 text-sm font-semibold"
-            >
-              <ArrowLeft className="size-4" />
-              Volver
-            </button>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-xl border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-md max-w-3xl mx-auto w-full">
+        <header className="shrink-0 border-b border-(--color-gris-claro-2) px-3 py-2 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-(--color-negro) truncate">Cierre de caja</h2>
+            <p className="text-[11px] text-(--color-gris-letra) truncate">
+              Turno actual{idCaja ? ` · #${idCaja}` : ""}
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/pos/ventas")}
+            className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-(--color-gris-claro-2) px-2 py-1 text-xs font-semibold hover:bg-(--color-pagina-3)"
+          >
+            <ArrowLeft className="size-3.5" />
+            Volver
+          </button>
         </header>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           {loading ? (
-            <Skeleton className="h-96 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-lg" />
           ) : (
             <>
-              <Seccion numero={1} titulo="Resumen de Ventas">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-pink-100 bg-pink-50/80 p-4 flex items-center gap-3">
-                    <Banknote className="size-8 text-(--color-pagina-2) shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-(--color-gris-letra) uppercase">
-                        Ventas en efectivo
-                      </p>
-                      <p className="text-xl font-bold text-(--color-negro) tabular-nums">
-                        {fmtQ(ventasEfectivo)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-(--color-gris-claro-2) bg-(--color-pagina-3)/40 p-4 flex items-center gap-3">
-                    <CreditCard className="size-8 text-(--color-gris-letra) shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-(--color-gris-letra) uppercase">
-                        Ventas por banco
-                      </p>
-                      <p className="text-xl font-bold text-(--color-negro) tabular-nums">{fmtQ(0)}</p>
-                      <p className="text-[10px] text-(--color-gris-letra) mt-0.5">
-                        Tarjeta/transferencia no afectan el arqueo de efectivo
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </Seccion>
-
-              <Seccion numero={2} titulo="Gastos del Día">
-                <div className="rounded-xl border border-(--color-gris-claro-2) overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-(--color-pagina-3)/60 text-left">
-                      <tr>
-                        <th className="px-3 py-2 font-semibold text-(--color-pagina)">Descripción</th>
-                        <th className="px-3 py-2 font-semibold text-(--color-pagina) text-right">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gastos.length === 0 ? (
-                        <tr>
-                          <td colSpan={2} className="px-3 py-4 text-center text-(--color-gris-letra)">
-                            Sin gastos registrados en este turno
-                          </td>
-                        </tr>
-                      ) : (
-                        gastos.map((g) => (
-                          <tr key={g.idMovimientoCaja} className="border-t border-(--color-gris-claro-2)">
-                            <td className="px-3 py-2 text-(--color-negro)">
-                              {g.motivo || g.tipoMovimientoNombre || "Gasto"}
-                              {g.observacion ? (
-                                <span className="block text-xs text-(--color-gris-letra)">
-                                  {g.observacion}
-                                </span>
-                              ) : null}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                              {fmtQ(g.monto)}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                      <tr className="border-t-2 border-pink-200 bg-pink-50/50">
-                        <td className="px-3 py-2 font-bold text-(--color-negro)">
-                          Total Gastos (Efectivo)
-                        </td>
-                        <td className="px-3 py-2 text-right font-bold text-(--color-rojo) tabular-nums">
-                          {fmtQ(totalGastos)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </Seccion>
-
-              <Seccion numero={3} titulo="Fondo de Caja">
-                <div className="rounded-xl border-2 border-dashed border-(--color-gris-claro-2) bg-(--color-pagina-3)/30 px-4 py-5 text-center">
-                  <Wallet className="size-8 mx-auto text-(--color-pagina-2) mb-2" />
-                  <p className="text-xs font-semibold text-(--color-gris-letra) uppercase">
-                    Efectivo fijo (base inicial) · Monto de apertura
+              {ticketsPendientes > 0 ? (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+                  <AlertTriangle className="size-4 shrink-0 text-amber-600" />
+                  <p className="flex-1 font-semibold">
+                    {ticketsPendientes} venta(s) en espera — ciérrelas antes de cerrar.
                   </p>
-                  <p className="text-2xl font-bold text-(--color-negro) tabular-nums mt-1">
-                    {fmtQ(montoApertura)}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/pos/ventas")}
+                    className="shrink-0 rounded bg-amber-600 px-2 py-1 text-[10px] font-bold text-(--color-blanco)"
+                  >
+                    Ventas
+                  </button>
                 </div>
-              </Seccion>
+              ) : null}
 
-              <Seccion numero={4} titulo="Balance Final (esperado en caja)">
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 space-y-2 text-sm">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-emerald-900">(+) Base de caja</span>
-                    <span className="font-semibold tabular-nums text-emerald-950">
-                      {fmtQ(montoApertura)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-emerald-900">(+) Ventas efectivo</span>
-                    <span className="font-semibold tabular-nums text-emerald-950">
-                      {fmtQ(ventasEfectivo)}
-                    </span>
-                  </div>
-                  {otrasEntradas > 0 ? (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-emerald-900">(+) Otras entradas</span>
-                      <span className="font-semibold tabular-nums text-emerald-950">
-                        {fmtQ(otrasEntradas)}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Kpi label="Ventas efectivo" value={fmtQ(ventasEfectivo)} icon={Banknote} />
+                <Kpi
+                  label="Ventas banco"
+                  value={fmtQ(0)}
+                  icon={CreditCard}
+                  className="opacity-90"
+                />
+                <Kpi label="Base apertura" value={fmtQ(montoApertura)} />
+                <Kpi
+                  label="Efectivo esperado"
+                  value={fmtQ(montoEsperado)}
+                  className="border-emerald-200 bg-emerald-50/80"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2.5 space-y-1">
+                    <p className="text-[10px] font-bold uppercase text-emerald-800 mb-1">
+                      Balance en caja
+                    </p>
+                    <FilaBalance label="(+) Base" value={fmtQ(montoApertura)} />
+                    <FilaBalance label="(+) Ventas efectivo" value={fmtQ(ventasEfectivo)} />
+                    {otrasEntradas > 0 ? (
+                      <FilaBalance label="(+) Otras entradas" value={fmtQ(otrasEntradas)} />
+                    ) : null}
+                    <FilaBalance
+                      label="(-) Gastos"
+                      value={fmtQ(totalGastos)}
+                      negativo
+                    />
+                    <div className="border-t border-emerald-300/60 pt-1.5 mt-1 flex justify-between items-baseline">
+                      <span className="text-xs font-bold text-emerald-950">Total esperado</span>
+                      <span className="text-lg font-bold tabular-nums text-emerald-800">
+                        {fmtQ(montoEsperado)}
                       </span>
                     </div>
-                  ) : null}
-                  <div className="flex justify-between gap-2">
-                    <span className="text-emerald-900">(-) Gastos efectivo</span>
-                    <span className="font-semibold tabular-nums text-emerald-950">
-                      {fmtQ(totalGastos)}
-                    </span>
                   </div>
-                  <div className="border-t border-emerald-300/60 pt-3 mt-2 flex justify-between items-end gap-2">
-                    <span className="font-bold text-emerald-950">Efectivo total esperado</span>
-                    <span className="text-2xl font-bold tabular-nums text-emerald-800">
-                      {fmtQ(montoEsperado)}
-                    </span>
-                  </div>
-                </div>
-              </Seccion>
 
-              <Seccion numero={5} titulo="Arqueo físico · Monto contado">
-                <div className="rounded-xl border-2 border-(--color-pagina)/30 bg-(--color-pagina-4)/30 p-4 space-y-3">
-                  <p className="text-sm text-(--color-gris-letra)">
-                    Cuente todo el efectivo en caja e ingrese el total (billetes y monedas juntos).
-                  </p>
-                  <div>
-                    <label
-                      htmlFor="monto-contado"
-                      className="text-xs font-bold uppercase text-(--color-pagina)"
-                    >
-                      Monto contado
-                    </label>
+                  <div className="rounded-lg border border-(--color-pagina)/25 bg-(--color-pagina-4)/40 px-3 py-2.5 space-y-2">
+                    <p className="text-[10px] font-bold uppercase text-(--color-pagina)">
+                      Arqueo · monto contado
+                    </p>
                     <input
                       id="monto-contado"
                       type="text"
@@ -304,85 +252,121 @@ const CierreCaja = () => {
                       autoComplete="off"
                       placeholder="0.00"
                       value={montoContado}
-                      onChange={(e) => setMontoContado(e.target.value.replace(/[^\d.,]/g, ""))}
-                      className="mt-1 w-full rounded-lg border border-(--color-gris-claro-2) bg-(--color-blanco) px-4 py-3 text-right text-2xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-(--color-pagina)/40"
+                      onChange={(e) =>
+                        setMontoContado(e.target.value.replace(/[^\d.,]/g, ""))
+                      }
+                      className="w-full rounded-md border border-(--color-gris-claro-2) bg-(--color-blanco) px-3 py-2 text-right text-xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-(--color-pagina)/40"
+                    />
+                    {diferencia != null ? (
+                      <p
+                        className={cn(
+                          "text-xs font-semibold rounded px-2 py-1 flex items-center gap-1.5",
+                          diferencia === 0
+                            ? "bg-emerald-100 text-emerald-900"
+                            : "bg-amber-100 text-amber-950"
+                        )}
+                      >
+                        {diferencia !== 0 ? (
+                          <AlertTriangle className="size-3.5 shrink-0" />
+                        ) : null}
+                        Diferencia: <span className="tabular-nums">{fmtQ(diferencia)}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-3 flex flex-col min-h-0">
+                  <div className="rounded-lg border border-(--color-gris-claro-2) overflow-hidden flex flex-col min-h-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase text-(--color-pagina) px-2.5 py-1.5 bg-(--color-pagina-3)/50 border-b border-(--color-gris-claro-2)">
+                      Gastos del turno
+                    </p>
+                    <div className="max-h-36 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <tbody>
+                          {gastos.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={2}
+                                className="px-2 py-3 text-center text-(--color-gris-letra)"
+                              >
+                                Sin gastos
+                              </td>
+                            </tr>
+                          ) : (
+                            gastos.map((g) => (
+                              <tr
+                                key={g.idMovimientoCaja}
+                                className="border-t border-(--color-gris-claro-2)/80"
+                              >
+                                <td className="px-2 py-1.5 text-(--color-negro) leading-snug">
+                                  {g.motivo || g.tipoMovimientoNombre || "Gasto"}
+                                </td>
+                                <td className="px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap">
+                                  {fmtQ(g.monto)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-pink-200 bg-pink-50/60">
+                            <td className="px-2 py-1.5 font-bold">Total gastos</td>
+                            <td className="px-2 py-1.5 text-right font-bold text-(--color-rojo) tabular-nums">
+                              {fmtQ(totalGastos)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="obs-cierre"
+                      className="text-[10px] font-bold uppercase text-(--color-pagina)"
+                    >
+                      Observaciones
+                      {requiereObservacion ? (
+                        <span className="text-(--color-rojo) normal-case font-semibold">
+                          {" "}
+                          · obligatorias si hay diferencia
+                        </span>
+                      ) : null}
+                    </label>
+                    <textarea
+                      id="obs-cierre"
+                      value={observaciones}
+                      onChange={(e) => setObservaciones(e.target.value)}
+                      placeholder="Novedades o discrepancias…"
+                      rows={2}
+                      className={cn(
+                        "w-full resize-none rounded-md border bg-(--color-blanco) p-2 text-xs focus:outline-none focus:ring-2 focus:ring-(--color-pagina)/40",
+                        requiereObservacion && !observaciones.trim()
+                          ? "border-(--color-rojo)"
+                          : "border-(--color-gris-claro-2)"
+                      )}
                     />
                   </div>
-                  {diferencia != null ? (
-                    <div
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold",
-                        diferencia === 0
-                          ? "bg-emerald-100 text-emerald-900"
-                          : "bg-amber-100 text-amber-950"
-                      )}
-                    >
-                      {diferencia !== 0 ? <AlertTriangle className="size-4 shrink-0" /> : null}
-                      <span>
-                        Diferencia (contado − esperado):{" "}
-                        <span className="tabular-nums">{fmtQ(diferencia)}</span>
-                      </span>
-                    </div>
-                  ) : null}
                 </div>
-              </Seccion>
-
-              <Seccion numero={6} titulo="Observaciones">
-                <textarea
-                  value={observaciones}
-                  onChange={(e) => setObservaciones(e.target.value)}
-                  placeholder="Escriba aquí cualquier novedad o discrepancia detectada durante el cierre…"
-                  rows={4}
-                  className={cn(
-                    "w-full resize-none rounded-lg border bg-(--color-blanco) p-3 text-sm focus:outline-none focus:ring-2 focus:ring-(--color-pagina)/40",
-                    requiereObservacion && !observaciones.trim()
-                      ? "border-(--color-rojo)"
-                      : "border-(--color-gris-claro-2)"
-                  )}
-                />
-                {requiereObservacion && !observaciones.trim() ? (
-                  <p className="text-xs text-(--color-rojo)">Obligatoria por diferencia de caja.</p>
-                ) : null}
-              </Seccion>
-
-              {ticketsPendientes > 0 ? (
-                <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
-                  <AlertTriangle className="size-5 shrink-0 text-amber-600" />
-                  <div className="flex-1 text-sm text-amber-950">
-                    <p className="font-bold">
-                      Tiene {ticketsPendientes} venta(s) en espera sin cobrar
-                    </p>
-                    <p className="text-xs mt-0.5 leading-relaxed">
-                      Debe cobrarlas o cerrarlas antes de cerrar el turno para no dejar ventas a medias.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/pos/ventas")}
-                    className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-(--color-blanco) hover:bg-amber-700"
-                  >
-                    Ir a Ventas
-                  </button>
-                </div>
-              ) : null}
-
-              <div className="pt-2 space-y-2">
-                <button
-                  type="button"
-                  onClick={handleConfirmar}
-                  disabled={cerrarM.isPending || ticketsPendientes > 0}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-(--color-rojo) px-6 py-4 text-base font-bold text-(--color-blanco) hover:bg-(--color-rojo-obscuro) disabled:opacity-50 shadow-md"
-                >
-                  <Lock className="size-5" />
-                  Confirmar cierre de caja
-                </button>
-                <p className="text-center text-[11px] text-(--color-gris-letra) px-2">
-                  Al confirmar, no podrá registrar más movimientos en este turno.
-                </p>
               </div>
             </>
           )}
         </div>
+
+        <footer className="shrink-0 border-t border-(--color-gris-claro-2) px-3 py-2.5 bg-(--color-pagina-3)/20">
+          <button
+            type="button"
+            onClick={handleConfirmar}
+            disabled={cerrarM.isPending || ticketsPendientes > 0 || loading}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-(--color-rojo) px-4 py-2.5 text-sm font-bold text-(--color-blanco) hover:bg-(--color-rojo-obscuro) disabled:opacity-50"
+          >
+            <Lock className="size-4" />
+            {cerrarM.isPending ? "Cerrando…" : "Confirmar cierre de caja"}
+          </button>
+          <p className="text-center text-[10px] text-(--color-gris-letra) mt-1">
+            Requiere NIP · No podrá registrar más movimientos en este turno
+          </p>
+        </footer>
       </div>
 
       <NipDialog

@@ -79,16 +79,46 @@ export function roundVenta(n) {
   return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 }
 
+/** Importe bruto de la línea (precio × cantidad), sin descuento. */
+export function brutoLinea(item) {
+  return roundVenta((Number(item?.precio) || 0) * (Number(item?.cantidad) || 0));
+}
+
+/**
+ * Descuento en MONTO de una línea, derivado de su tipo/valor.
+ * - tipo "porcentaje": valor es el % (tope 100) → monto = bruto × %/100.
+ * - tipo "monto": valor es el monto fijo.
+ * Siempre se topa entre 0 y el bruto (el backend rechaza subtotal negativo).
+ */
+export function descuentoMontoLinea(item) {
+  const bruto = brutoLinea(item);
+  const valor = Number(item?.descuentoValor) || 0;
+  if (!item?.descuentoTipo || valor <= 0 || bruto <= 0) return 0;
+  const monto =
+    item.descuentoTipo === "porcentaje"
+      ? roundVenta((bruto * Math.min(valor, 100)) / 100)
+      : roundVenta(valor);
+  return Math.max(0, Math.min(monto, bruto));
+}
+
+/** Subtotal de la línea ya con su descuento aplicado. */
+export function subtotalLinea(item) {
+  return roundVenta(brutoLinea(item) - descuentoMontoLinea(item));
+}
+
 /** Arma el body de POST /api/Ventas */
 export function buildVentaCrearBody(carrito, pagos, { observaciones = null, idCaja = null } = {}) {
   const detalles = carrito
     .filter((l) => l.cantidad > 0)
-    .map((l) => ({
-      idVariante: l.idVariante,
-      cantidad: l.cantidad,
-      descuentoMonto: l.descuentoMonto ?? null,
-      idUbicacion: l.idUbicacion ?? null,
-    }));
+    .map((l) => {
+      const descuento = descuentoMontoLinea(l);
+      return {
+        idVariante: l.idVariante,
+        cantidad: l.cantidad,
+        descuentoMonto: descuento > 0 ? descuento : null,
+        idUbicacion: l.idUbicacion ?? null,
+      };
+    });
 
   return {
     idCaja: idCaja ?? null,
@@ -121,11 +151,20 @@ function mapTicketDetalle(raw) {
   if (!raw) return null;
   const cantidad = Number(pick(raw, "cantidad", "Cantidad") ?? 0);
   const precio = Number(pick(raw, "precio", "Precio") ?? 0);
+  const descuento = Number(
+    pick(raw, "descuento", "Descuento", "descuentoMonto", "DescuentoMonto") ?? 0
+  );
+  const subtotalRaw = pick(raw, "subtotal", "Subtotal");
+  const subtotal =
+    subtotalRaw != null
+      ? roundVenta(Number(subtotalRaw))
+      : roundVenta(cantidad * precio - descuento);
   return {
     nombre: pick(raw, "nombre", "Nombre") ?? "",
     cantidad,
     precio,
-    subtotal: roundVenta(cantidad * precio),
+    descuento: roundVenta(descuento),
+    subtotal,
   };
 }
 
@@ -163,7 +202,8 @@ export function buildTicketDesdeCobro({ ventaCreada, lineas, pagos, cajeroNombre
     nombre: l.nombre,
     cantidad: l.cantidad,
     precio: l.precio,
-    subtotal: roundVenta(l.precio * l.cantidad),
+    descuento: descuentoMontoLinea(l),
+    subtotal: subtotalLinea(l),
     notaLinea: l.notaLinea ?? null,
   }));
 

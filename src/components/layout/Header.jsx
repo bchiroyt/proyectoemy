@@ -3,6 +3,8 @@ import { useAuthStore } from "@/context/useAuthStore";
 import { Bell, ChevronDown, User } from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { useHeaderUserActionStore } from "@/context/useHeaderUserActionStore";
+import { useHeaderTicketsStore } from "@/context/useHeaderTicketsStore";
+import { PosTicketsHeaderDropdown } from "@/components/layout/PosTicketsHeaderDropdown";
 
 const Header = () => {
     const user = useAuthStore((s) => s.user);
@@ -11,12 +13,15 @@ const Header = () => {
     const titulo = useNavigationStore((state) => state.titulo);
     const userAction = useHeaderUserActionStore((s) => s.onClick);
     const userHint = useHeaderUserActionStore((s) => s.hint);
-
+    const ticketsVisible = useHeaderTicketsStore((s) => s.visible);
 
     return (
-        <header className="h-[65px] w-full bg-(--color-pagina) flex items-center justify-between px-8 shadow-sm border-b z-10 sticky top-0">
-            <div className="flex items-center gap-4 text-center">
-                <h1 className="text-[20px] text-(--color-blanco) font-bold"> <span className="text-pagina">{titulo}</span></h1>
+        <header className="h-[65px] w-full bg-(--color-pagina) flex items-center justify-between px-4 sm:px-8 shadow-sm border-b z-10 sticky top-0">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                <h1 className="truncate text-[18px] sm:text-[20px] text-(--color-blanco) font-bold">
+                    <span className="text-pagina">{titulo}</span>
+                </h1>
+                {ticketsVisible ? <PosTicketsHeaderDropdown /> : null}
             </div>
 
             <div className="flex items-center gap-5">

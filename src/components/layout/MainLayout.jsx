@@ -1,19 +1,24 @@
+import { useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AppSidebar from "./AppSidebar";
 import Header from "./Header";
+
+/** POS en operación: sin menú lateral (ventas y cierre de turno). */
+const RUTAS_SIN_SIDEBAR = new Set(["/pos/ventas", "/pos/cierre"]);
+const ocultarSidebarEnRuta = (pathname) => RUTAS_SIN_SIDEBAR.has(pathname);
+
 const MainLayout = ({ children }) => {
+    const { pathname } = useLocation();
+    const ocultarSidebar = ocultarSidebarEnRuta(pathname);
+
     return (
         <TooltipProvider>
-            <SidebarProvider>
+            <SidebarProvider defaultOpen={!ocultarSidebar}>
                 <div className="flex w-full h-screen overflow-hidden bg-(--color-pagina-4)">
-                    {/* El Sidebar se queda fijo a la izquierda */}
+                    {!ocultarSidebar ? <AppSidebar /> : null}
 
-                    <AppSidebar />
-
-
-                    {/* El resto de la pantalla es flexible */}
-                    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                    <div className="flex-1 flex flex-col min-w-0 min-h-0 w-full">
                         <Header />
 
                         {/*<main className="flex-1 min-h-0 flex flex-col overflow-hidden">

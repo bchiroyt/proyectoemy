@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, BadgeCheck, Banknote, Building2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Banknote, Building2, Pencil, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
 import { usePosTicketsStore } from "@/context/usePosTicketsStore";
 import { useMontoTeclado } from "@/hooks/useMontoTeclado";
 import { useCrearVentaMutation } from "@/hooks/queries/useVentaQueries";
+import {
+  useAplicarReembolsoMutation,
+  usePrevisualizarReembolsoMutation,
+} from "@/hooks/queries/useReembolsoQueries";
 import { useMiCajaActivaQuery } from "@/hooks/queries/useCajaQueries";
 import { getMetodosPagoConfig } from "@/constants/metodosPago";
-import { buildVentaCrearBody, roundVenta } from "@/lib/ventaMappers";
+import { montoBaseLineaReembolso } from "@/lib/reembolsoMappers";
+import { buildVentaCrearBody, roundVenta, subtotalLinea } from "@/lib/ventaMappers";
 import {
   calcularVistaCobro,
   construirPagosFinales,
@@ -33,9 +38,15 @@ const CobroCaja = () => {
   const navigate = useNavigate();
   const carrito = usePosVentaStore((s) => s.carrito);
   const totalStore = usePosVentaStore((s) => s.total);
+  const operacion = usePosVentaStore((s) => s.operacion);
+  const pendienteKey = usePosVentaStore((s) => s.pendienteKey);
   const ultimaVenta = usePosVentaStore((s) => s.ultimaVenta);
   const setUltimaVenta = usePosVentaStore((s) => s.setUltimaVenta);
+  const clearPendiente = usePosVentaStore((s) => s.clearPendiente);
   const clearParaNuevaVenta = usePosVentaStore((s) => s.clearParaNuevaVenta);
+  const notificarReembolsoFinalizado = usePosVentaStore(
+    (s) => s.notificarReembolsoFinalizado
+  );
   const limpiarTicketActivo = usePosTicketsStore((s) => s.limpiarTicketActivo);
 
   const [mostrarTicket, setMostrarTicket] = useState(false);
@@ -44,11 +55,15 @@ const CobroCaja = () => {
   const metodoEfectivo = metodos.find((m) => m.clave === "efectivo");
   const metodoBanco = metodos.find((m) => m.clave === "banco");
 
-  const [metodoActivo, setMetodoActivo] = useState(null);
+  const [metodoActivo, setMetodoActivo] = useState(
+    () => metodoEfectivo?.clave ?? metodos[0]?.clave ?? null
+  );
   const [pagos, setPagos] = useState([]);
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
 
   const crearM = useCrearVentaMutation();
+  const reembolsoM = useAplicarReembolsoMutation();
+  const previsualizarReembolsoM = usePrevisualizarReembolsoMutation();
   const miCajaQ = useMiCajaActivaQuery();
   const idCaja = miCajaQ.data?.data?.idCaja ?? null;
   const validarRef = useRef(null);
@@ -57,13 +72,18 @@ const CobroCaja = () => {
     () => (carrito ?? []).filter((l) => l.cantidad > 0),
     [carrito]
   );
+  const esReembolso = operacion?.tipo === "reembolso";
 
   const deudaTotal = useMemo(
     () =>
       roundVenta(
-        lineas.reduce((acc, l) => acc + l.precio * l.cantidad, 0) || totalStore || 0
+        lineas.reduce((acc, l) => acc + subtotalLinea(l), 0) || totalStore || 0
       ),
     [lineas, totalStore]
+  );
+  const montoObjetivo = useMemo(
+    () => (esReembolso ? Math.abs(deudaTotal) : deudaTotal),
+    [esReembolso, deudaTotal]
   );
 
   const metodoSeleccionado = metodos.find((m) => m.clave === metodoActivo);
@@ -73,10 +93,10 @@ const CobroCaja = () => {
       roundVenta(
         Math.max(
           0,
-          deudaTotal - pagos.reduce((acc, p) => acc + p.montoAplicado, 0)
+          montoObjetivo - pagos.reduce((acc, p) => acc + p.montoAplicado, 0)
         )
       ),
-    [deudaTotal, pagos]
+    [montoObjetivo, pagos]
   );
 
   const tecladoHabilitado =
@@ -86,22 +106,24 @@ const CobroCaja = () => {
     monto: montoDigitando,
     textoMonto,
     reset: resetMonto,
+    setMonto,
     activarOverwrite,
     edicionActiva,
   } = useMontoTeclado({
     enabled: tecladoHabilitado,
     onEnter: () => validarRef.current?.(),
+    allowNegative: esReembolso,
   });
 
   const vista = useMemo(
     () =>
       calcularVistaCobro({
-        deudaTotal,
+        deudaTotal: montoObjetivo,
         pagos,
         metodo: metodoSeleccionado,
-        montoDigitando,
+        montoDigitando: esReembolso ? Math.abs(montoDigitando) : montoDigitando,
       }),
-    [deudaTotal, pagos, metodoSeleccionado, montoDigitando]
+    [montoObjetivo, pagos, metodoSeleccionado, montoDigitando, esReembolso]
   );
 
   const confirmarPagoParcial = useCallback(
@@ -112,7 +134,7 @@ const CobroCaja = () => {
       const aplicadoPrevio = roundVenta(
         pagos.reduce((acc, p) => acc + p.montoAplicado, 0)
       );
-      const deudaRest = roundVenta(Math.max(0, deudaTotal - aplicadoPrevio));
+      const deudaRest = roundVenta(Math.max(0, montoObjetivo - aplicadoPrevio));
       if (deudaRest <= 0.005) return false;
 
       const linea = crearLineaPago(metodo, montoRecibido, deudaRest);
@@ -121,17 +143,18 @@ const CobroCaja = () => {
       activarOverwrite();
       return true;
     },
-    [metodoActivo, metodos, pagos, deudaTotal, resetMonto, activarOverwrite]
+    [metodoActivo, metodos, pagos, montoObjetivo, resetMonto, activarOverwrite]
   );
 
   const seleccionarMetodo = useCallback(
     (clave) => {
+      const montoActual = esReembolso ? Math.abs(montoDigitando) : montoDigitando;
       if (
         clave !== metodoActivo &&
-        montoDigitando > 0 &&
+        montoActual > 0 &&
         deudaRestanteConfirmada > 0.005
       ) {
-        confirmarPagoParcial(montoDigitando, metodoActivo);
+        confirmarPagoParcial(montoActual, metodoActivo);
       } else if (clave !== metodoActivo) {
         resetMonto();
         activarOverwrite();
@@ -144,6 +167,7 @@ const CobroCaja = () => {
     [
       metodoActivo,
       montoDigitando,
+      esReembolso,
       deudaRestanteConfirmada,
       confirmarPagoParcial,
       resetMonto,
@@ -151,20 +175,62 @@ const CobroCaja = () => {
     ]
   );
 
+  const eliminarPago = useCallback((idx) => {
+    setPagos((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  const editarPago = useCallback(
+    (idx) => {
+      const objetivo = pagos[idx];
+      if (!objetivo) return;
+      setPagos((prev) => prev.filter((_, i) => i !== idx));
+      setMetodoActivo(objetivo.clave);
+      setMonto(objetivo.montoRecibido);
+    },
+    [pagos, setMonto]
+  );
+
   const cubreSoloPagos =
     pagos.length > 0 && deudaRestanteConfirmada <= 0.005 && montoDigitando <= 0;
+  const montoPantallaValido = esReembolso ? montoDigitando < 0 : montoDigitando > 0;
   const cubreConPantalla =
-    montoDigitando > 0 && vista.cubreDeuda && metodoActivo != null;
+    montoPantallaValido && vista.cubreDeuda && metodoActivo != null;
   const puedeValidar = metodos.length > 0 && (cubreSoloPagos || cubreConPantalla);
 
+  const setReembolsoSesion = usePosVentaStore((s) => s.setReembolsoSesion);
+
+  const volverAVentas = useCallback(() => {
+    if (esReembolso) {
+      const ref = operacion?.reembolso;
+      setReembolsoSesion({
+        activo: true,
+        idVenta: ref?.idVenta ?? null,
+        motivo: ref?.motivo ?? "",
+        observacion: ref?.observacion ?? "",
+      });
+    }
+    clearPendiente();
+    navigate("/pos/ventas");
+  }, [clearPendiente, navigate, esReembolso, operacion, setReembolsoSesion]);
+
   const handleValidar = useCallback(async () => {
-    if (crearM.isPending) return;
+    if (crearM.isPending || reembolsoM.isPending || previsualizarReembolsoM.isPending) {
+      return;
+    }
 
     if (!puedeValidar) {
       if (montoDigitando <= 0 && pagos.length === 0) {
         setToast({
           open: true,
-          message: "Ingrese el monto recibido.",
+          message: esReembolso
+            ? "Ingrese el monto a devolver con signo negativo (ej. -25)."
+            : "Ingrese el monto recibido.",
+          type: "warning",
+        });
+      } else if (esReembolso && montoDigitando > 0) {
+        setToast({
+          open: true,
+          message: "Para reembolso debe ingresar el monto con signo negativo.",
           type: "warning",
         });
       } else if (!vista.cubreDeuda) {
@@ -177,28 +243,100 @@ const CobroCaja = () => {
       return;
     }
 
+    const montoDigitandoAbs = esReembolso ? Math.abs(montoDigitando) : montoDigitando;
     const pagosFinales =
-      montoDigitando > 0
+      montoDigitandoAbs > 0
         ? construirPagosFinales(
             pagos,
             metodoActivo,
-            montoDigitando,
+            montoDigitandoAbs,
             metodos,
-            deudaTotal
+            montoObjetivo
           )
         : pagos;
 
     const suma = roundVenta(pagosFinales.reduce((acc, p) => acc + p.montoAplicado, 0));
-    if (Math.abs(suma - deudaTotal) > 0.01) {
+    if (Math.abs(suma - montoObjetivo) > 0.01) {
       setToast({
         open: true,
-        message: "Los pagos no coinciden con el total de la venta.",
+        message: "Los pagos no coinciden con el total de la operación.",
         type: "error",
       });
       return;
     }
 
     try {
+      if (esReembolso) {
+        const motivo = operacion?.reembolso?.motivo?.trim?.() ?? "";
+        if (!motivo) {
+          setToast({
+            open: true,
+            message: "El motivo del reembolso es obligatorio.",
+            type: "warning",
+          });
+          return;
+        }
+        const body = {
+          idVenta: Number(operacion?.reembolso?.idVenta),
+          idCaja,
+          motivo,
+          observacion: operacion?.reembolso?.observacion ?? null,
+          lineas: lineas.map((l) => {
+            const base = montoBaseLineaReembolso(l);
+            const penalizacion = roundVenta(Number(l.montoPenalizacion) || 0);
+            const montoLinea = roundVenta(Math.max(0, base - penalizacion));
+            return {
+              idVentaDetalle: l.idVentaDetalle,
+              cantidadDevuelta: l.cantidad,
+              productoRecibido: Boolean(l.productoRecibido ?? true),
+              regresaInventario: Boolean(l.regresaInventario ?? false),
+              idUbicacion: l.regresaInventario ? l.idUbicacion ?? null : null,
+              montoPenalizacion: penalizacion,
+              montoBaseDevolucion: base,
+              montoReembolsado: montoLinea,
+              motivoPenalizacion: l.motivoPenalizacion?.trim() || null,
+              observacionDetalle: l.observacionDetalle?.trim() || null,
+            };
+          }),
+          pagos: pagosFinales.map((p) => ({
+            idMetodoPago: p.idMetodoPago,
+            monto: roundVenta(p.montoAplicado),
+            referencia: null,
+          })),
+        };
+        const pre = await previsualizarReembolsoM.mutateAsync(body);
+        if (!pre?.data?.esValido) {
+          const errores = [
+            ...(pre?.data?.errores ?? []),
+            ...(pre?.data?.erroresLineas ?? []),
+            ...(pre?.data?.erroresPagos ?? []),
+          ];
+          const detalle =
+            errores.length > 0
+              ? errores.slice(0, 4).join(" · ")
+              : pre?.mensaje || "La prevalidación de reembolso encontró errores.";
+          setToast({
+            open: true,
+            message: detalle,
+            type: "error",
+          });
+          return;
+        }
+        await reembolsoM.mutateAsync(body);
+        limpiarTicketActivo();
+        clearParaNuevaVenta();
+        setPagos([]);
+        resetMonto();
+        notificarReembolsoFinalizado();
+        navigate("/pos/ventas", { replace: true });
+        setToast({
+          open: true,
+          message: "Reembolso aplicado correctamente.",
+          type: "success",
+        });
+        return;
+      }
+
       const body = buildVentaCrearBody(lineas, pagosFinales, { idCaja });
       const res = await crearM.mutateAsync(body);
       setUltimaVenta({
@@ -221,38 +359,58 @@ const CobroCaja = () => {
         open: true,
         message: getApiErrorMessage(
           err,
-          "No se pudo registrar la venta."
+          esReembolso ? "No se pudo aplicar el reembolso." : "No se pudo registrar la venta."
         ),
         type: "error",
       });
     }
   }, [
-    crearM.isPending,
     puedeValidar,
-    cubreSoloPagos,
+    esReembolso,
     montoDigitando,
     vista,
     pagos,
     metodoActivo,
     metodos,
     deudaTotal,
+    montoObjetivo,
     lineas,
     crearM,
+    previsualizarReembolsoM,
+    reembolsoM,
+    operacion,
     idCaja,
     setUltimaVenta,
     limpiarTicketActivo,
+    clearParaNuevaVenta,
+    clearPendiente,
+    notificarReembolsoFinalizado,
+    navigate,
     setTitulo,
+    resetMonto,
   ]);
 
-  validarRef.current = () => {
-    if (montoDigitando > 0 && deudaRestanteConfirmada > 0.005 && !vista.cubreDeuda) {
-      confirmarPagoParcial(montoDigitando);
+  useEffect(() => {
+    setPagos([]);
+    resetMonto();
+    if (metodoEfectivo?.clave) {
+      setMetodoActivo(metodoEfectivo.clave);
     }
-  };
+  }, [pendienteKey, metodoEfectivo?.clave, resetMonto]);
 
   useEffect(() => {
-    setTitulo("POS · Cobro");
-  }, [setTitulo]);
+    validarRef.current = () => {
+      const montoActual = esReembolso ? Math.abs(montoDigitando) : montoDigitando;
+      const validoSigno = esReembolso ? montoDigitando < 0 : montoDigitando > 0;
+      if (validoSigno && montoActual > 0 && deudaRestanteConfirmada > 0.005 && !vista.cubreDeuda) {
+        confirmarPagoParcial(montoActual);
+      }
+    };
+  }, [esReembolso, montoDigitando, deudaRestanteConfirmada, vista.cubreDeuda, confirmarPagoParcial]);
+
+  useEffect(() => {
+    setTitulo(esReembolso ? "POS · Reembolso" : "POS · Cobro");
+  }, [setTitulo, esReembolso]);
 
   useEffect(() => {
     if (mostrarTicket) return;
@@ -267,22 +425,21 @@ const CobroCaja = () => {
     navigate("/pos/ventas", { replace: true });
   };
 
-  useEffect(() => {
-    if (metodos.length && !metodoActivo) {
-      setMetodoActivo(metodoEfectivo?.clave ?? metodos[0].clave);
-      activarOverwrite();
-    }
-  }, [metodos.length, metodoEfectivo, metodoActivo, activarOverwrite]);
-
   const mensajeEstado = useMemo(() => {
     if (!metodoActivo) return "Seleccione método de pago";
-    if (montoDigitando <= 0) return "Introduzca la cantidad recibida";
+    if (esReembolso && montoDigitando >= 0) {
+      return "Para reembolso escriba monto negativo (ej. -25)";
+    }
+    if (!esReembolso && montoDigitando <= 0) return "Introduzca la cantidad recibida";
+    if (esReembolso && montoDigitando < 0 && vista.cubreDeuda) {
+      return "Cubre el reembolso · Pulse VALIDAR";
+    }
     if (vista.cubreDeuda && vista.cambioVista > 0) {
       return `Cubre la venta · Cambio ${fmtQ(vista.cambioVista)}`;
     }
     if (vista.cubreDeuda) return "Cubre la venta · Pulse VALIDAR";
     return `Falta ${fmtQ(vista.falta)} · Puede combinar EFECTIVO y BANCO`;
-  }, [metodoActivo, montoDigitando, vista]);
+  }, [metodoActivo, montoDigitando, vista, esReembolso]);
 
   if (mostrarTicket && ultimaVenta) {
     return (
@@ -310,7 +467,7 @@ const CobroCaja = () => {
         </p>
         <button
           type="button"
-          onClick={() => navigate("/pos/ventas")}
+          onClick={volverAVentas}
           className="text-sm font-semibold text-(--color-pagina) hover:underline"
         >
           Volver a ventas
@@ -324,14 +481,14 @@ const CobroCaja = () => {
       <div className="shrink-0 px-4 py-3 border-b border-(--color-pos-borde-suave) bg-(--color-pos-panel) flex items-center gap-4">
         <button
           type="button"
-          onClick={() => navigate("/pos/ventas")}
+          onClick={volverAVentas}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-(--color-pagina) text-(--color-pagina) text-sm font-bold hover:bg-(--color-pos-accent-suave)"
         >
           <ArrowLeft className="size-4" />
           Volver
         </button>
         <h1 className="flex-1 text-center text-xl sm:text-2xl font-black tracking-wide text-(--color-negro)">
-          COBRO
+          {esReembolso ? "REEMBOLSO" : "COBRO"}
         </h1>
         <span className="w-20 hidden sm:block" aria-hidden />
       </div>
@@ -380,22 +537,49 @@ const CobroCaja = () => {
               <div className="min-h-[8rem] border border-t-0 border-(--color-pos-borde-suave) rounded-b-lg bg-(--color-pos-panel) p-3 space-y-2">
                 {pagos.length === 0 ? (
                   <p className="text-sm text-(--color-pos-texto-muted) py-4 text-center leading-relaxed">
-                    Si divide el pago, al cambiar de método se guarda el monto anterior aquí.
+                    {esReembolso
+                      ? "Puede dividir la devolución por método; al cambiar se guarda aquí."
+                      : "Si divide el pago, al cambiar de método se guarda el monto anterior aquí."}
                   </p>
                 ) : (
                   pagos.map((p, idx) => (
                     <div
                       key={`${p.clave}-${idx}`}
-                      className="flex justify-between text-sm font-semibold border-b border-(--color-pos-borde-suave)/60 pb-2 last:border-0"
+                      className="flex items-center gap-2 text-sm font-semibold border-b border-(--color-pos-borde-suave)/60 pb-2 last:border-0"
                     >
-                      <span>{p.nombre}</span>
-                      <span className="tabular-nums">{fmtQ(p.montoAplicado)}</span>
+                      <button
+                        type="button"
+                        onClick={() => editarPago(idx)}
+                        title="Editar este pago"
+                        className="flex flex-1 items-center gap-1.5 text-left rounded px-1 py-0.5 hover:bg-(--color-pos-accent-suave) hover:text-(--color-pagina) transition-colors"
+                      >
+                        <Pencil className="size-3.5 opacity-60 shrink-0" />
+                        <span>{p.nombre}</span>
+                      </button>
+                      <span className="tabular-nums">
+                        {fmtQ(esReembolso ? -p.montoAplicado : p.montoAplicado)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => eliminarPago(idx)}
+                        aria-label={`Quitar pago ${p.nombre}`}
+                        title="Quitar este pago"
+                        className="rounded p-1 text-(--color-pos-texto-muted) hover:bg-(--color-rojo)/10 hover:text-(--color-rojo-obscuro) transition-colors"
+                      >
+                        <X className="size-4" />
+                      </button>
                     </div>
                   ))
                 )}
+                {pagos.length > 0 && (
+                  <p className="text-[11px] text-(--color-pos-texto-muted) pt-1 leading-snug">
+                    Toca un pago para editar su monto o usa la X para quitarlo.
+                  </p>
+                )}
                 {pagos.length > 0 && deudaRestanteConfirmada > 0.005 && (
                   <p className="text-xs text-(--color-pos-texto-muted) pt-1">
-                    Pendiente en pantalla para completar {fmtQ(deudaRestanteConfirmada)}
+                    Pendiente en pantalla para completar{" "}
+                    {fmtQ(esReembolso ? -deudaRestanteConfirmada : deudaRestanteConfirmada)}
                   </p>
                 )}
               </div>
@@ -444,7 +628,9 @@ const CobroCaja = () => {
               </div>
               <div className="rounded-lg border border-(--color-pos-borde-suave) bg-(--color-pos-panel) px-3 py-3">
                 <p className="text-xs font-bold text-(--color-pos-texto-muted)">Deuda total</p>
-                <p className="text-xl font-black tabular-nums mt-1">{fmtQ(deudaTotal)}</p>
+                <p className="text-xl font-black tabular-nums mt-1">
+                  {fmtQ(esReembolso ? -montoObjetivo : deudaTotal)}
+                </p>
               </div>
               <div className="rounded-lg border border-(--color-pos-borde-suave) bg-(--color-pos-panel) px-3 py-3">
                 <p className="text-xs font-bold text-(--color-pos-texto-muted)">Cambio</p>
@@ -460,7 +646,12 @@ const CobroCaja = () => {
       <div className="shrink-0 p-4 border-t border-(--color-pos-borde-suave) bg-(--color-pos-panel)">
         <button
           type="button"
-          disabled={!puedeValidar || crearM.isPending}
+          disabled={
+            !puedeValidar ||
+            crearM.isPending ||
+            reembolsoM.isPending ||
+            previsualizarReembolsoM.isPending
+          }
           onClick={() => void handleValidar()}
           className={cn(
             "w-full max-w-5xl mx-auto flex flex-col items-center justify-center gap-2 py-5 rounded-xl font-black text-(--color-blanco) transition-colors",
@@ -471,7 +662,11 @@ const CobroCaja = () => {
         >
           <BadgeCheck className="size-10" strokeWidth={2} />
           <span className="text-lg tracking-widest">
-            {crearM.isPending ? "PROCESANDO…" : "VALIDAR"}
+            {crearM.isPending || reembolsoM.isPending || previsualizarReembolsoM.isPending
+              ? "PROCESANDO…"
+              : esReembolso
+                ? "REEMBOLSAR"
+                : "VALIDAR"}
           </span>
         </button>
       </div>

@@ -12,7 +12,11 @@ const RAFAGA_LECTOR_MS = 80;
  * Edición de cantidad en carrito POS sin input visible.
  * Delete: quita dígitos → 0 → elimina línea.
  */
-export function useCarritoCantidadTeclado(carrito, setCarrito) {
+export function useCarritoCantidadTeclado(
+  carrito,
+  setCarrito,
+  { getMaxCantidad, getMinCantidad, getPuedeEliminarLinea } = {}
+) {
   const [lineaId, setLineaId] = useState(null);
   const [draft, setDraft] = useState(null);
   const overwriteRef = useRef(true);
@@ -32,12 +36,28 @@ export function useCarritoCantidadTeclado(carrito, setCarrito) {
 
   const actualizarCantidad = useCallback(
     (id, cantidad) => {
-      const n = Math.max(0, Math.min(9999, Math.floor(Number(cantidad)) || 0));
       setCarrito((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, cantidad: n } : p))
+        prev.map((p) => {
+          if (p.id !== id) return p;
+          const maxCantidad = Math.max(
+            0,
+            Math.floor(
+              Number(typeof getMaxCantidad === "function" ? getMaxCantidad(p) : 9999) || 9999
+            )
+          );
+          const minCantidad = Math.max(
+            0,
+            Math.floor(
+              Number(typeof getMinCantidad === "function" ? getMinCantidad(p) : 0) || 0
+            )
+          );
+          const n = Math.floor(Number(cantidad)) || 0;
+          const limitado = Math.max(minCantidad, Math.min(maxCantidad, n));
+          return { ...p, cantidad: limitado };
+        })
       );
     },
-    [setCarrito]
+    [setCarrito, getMaxCantidad, getMinCantidad]
   );
 
   const eliminarLinea = useCallback(
@@ -64,6 +84,13 @@ export function useCarritoCantidadTeclado(carrito, setCarrito) {
 
     const handler = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // Si el foco está en un campo de texto (p. ej. el input de descuento), no tocamos
+      // la cantidad: deja que el input maneje la tecla.
+      const tag = e.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.target?.isContentEditable) {
+        return;
+      }
 
       // Medimos el hueco respecto a la tecla anterior para distinguir lector vs. teclado.
       const ahora = Date.now();
@@ -100,6 +127,13 @@ export function useCarritoCantidadTeclado(carrito, setCarrito) {
           setDraft("0");
           overwriteRef.current = false;
           actualizarCantidad(lineaId, 0);
+          return;
+        }
+
+        const puedeEliminar =
+          typeof getPuedeEliminarLinea !== "function" || getPuedeEliminarLinea(item);
+        if (!puedeEliminar) {
+          deseleccionar();
           return;
         }
 
@@ -141,13 +175,8 @@ export function useCarritoCantidadTeclado(carrito, setCarrito) {
     actualizarCantidad,
     eliminarLinea,
     deseleccionar,
+    getPuedeEliminarLinea,
   ]);
-
-  useEffect(() => {
-    if (lineaId != null && !carrito.some((p) => p.id === lineaId)) {
-      deseleccionar();
-    }
-  }, [carrito, lineaId, deseleccionar]);
 
   return {
     lineaSeleccionadaId: lineaId,

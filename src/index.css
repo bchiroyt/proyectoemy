@@ -217,8 +217,26 @@
   }
 }
 
-/* Ticket de venta — impresión */
+/* Ticket de venta — impresión térmica 80 mm (Epson TM-T20IV, etc.) */
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
 @media print {
+  html,
+  body {
+    width: 80mm !important;
+    min-width: 80mm !important;
+    max-width: 80mm !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -228,22 +246,73 @@
     visibility: visible;
   }
 
+  .ticket-page,
+  .ticket-page > * {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
   .ticket-print-area {
     position: absolute;
     left: 0;
     top: 0;
-    width: 80mm;
-    max-width: 80mm;
+    width: 72mm;
+    max-width: 72mm;
     margin: 0;
-    padding: 4mm;
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
+    padding: 2mm 4mm 3mm;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ticket-print-area .ticket-logo-wrap {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .ticket-print-area .ticket-logo-img {
+    display: block !important;
+    max-width: 48mm !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: 18mm !important;
+    margin: 0 auto 2mm !important;
+    object-fit: contain;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Versión compacta en papel: menos relleno y sin “tarjetas” de color */
+  .ticket-print-area .ticket-line-item {
+    background: transparent !important;
+    border-radius: 0 !important;
+    padding: 1.5mm 0 !important;
+    border-bottom: 1px dashed #ccc;
+  }
+
+  .ticket-print-area header,
+  .ticket-print-area footer {
+    padding-top: 1mm;
+    padding-bottom: 1mm;
+    margin-bottom: 2mm;
   }
 
   .ticket-actions,
   [data-sidebar],
-  header {
+  header,
+  .ticket-page > p {
     display: none !important;
   }
 }

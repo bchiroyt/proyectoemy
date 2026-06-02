@@ -4,6 +4,7 @@ import { useAuthStore } from "@/context/useAuthStore";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
 import { useVentaTicketQuery } from "@/hooks/queries/useVentaQueries";
 import { buildTicketDesdeCobro } from "@/lib/ventaMappers";
+import { imprimirTicket } from "@/lib/printTicket";
 import { TicketVentaPreview } from "@/pages/pos/components/TicketVentaPreview";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,7 @@ export function VentaTicketPanel({ onNuevaVenta, className }) {
   }, [ticketQ.data, ultimaVenta, nombreMostrar]);
 
   const handleImprimir = () => {
-    window.print();
+    void imprimirTicket();
   };
 
   if (!ultimaVenta) {

@@ -13,11 +13,13 @@ function parseDraft(draft) {
  * Entrada de monto con teclado: teclear 1 luego 2 → Q 12.00 (no modo centavos).
  * El primer dígito reemplaza; los siguientes se concatenan.
  */
-export function useMontoTeclado({ enabled = true, onEnter } = {}) {
+export function useMontoTeclado({ enabled = true, onEnter, allowNegative = false } = {}) {
   const [draft, setDraft] = useState("");
   const overwriteRef = useRef(true);
   const onEnterRef = useRef(onEnter);
-  onEnterRef.current = onEnter;
+  useEffect(() => {
+    onEnterRef.current = onEnter;
+  }, [onEnter]);
 
   const monto = useMemo(() => Math.min(parseDraft(draft), MAX_MONTO), [draft]);
 
@@ -28,6 +30,20 @@ export function useMontoTeclado({ enabled = true, onEnter } = {}) {
 
   const activarOverwrite = useCallback(() => {
     overwriteRef.current = true;
+  }, []);
+
+  /** Carga un monto existente para editarlo (permite seguir tecleando/borrando). */
+  const setMonto = useCallback((valor) => {
+    const n = Number(valor);
+    if (!Number.isFinite(n) || n <= 0) {
+      setDraft("");
+      overwriteRef.current = true;
+      return;
+    }
+    const acotado = Math.min(n, MAX_MONTO);
+    const entero = Number.isInteger(acotado);
+    setDraft(entero ? String(acotado) : acotado.toFixed(2));
+    overwriteRef.current = false;
   }, []);
 
   const textoMonto = useCallback(
@@ -63,6 +79,18 @@ export function useMontoTeclado({ enabled = true, onEnter } = {}) {
 
       const digito = digitoDesdeTecla(e);
       const esPunto = e.key === "." || e.key === "," || e.code === "NumpadDecimal";
+      const esSigno = e.key === "-" || e.code === "NumpadSubtract";
+
+      if (allowNegative && esSigno) {
+        e.preventDefault();
+        e.stopPropagation();
+        setDraft((prev) => {
+          if (!prev) return "-";
+          return prev.startsWith("-") ? prev.slice(1) : `-${prev}`;
+        });
+        overwriteRef.current = false;
+        return;
+      }
 
       if (!digito && !esPunto) return;
 
@@ -70,16 +98,18 @@ export function useMontoTeclado({ enabled = true, onEnter } = {}) {
       e.stopPropagation();
 
       setDraft((prev) => {
+        const negativo = allowNegative && prev.startsWith("-");
+        const prevBase = negativo ? prev.slice(1) : prev;
         let next;
         if (overwriteRef.current) {
           next = digito ?? (esPunto ? "0." : "");
           overwriteRef.current = false;
         } else {
           if (esPunto) {
-            if (prev.includes(".")) return prev;
-            next = prev === "" ? "0." : `${prev}.`;
+            if (prevBase.includes(".")) return prev;
+            next = prevBase === "" ? "0." : `${prevBase}.`;
           } else {
-            next = prev + digito;
+            next = prevBase + digito;
           }
         }
 
@@ -94,19 +124,20 @@ export function useMontoTeclado({ enabled = true, onEnter } = {}) {
         }
 
         if (parseDraft(next) > MAX_MONTO) return prev;
-        return next;
+        return negativo ? `-${next}` : next;
       });
     };
 
     document.addEventListener("keydown", handler, true);
     return () => document.removeEventListener("keydown", handler, true);
-  }, [enabled, monto]);
+  }, [enabled, monto, allowNegative]);
 
   return {
     monto,
     draft,
     textoMonto,
     reset,
+    setMonto,
     activarOverwrite,
     edicionActiva: enabled,
   };

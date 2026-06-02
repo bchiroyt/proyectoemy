@@ -11,8 +11,8 @@ import {
   useCrearCompraMutation,
   useEliminarDetalleCompraMutation,
   useProveedoresCompraQuery,
-  useVariantesBuscarQuery,
 } from "@/hooks/queries/useComprasQueries";
+import { CompraLineasProductos } from "@/pages/compras/components/CompraLineasProductos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,17 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { AlertTriangle, ArrowLeft, ClipboardList, Info, Minus, Plus, Search, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ClipboardList, Info, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const fmtQ = (n) =>
@@ -109,8 +99,6 @@ const NuevaCompra = () => {
   const [documentoRef, setDocumentoRef] = useState("");
   const [tipoComprobante, setTipoComprobante] = useState("none");
   const [notas, setNotas] = useState("");
-  const [busqueda, setBusqueda] = useState("");
-  const [debouncedCriterio, setDebouncedCriterio] = useState("");
   const [lineas, setLineas] = useState([]);
   const [formError, setFormError] = useState("");
   const [confirmarMayor, setConfirmarMayor] = useState(false);
@@ -124,15 +112,6 @@ const NuevaCompra = () => {
   const agregarDetMut = useAgregarDetalleCompraMutation();
   const actualizarDetMut = useActualizarDetalleCompraMutation();
   const eliminarDetMut = useEliminarDetalleCompraMutation();
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedCriterio(busqueda.trim()), 350);
-    return () => clearTimeout(t);
-  }, [busqueda]);
-
-  const variantesQ = useVariantesBuscarQuery(debouncedCriterio, {
-    enabled: debouncedCriterio.length >= 1,
-  });
 
   useEffect(() => {
     if (isEdit) {
@@ -174,8 +153,6 @@ const NuevaCompra = () => {
       nombre: p.nombre ?? p.Nombre ?? "",
     }));
   }, [provQ.data]);
-
-  const variantesResultado = variantesQ.data ?? [];
 
   const subtotal = lineas.reduce((a, l) => {
     const cant = isDirecta ? l.cantidadRecibida : l.cantidadSolicitada;
@@ -254,6 +231,12 @@ const NuevaCompra = () => {
   };
 
   const quitar = (idVariante) => setLineas((prev) => prev.filter((x) => x.idVariante !== idVariante));
+
+  const updateLinea = (idVariante, patch) => {
+    setLineas((prev) =>
+      prev.map((x) => (x.idVariante === idVariante ? { ...x, ...patch } : x))
+    );
+  };
 
   const buildHeaderBody = () => {
     const idTipo =
@@ -535,224 +518,26 @@ const NuevaCompra = () => {
 
         <div className="grid gap-4 xl:grid-cols-[1fr_320px] items-start">
           <div className="space-y-4 min-w-0">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-(--color-pagina)" />
-              <Input
-                placeholder="Buscar variantes por nombre, SKU o código…"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className={cn(
-                  "pl-10 h-11 border-(--color-gris-claro-2)",
-                  "bg-(--color-gris-claro-2) placeholder:text-(--color-gris-letra) focus-visible:ring-(--color-gris-claro-2)"
-                )}
-                disabled={loadingEdit}
-              />
+            <CompraLineasProductos
+              lineas={lineas}
+              isDirecta={isDirecta}
+              disabled={loadingEdit}
+              onAgregar={agregar}
+              onQuitar={quitar}
+              onSetCant={setCant}
+              onSetRecibida={setRecibidaLinea}
+              onSetCostoReal={setCostoReal}
+              onUpdateLinea={updateLinea}
+            />
+
+            <div className="flex items-start gap-2 rounded-lg border border-(--color-gris-claro-2) bg-(--color-gris-claro-2)/80 px-4 py-3 text-xs text-(--color-gris-letra)">
+              <Info className="size-4 shrink-0 text-(--color-pagina) mt-0.5" />
+              <p>
+                {isDirecta
+                  ? "En modo directo se registra y cierra la compra inmediatamente, ingresando lo realmente recibido y el costo real. El inventario se actualiza al guardar."
+                  : "Se guarda como presupuesto (estado EN_PROCESO). Más tarde puedes recibirlo desde la lista para confirmar cantidades, costos y entrar al inventario."}
+              </p>
             </div>
-
-            {variantesQ.isFetching ? (
-              <p className="text-xs text-(--color-gris-letra)">Buscando…</p>
-            ) : null}
-
-            {variantesResultado.length > 0 && debouncedCriterio.length >= 1 && (
-              <Card className="border-(--color-gris-claro-2) bg-(--color-blanco) shadow-sm">
-                <CardContent className="p-2 max-h-48 overflow-y-auto">
-                  {variantesResultado.map((v, idx) => {
-                    const idVariante = v.idVariante ?? v.IdVariante;
-                    const disp = v.disponibleParaCompra ?? v.DisponibleParaCompra;
-                    const motivo = v.motivoNoDisponible ?? v.MotivoNoDisponible;
-                    const nombre =
-                      v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
-                    const sku = v.sku ?? v.Sku ?? "";
-                    const sinId = idVariante == null || Number(idVariante) <= 0;
-                    const deshabilitado = disp === false || sinId;
-                    const tooltip = sinId
-                      ? "El backend no envió IdVariante. Reinicia el backend para tomar la nueva versión."
-                      : disp === false
-                      ? motivo || "No disponible para compra"
-                      : undefined;
-                    return (
-                      <button
-                        key={idVariante ?? (sku ? `sku:${sku}` : `idx:${idx}`)}
-                        type="button"
-                        disabled={deshabilitado}
-                        title={tooltip}
-                        onClick={() => {
-                          if (deshabilitado) return;
-                          agregar(v);
-                          setBusqueda("");
-                          setDebouncedCriterio("");
-                        }}
-                        className={cn(
-                          "w-full text-left px-3 py-2 rounded-md text-sm flex justify-between gap-2",
-                          deshabilitado ? "opacity-50 cursor-not-allowed" : "hover:bg-(--color-pagina-hover)"
-                        )}
-                      >
-                        <span className="font-medium text-(--color-negro)">
-                          {nombre}
-                          {sinId ? (
-                            <span className="ml-2 text-[10px] uppercase font-bold text-(--color-rojo)">
-                              (sin id)
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="text-xs text-(--color-gris-letra) font-mono">{sku}</span>
-                      </button>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="border-(--color-gris-claro-2) shadow-sm overflow-hidden">
-              <CardHeader className="py-3 px-4 border-b border-(--color-gris-claro-2)">
-                <CardTitle className="text-sm font-bold">Productos</CardTitle>
-              </CardHeader>
-              <ScrollArea className="h-[min(360px,45vh)] sm:h-[min(420px,50vh)]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-(--color-gris-claro-2) hover:bg-(--color-gris-claro-2)">
-                      <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra)">Producto</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold w-24">SKU</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold text-right w-24">
-                        {isDirecta ? "Costo est." : "Costo"}
-                      </TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold text-center w-32">
-                        Solicitada
-                      </TableHead>
-                      {isDirecta ? (
-                        <>
-                          <TableHead className="text-[10px] uppercase font-bold text-right w-24">
-                            Recibida
-                          </TableHead>
-                          <TableHead className="text-[10px] uppercase font-bold text-right w-24">
-                            Costo real
-                          </TableHead>
-                        </>
-                      ) : null}
-                      <TableHead className="text-[10px] uppercase font-bold text-right w-28">
-                        Subtotal
-                      </TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lineas.map((row, idx) => {
-                      const cantUI = isDirecta ? row.cantidadRecibida : row.cantidadSolicitada;
-                      const costoUI = isDirecta ? row.costoReal : row.costoEstimado;
-                      const mayor = isDirecta && row.cantidadRecibida > row.cantidadSolicitada;
-                      const rowKey =
-                        row.idDetalleCompra ??
-                        row.idVariante ??
-                        (row.sku ? `sku:${row.sku}` : `idx:${idx}`);
-                      return (
-                        <TableRow key={rowKey}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium text-(--color-negro) text-sm">{row.nombre}</p>
-                              <p className="text-xs text-(--color-gris-letra)">{row.detalle}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{row.sku}</TableCell>
-                          <TableCell className="text-right">
-                            <Input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              className="h-8 text-right tabular-nums text-sm"
-                              value={row.costoEstimado}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setLineas((prev) =>
-                                  prev.map((x) =>
-                                    x.idVariante === row.idVariante
-                                      ? { ...x, costoEstimado: Number.isFinite(val) ? val : 0 }
-                                      : x
-                                  )
-                                );
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="size-8"
-                                onClick={() => setCant(row.idVariante, -1)}
-                              >
-                                <Minus className="size-3.5" />
-                              </Button>
-                              <span className="w-8 text-center text-sm font-semibold tabular-nums">
-                                {row.cantidadSolicitada}
-                              </span>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="size-8"
-                                onClick={() => setCant(row.idVariante, 1)}
-                              >
-                                <Plus className="size-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          {isDirecta ? (
-                            <>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step="1"
-                                  className={cn(
-                                    "h-8 text-right tabular-nums text-sm",
-                                    mayor ? "border-amber-400 bg-amber-50" : ""
-                                  )}
-                                  value={row.cantidadRecibida}
-                                  onChange={(e) => setRecibidaLinea(row.idVariante, e.target.value)}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  className="h-8 text-right tabular-nums text-sm"
-                                  value={row.costoReal}
-                                  onChange={(e) => setCostoReal(row.idVariante, e.target.value)}
-                                />
-                              </TableCell>
-                            </>
-                          ) : null}
-                          <TableCell className="text-right tabular-nums font-semibold text-sm">
-                            {fmtQ(cantUI * costoUI)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-8 text-(--color-gris-letra) hover:text-(--color-rojo)"
-                              onClick={() => quitar(row.idVariante)}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-              <div className="flex items-start gap-2 px-4 py-3 border-t border-(--color-gris-claro-2) bg-(--color-gris-claro-2)/80 text-xs text-(--color-gris-letra)">
-                <Info className="size-4 shrink-0 text-(--color-pagina) mt-0.5" />
-                <p>
-                  {isDirecta
-                    ? "En modo directo se registra y cierra la compra inmediatamente, ingresando lo realmente recibido y el costo real. El inventario se actualiza al guardar."
-                    : "Se guarda como presupuesto (estado EN_PROCESO). Más tarde puedes recibirlo desde la lista para confirmar cantidades, costos y entrar al inventario."}
-                </p>
-              </div>
-            </Card>
 
             {isDirecta && algunaMayor ? (
               <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -823,21 +608,6 @@ const NuevaCompra = () => {
       </div>
 
       <footer className="shrink-0 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-(--color-gris-claro-2) bg-(--color-blanco) pt-3 pb-1 md:pb-0 -mx-2 px-2 md:mx-0 md:px-0">
-        <div className="relative">
-          Buscador de productos
-          <Search className="flex flex-1 justify-start grap-2  absolute left-3 top-1/2 size-4 -translate-y-1/2 text-(--color-pagina)" />
-            <Input
-              placeholder="Buscar variantes por nombre, SKU o código…"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className={cn(
-                 "pl-10 h-11 border-(--color-gris-claro-2)",
-                 "bg-(--color-gris-claro-2) placeholder:text-(--color-gris-letra) focus-visible:ring-(--color-gris-claro-2)"
-              )}
-              disabled={loadingEdit}
-              />
-            </div>
-
         <Button variant="outline" type="button" onClick={() => setLineas([])} disabled={busy}>
           Limpiar líneas
         </Button>

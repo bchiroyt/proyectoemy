@@ -1,5 +1,6 @@
 import { ShoppingCart, Barcode } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { descuentoMontoLinea, subtotalLinea, roundVenta } from "@/lib/ventaMappers";
 import {
   Table,
   TableBody,
@@ -18,9 +19,36 @@ export function CarritoPanel({
   seleccionarLinea,
   deseleccionar,
   cantidadVisible,
-  tabsSlot,
+  modoReembolso = false,
+  lineaReembolsoActivaId = null,
+  onAbrirLineaReembolso,
   children,
 }) {
+  const lineaAportaTotal = (p) =>
+    !modoReembolso || !p.esReembolso || p.cantidad > 0;
+
+  const subtotalBrutoCarrito = roundVenta(
+    carrito.reduce(
+      (acc, p) => acc + (lineaAportaTotal(p) ? p.precio * p.cantidad : 0),
+      0
+    )
+  );
+  const descuentoTotalCarrito = roundVenta(
+    carrito.reduce(
+      (acc, p) => acc + (lineaAportaTotal(p) ? descuentoMontoLinea(p) : 0),
+      0
+    )
+  );
+
+  const manejarClickLinea = (item) => {
+    if (modoReembolso && item.esReembolso && onAbrirLineaReembolso) {
+      onAbrirLineaReembolso(item.id);
+      return;
+    }
+    seleccionarLinea(item.id);
+  };
+
+  const idLineaActiva = modoReembolso ? lineaReembolsoActivaId : lineaSeleccionadaId;
 
   return (
     <aside
@@ -29,8 +57,6 @@ export function CarritoPanel({
         if (e.target === e.currentTarget) deseleccionar();
       }}
     >
-      {tabsSlot}
-
       <div className="p-4 border-b border-(--color-pos-borde-suave) flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-(--color-pagina)">
           <ShoppingCart className="w-5 h-5" />
@@ -62,7 +88,9 @@ export function CarritoPanel({
               strokeWidth={1.25}
             />
             <p className="text-sm leading-relaxed">
-              Pase un producto por el escáner para comenzar, o agréguelo desde la cuadrícula.
+              {modoReembolso
+                ? "Configure productos en el detalle de la venta y confirme con «Listo» para agregarlos aquí."
+                : "Pase un producto por el escáner para comenzar, o agréguelo desde la cuadrícula."}
             </p>
           </div>
         ) : (
@@ -85,28 +113,29 @@ export function CarritoPanel({
             </TableHeader>
             <TableBody>
               {carrito.map((item) => {
-                const seleccionada = lineaSeleccionadaId === item.id;
+                const seleccionada = idLineaActiva === item.id;
                 const cantStr = cantidadVisible(item);
                 const cantNum = item.cantidad;
+                const descLinea = descuentoMontoLinea(item);
+                const subLinea = subtotalLinea(item);
 
                 return (
                   <TableRow
                     key={item.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => seleccionarLinea(item.id)}
+                    onClick={() => manejarClickLinea(item)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        seleccionarLinea(item.id);
+                        manejarClickLinea(item);
                       }
                     }}
                     className={cn(
                       "cursor-pointer transition-colors border-l-2 border-l-transparent",
                       seleccionada &&
                         "bg-(--color-pos-accent-suave)/80 border-l-(--color-pagina)",
-                      flashRowId === item.id && "animate-pos-scan-flash",
-                      cantNum === 0 && "opacity-70"
+                      flashRowId === item.id && "animate-pos-scan-flash"
                     )}
                   >
                     <TableCell className="whitespace-normal align-top py-2.5">
@@ -136,7 +165,21 @@ export function CarritoPanel({
                       {item.precio.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums align-top py-2.5">
-                      {(item.precio * cantNum).toFixed(2)}
+                      {descLinea > 0 ? (
+                        <>
+                          <span className="block text-[11px] font-normal text-(--color-pos-texto-muted) line-through">
+                            {(item.precio * cantNum).toFixed(2)}
+                          </span>
+                          <span className="block">{subLinea.toFixed(2)}</span>
+                          <span className="block text-[10px] font-semibold text-(--color-esmeralda-hover)">
+                            {item.descuentoTipo === "porcentaje"
+                              ? `-${item.descuentoValor}%`
+                              : `-Q${descLinea.toFixed(2)}`}
+                          </span>
+                        </>
+                      ) : (
+                        (item.precio * cantNum).toFixed(2)
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -145,15 +188,33 @@ export function CarritoPanel({
           </Table>
         )}
 
-        {lineaSeleccionadaId != null && carrito.length > 0 && (
+        {modoReembolso && carrito.some((p) => p.esReembolso) && (
           <p className="text-[10px] text-(--color-pos-texto-muted) px-2 pt-2 leading-snug">
-            Teclado: dígitos cambian cantidad · Supr borra dígito, luego 0, luego quita la línea · Esc
-            cancela
+            Pulse un producto para abrir el detalle del reembolso.
+          </p>
+        )}
+
+        {!modoReembolso && lineaSeleccionadaId != null && carrito.length > 0 && (
+          <p className="text-[10px] text-(--color-pos-texto-muted) px-2 pt-2 leading-snug">
+            Teclado: dígitos cambian cantidad · Supr borra dígito, luego 0, luego quita la línea ·
+            Esc cancela
           </p>
         )}
       </div>
 
       <div className="p-3 border-t border-(--color-pos-borde-suave) space-y-2 bg-(--color-pos-panel)">
+        {descuentoTotalCarrito > 0 && (
+          <div className="space-y-1 px-1 text-sm">
+            <div className="flex justify-between text-(--color-pos-texto-muted)">
+              <span>Subtotal</span>
+              <span className="tabular-nums">Q {subtotalBrutoCarrito.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-(--color-esmeralda-hover) font-semibold">
+              <span>Descuento</span>
+              <span className="tabular-nums">- Q {descuentoTotalCarrito.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
         <div className="flex justify-between items-baseline px-1">
           <span className="text-lg font-bold">Total</span>
           <span className="text-xl font-bold tabular-nums">Q {total.toFixed(2)}</span>

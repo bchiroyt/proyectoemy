@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Check, Info, Plus, RotateCcw, ScanBarcode, ScanLine, X } from "lucide-react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Check, Info, RotateCcw, ScanLine, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { cn } from "@/lib/utils";
 import {
@@ -16,10 +17,20 @@ import {
 import { MovimientoCajaDialog } from "@/pages/caja/components/MovimientoCajaDialog";
 import { CambiarCajeroDialog } from "@/pages/caja/components/CambiarCajeroDialog";
 import { useHeaderUserActionStore } from "@/context/useHeaderUserActionStore";
+import { useHeaderTicketsStore } from "@/context/useHeaderTicketsStore";
 import { CatalogoProductoCard } from "@/pages/pos/components/CatalogoProductoCard";
 import { CarritoPanel } from "@/pages/pos/components/CarritoPanel";
+import { ReembolsoLineaDetalleDialog } from "@/pages/pos/components/ReembolsoLineaDetalleDialog";
+import { CerrarTurnoMenu } from "@/pages/pos/components/CerrarTurnoMenu";
 import { useCarritoCantidadTeclado } from "@/hooks/useCarritoCantidadTeclado";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
+import { ID_UBICACION_REEMBOLSO } from "@/lib/reembolsoMappers";
+import { subtotalLinea, roundVenta } from "@/lib/ventaMappers";
+import {
+  useReembolsoPreparacionQuery,
+  useReembolsoVentasDisponiblesQuery,
+  QK_REEMBOLSOS,
+} from "@/hooks/queries/useReembolsoQueries";
 import {
   usePosTicketsStore,
   LIMITE_TICKETS_ESPERA,
@@ -43,6 +54,9 @@ const CATEGORIA_TODO = "todo";
 const VentasPOS = () => {
   const setTitulo = useNavigationStore((state) => state.setTitulo);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const reembolsoCleanupPending = usePosVentaStore((s) => s.reembolsoCleanupPending);
+  const consumeReembolsoCleanup = usePosVentaStore((s) => s.consumeReembolsoCleanup);
   const miCajaQ = useMiCajaActivaQuery();
   const idCaja = miCajaQ.data?.data?.idCaja;
   const flashTimerRef = useRef(0);
@@ -50,10 +64,8 @@ const VentasPOS = () => {
 
   const tickets = usePosTicketsStore((s) => s.tickets);
   const activeId = usePosTicketsStore((s) => s.activeId);
-  const setActivo = usePosTicketsStore((s) => s.setActivo);
-  const nuevoTicket = usePosTicketsStore((s) => s.nuevoTicket);
-  const cerrarTicket = usePosTicketsStore((s) => s.cerrarTicket);
   const setCarrito = usePosTicketsStore((s) => s.setCarritoActivo);
+  const prevActiveIdRef = useRef(activeId);
 
   const ticketActivo = tickets.find((t) => t.id === activeId) ?? tickets[0];
   const carrito = ticketActivo?.carrito ?? [];
@@ -63,21 +75,45 @@ const VentasPOS = () => {
   const [categoriaId, setCategoriaId] = useState(CATEGORIA_TODO);
   const [pagina, setPagina] = useState(1);
   const [flashRowId, setFlashRowId] = useState(null);
-  const [scanFeedback, setScanFeedback] = useState(null);
   const [scanModal, setScanModal] = useState(null);
   const [gastosOpen, setGastosOpen] = useState(false);
   const [cambiarCajeroOpen, setCambiarCajeroOpen] = useState(false);
+  const [reembolsoFiltro, setReembolsoFiltro] = useState("");
+  const [reembolsoLineaModalId, setReembolsoLineaModalId] = useState(null);
+  const [reembolsoLineaBorrador, setReembolsoLineaBorrador] = useState(null);
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
+  const reembolsoSesion = usePosVentaStore((s) => s.reembolsoSesion);
+  const setReembolsoSesion = usePosVentaStore((s) => s.setReembolsoSesion);
+  const resetReembolsoSesion = usePosVentaStore((s) => s.resetReembolsoSesion);
   const setPendiente = usePosVentaStore((s) => s.setPendiente);
+  const clearPendiente = usePosVentaStore((s) => s.clearPendiente);
+
+  const tieneLineasReembolsoEnCarrito = useMemo(
+    () => carrito.some((p) => p.esReembolso && p.cantidad > 0),
+    [carrito]
+  );
+  const modoReembolso = reembolsoSesion.activo || tieneLineasReembolsoEnCarrito;
+  const ventaReembolsoId = reembolsoSesion.idVenta;
+  const reembolsoMotivo = reembolsoSesion.motivo;
+  const reembolsoObservacion = reembolsoSesion.observacion;
+  const setReembolsoMotivo = (motivo) => setReembolsoSesion({ motivo });
+  const setReembolsoObservacion = (observacion) => setReembolsoSesion({ observacion });
   const setHeaderAction = useHeaderUserActionStore((s) => s.setAction);
   const clearHeaderAction = useHeaderUserActionStore((s) => s.clearAction);
+  const setTicketsHeaderVisible = useHeaderTicketsStore((s) => s.setVisible);
+  const setOnLimiteAlcanzado = useHeaderTicketsStore((s) => s.setOnLimiteAlcanzado);
+  const clearTicketsHeader = useHeaderTicketsStore((s) => s.clear);
 
   const {
     lineaSeleccionadaId,
     seleccionarLinea,
     deseleccionar,
     cantidadVisible,
-  } = useCarritoCantidadTeclado(carrito, setCarrito);
+  } = useCarritoCantidadTeclado(carrito, setCarrito, {
+    getMaxCantidad: (item) => item.maxCantidad ?? 9999,
+    getMinCantidad: (item) => (item.esReembolso && item.cantidad > 0 ? 1 : 0),
+    getPuedeEliminarLinea: (item) => !item.esReembolso,
+  });
 
   useEffect(() => {
     setTitulo("POS · Ventas");
@@ -87,6 +123,25 @@ const VentasPOS = () => {
     setHeaderAction(() => setCambiarCajeroOpen(true), "Cambiar cajero / operador");
     return () => clearHeaderAction();
   }, [setHeaderAction, clearHeaderAction]);
+
+  useEffect(() => {
+    setTicketsHeaderVisible(true);
+    setOnLimiteAlcanzado(() => {
+      setToast({
+        open: true,
+        message: `Máximo ${LIMITE_TICKETS_ESPERA} ventas en espera. Cobre o cierre una antes de abrir otra.`,
+        type: "warning",
+      });
+    });
+    return () => clearTicketsHeader();
+  }, [setTicketsHeaderVisible, setOnLimiteAlcanzado, clearTicketsHeader]);
+
+  useEffect(() => {
+    if (prevActiveIdRef.current !== activeId) {
+      deseleccionar();
+      prevActiveIdRef.current = activeId;
+    }
+  }, [activeId, deseleccionar]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedCriterio(busqueda.trim()), 350);
@@ -104,18 +159,18 @@ const VentasPOS = () => {
 
   const catalogoQ = useVentaCatalogoQuery(
     { page: pagina, pageSize: PAGE_SIZE, criterio: criterioApi },
-    { enabled: !!idCaja }
+    { enabled: !!idCaja && !modoReembolso }
   );
 
+  const ventasReembolsoQ = useReembolsoVentasDisponiblesQuery(
+    { page: 1, pageSize: 30, criterio: reembolsoFiltro, idCaja },
+    { enabled: !!idCaja && modoReembolso }
+  );
+  const preparacionReembolsoQ = useReembolsoPreparacionQuery(ventaReembolsoId, {
+    enabled: !!ventaReembolsoId && modoReembolso,
+  });
   const productosPagina = catalogoQ.data?.items ?? [];
   const totalCount = catalogoQ.data?.totalCount ?? 0;
-  const totalPaginas = catalogoQ.data?.totalPages ?? 1;
-  const paginaSegura = Math.min(pagina, Math.max(1, totalPaginas));
-  const sliceStart = totalCount === 0 ? 0 : (paginaSegura - 1) * PAGE_SIZE;
-
-  useEffect(() => {
-    setPagina(1);
-  }, [debouncedCriterio, categoriaId]);
 
   useEffect(() => {
     if (!miCajaQ.isLoading && !miCajaQ.data?.data) {
@@ -161,15 +216,11 @@ const VentasPOS = () => {
             agregarProducto(producto, undefined, { seleccionar: false });
             dispararFlash(producto.id);
             setScanModal(null);
-            setScanFeedback({ type: "ok", nombre: producto.nombre });
             window.clearTimeout(scanMsgTimerRef.current);
-            scanMsgTimerRef.current = window.setTimeout(() => setScanFeedback(null), 2200);
           } else {
-            setScanFeedback(null);
             setScanModal({ type: "no-encontrado", codigo });
           }
         } catch {
-          setScanFeedback(null);
           setScanModal({ type: "error", codigo });
         }
       })();
@@ -182,7 +233,7 @@ const VentasPOS = () => {
     minLength: 3,
     // Siempre activo: aunque haya una línea seleccionada para editar cantidad, el
     // editor de cantidad ignora las ráfagas del lector, así que no hay conflicto.
-    enabled: true,
+    enabled: !modoReembolso,
   });
 
   useEffect(
@@ -193,20 +244,263 @@ const VentasPOS = () => {
     []
   );
 
-  const total = carrito.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+  const mapPrepLineaAItemReembolso = useCallback((l, idVenta) => {
+    if (!l?.idVentaDetalle) return null;
+    const cantidadVendida = Number(l.cantidadVendida) || 0;
+    const subtotalSnap = Number(l.subtotalLineaSnapshot) || 0;
+    const precioNetoUnitario =
+      cantidadVendida > 0
+        ? roundVenta(subtotalSnap / cantidadVendida)
+        : Math.abs(Number(l.precioUnitario) || 0);
+    return {
+      id: `reb-${l.idVentaDetalle}`,
+      idVariante: l.idVariante,
+      idVentaDetalle: l.idVentaDetalle,
+      idVentaOrigen: idVenta,
+      idUbicacion: null,
+      nombre: l.nombre,
+      sku: l.sku,
+      precio: -precioNetoUnitario,
+      precioNetoUnitario,
+      subtotalLineaSnapshot: subtotalSnap,
+      cantidad: 0,
+      cantidadVendida: Number(l.cantidadVendida) || 0,
+      cantidadYaDevuelta: Number(l.cantidadYaDevuelta) || 0,
+      maxCantidad: Math.max(1, Math.floor(l.cantidadDisponible || 0)),
+      esReembolso: true,
+      productoRecibido: true,
+      regresaInventario: false,
+      puedeReintegrarInventario: !!l.puedeReintegrarInventario,
+      descuentoTipo: null,
+      descuentoValor: null,
+      montoPenalizacion: 0,
+      motivoPenalizacion: "",
+      observacionDetalle: "",
+    };
+  }, []);
+
+  const total = roundVenta(
+    carrito.reduce(
+      (acc, p) => acc + (p.esReembolso && p.cantidad <= 0 ? 0 : subtotalLinea(p)),
+      0
+    )
+  );
+
+  const lineaSeleccionada = carrito.find((p) => p.id === lineaSeleccionadaId) ?? null;
+
+  const aplicarDescuentoLinea = useCallback(
+    (tipo, valorRaw) => {
+      if (lineaSeleccionadaId == null) return;
+      const valor = Number(valorRaw);
+      const valido = Number.isFinite(valor) && valor > 0;
+      setCarrito((prev) =>
+        prev.map((p) =>
+          p.id === lineaSeleccionadaId
+            ? {
+                ...p,
+                descuentoTipo: valido ? tipo : null,
+                descuentoValor: valido ? valor : null,
+              }
+            : p
+        )
+      );
+    },
+    [lineaSeleccionadaId, setCarrito]
+  );
+
+  const ventasReembolso = ventasReembolsoQ.data?.items ?? [];
+
+  const resetSesionReembolso = useCallback(() => {
+    resetReembolsoSesion();
+    setReembolsoFiltro("");
+    setReembolsoLineaModalId(null);
+    setReembolsoLineaBorrador(null);
+    setCarrito([]);
+    deseleccionar();
+    clearPendiente();
+    queryClient.invalidateQueries({ queryKey: [QK_REEMBOLSOS] });
+  }, [
+    resetReembolsoSesion,
+    setCarrito,
+    deseleccionar,
+    clearPendiente,
+    queryClient,
+  ]);
+
+  useEffect(() => {
+    if (!reembolsoCleanupPending) return;
+    consumeReembolsoCleanup();
+    resetSesionReembolso();
+  }, [reembolsoCleanupPending, consumeReembolsoCleanup, resetSesionReembolso]);
+
+  const toggleModoReembolso = () => {
+    if (modoReembolso) {
+      resetSesionReembolso();
+      return;
+    }
+    setReembolsoSesion({
+      activo: true,
+      idVenta: null,
+      motivo: "",
+      observacion: "",
+    });
+    setReembolsoFiltro("");
+    setReembolsoLineaModalId(null);
+    setReembolsoLineaBorrador(null);
+    setCarrito([]);
+    deseleccionar();
+    clearPendiente();
+  };
+
+  const seleccionarVentaReembolso = (idVenta) => {
+    setReembolsoSesion({ idVenta });
+    setReembolsoLineaModalId(null);
+    setReembolsoLineaBorrador(null);
+    setCarrito([]);
+    deseleccionar();
+  };
+
+  const aplicarCambiosLineaReembolso = useCallback((item, cambios) => {
+    const next = { ...item, ...cambios };
+    if (next.productoRecibido === false) {
+      next.regresaInventario = false;
+    }
+    if (next.regresaInventario) {
+      next.idUbicacion = ID_UBICACION_REEMBOLSO;
+    } else {
+      next.idUbicacion = null;
+    }
+    return next;
+  }, []);
+
+  const construirLineaReembolsoParaModal = useCallback(
+    (idLinea) => {
+      const enCarrito = carrito.find((c) => c.id === idLinea);
+      if (enCarrito) return { ...enCarrito };
+
+      const prep = preparacionReembolsoQ.data?.data;
+      if (!prep?.elegible) return null;
+      const idDetalle = Number(String(idLinea).replace(/^reb-/, ""));
+      const lineaPrep = (prep.lineas ?? []).find((l) => l.idVentaDetalle === idDetalle);
+      if (!lineaPrep) return null;
+      return mapPrepLineaAItemReembolso(lineaPrep, prep.idVenta);
+    },
+    [carrito, preparacionReembolsoQ.data, mapPrepLineaAItemReembolso]
+  );
+
+  const abrirConfigLineaReembolso = useCallback(
+    (idLinea) => {
+      const base = construirLineaReembolsoParaModal(idLinea);
+      if (!base) return;
+      setReembolsoLineaBorrador(base);
+      setReembolsoLineaModalId(idLinea);
+    },
+    [construirLineaReembolsoParaModal]
+  );
+
+  const cerrarModalReembolso = useCallback(() => {
+    setReembolsoLineaModalId(null);
+    setReembolsoLineaBorrador(null);
+  }, []);
+
+  const actualizarLineaReembolso = useCallback(
+    (idLinea, cambios) => {
+      setReembolsoLineaBorrador((prev) => {
+        if (!prev || prev.id !== idLinea) return prev;
+        return aplicarCambiosLineaReembolso(prev, cambios);
+      });
+    },
+    [aplicarCambiosLineaReembolso]
+  );
+
+  const cambiarCantidadReembolso = useCallback((idLinea, cantidad) => {
+    const max = Math.max(0, Math.floor(Number(cantidad) || 0));
+    setReembolsoLineaBorrador((prev) => {
+      if (!prev || prev.id !== idLinea) return prev;
+      const limitado = Math.min(prev.maxCantidad ?? 9999, max);
+      return { ...prev, cantidad: limitado };
+    });
+  }, []);
+
+  const confirmarLineaReembolso = useCallback(() => {
+    if (!reembolsoLineaBorrador) return;
+    if (reembolsoLineaBorrador.cantidad <= 0 || !reembolsoMotivo.trim()) return;
+
+    const linea = aplicarCambiosLineaReembolso(reembolsoLineaBorrador, {});
+    setCarrito((prev) => {
+      const idx = prev.findIndex((p) => p.id === linea.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = linea;
+        return next;
+      }
+      return [...prev, linea];
+    });
+    cerrarModalReembolso();
+  }, [
+    reembolsoLineaBorrador,
+    reembolsoMotivo,
+    aplicarCambiosLineaReembolso,
+    setCarrito,
+    cerrarModalReembolso,
+  ]);
+
+  const fmtFechaBreve = useMemo(
+    () => (valor) => {
+      if (!valor) return "";
+      const d = new Date(valor);
+      if (Number.isNaN(d.getTime())) return String(valor);
+      return d.toLocaleString("es-GT", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+    []
+  );
 
   const irACobro = () => {
     const lineas = carrito.filter((p) => p.cantidad > 0);
+    const enReembolso = modoReembolso || lineas.some((l) => l.esReembolso);
     if (!lineas.length) {
       setToast({
         open: true,
-        message: "Agregue al menos un producto con cantidad mayor a cero.",
+        message: enReembolso
+          ? "Agregue al menos un producto con «Listo» en el modal de reembolso."
+          : "Agregue al menos un producto con cantidad mayor a cero.",
         type: "warning",
       });
       return;
     }
-    const totalLineas = lineas.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
-    if (totalLineas <= 0) {
+    const totalLineas = roundVenta(lineas.reduce((acc, p) => acc + subtotalLinea(p), 0));
+    if (enReembolso) {
+      const invalidaPenal = lineas.find((l) => {
+        const base = Math.abs(Number(l.precio) || 0) * (Number(l.cantidad) || 0);
+        const penal = Number(l.montoPenalizacion) || 0;
+        return penal >= base;
+      });
+      if (invalidaPenal) {
+        setToast({
+          open: true,
+          message: `La penalización en ${invalidaPenal.nombre} no puede dejar reembolso en Q0.`,
+          type: "warning",
+        });
+        return;
+      }
+      const sinMotivoPenal = lineas.find(
+        (l) => (Number(l.montoPenalizacion) || 0) > 0 && !String(l.motivoPenalizacion || "").trim()
+      );
+      if (sinMotivoPenal) {
+        setToast({
+          open: true,
+          message: `La línea ${sinMotivoPenal.nombre} requiere motivo de penalización.`,
+          type: "warning",
+        });
+        return;
+      }
+    }
+    if (!enReembolso && totalLineas <= 0) {
       setToast({
         open: true,
         message: "El total de la venta debe ser mayor que cero.",
@@ -214,105 +508,70 @@ const VentasPOS = () => {
       });
       return;
     }
-    deseleccionar();
-    setPendiente(lineas, totalLineas);
-    navigate("/pos/cobro");
-  };
-
-  const handleNuevoTicket = () => {
-    deseleccionar();
-    const creado = nuevoTicket();
-    if (!creado) {
+    if (enReembolso && totalLineas >= 0) {
       setToast({
         open: true,
-        message: `Máximo ${LIMITE_TICKETS_ESPERA} ventas en espera. Cobre o cierre una antes de abrir otra.`,
+        message: "El total del reembolso debe ser menor que cero.",
         type: "warning",
       });
+      return;
     }
-  };
-
-  const handleCambiarTicket = (id) => {
-    if (id === activeId) return;
+    if (enReembolso && !ventaReembolsoId) {
+      setToast({
+        open: true,
+        message: "Seleccione una venta para reembolso.",
+        type: "warning",
+      });
+      return;
+    }
+    if (enReembolso && !reembolsoMotivo.trim()) {
+      setToast({
+        open: true,
+        message: "El motivo de reembolso es obligatorio.",
+        type: "warning",
+      });
+      return;
+    }
+    const invalida = lineas.find(
+      (l) =>
+        l.esReembolso &&
+        l.regresaInventario &&
+        (!l.idUbicacion || !Number.isFinite(Number(l.idUbicacion)))
+    );
+    if (enReembolso && invalida) {
+      setToast({
+        open: true,
+        message: `En «${invalida.nombre}»: si devuelve a inventario, elija la ubicación en el carrito.`,
+        type: "warning",
+      });
+      return;
+    }
     deseleccionar();
-    setActivo(id);
+    clearPendiente();
+    if (enReembolso) {
+      setReembolsoSesion({
+        activo: true,
+        idVenta: ventaReembolsoId,
+        motivo: reembolsoMotivo.trim(),
+        observacion: reembolsoObservacion.trim(),
+      });
+    }
+    setPendiente(
+      lineas,
+      totalLineas,
+      enReembolso
+        ? {
+            tipo: "reembolso",
+            reembolso: {
+              idVenta: ventaReembolsoId,
+              motivo: reembolsoMotivo.trim(),
+              observacion: reembolsoObservacion.trim() || null,
+            },
+          }
+        : { tipo: "venta", reembolso: null }
+    );
+    navigate("/pos/cobro");
   };
-
-  const handleCerrarTicket = (id) => {
-    deseleccionar();
-    cerrarTicket(id);
-  };
-
-  const ticketsTabs = (
-    <div className="flex items-center gap-1 overflow-x-auto border-b border-(--color-pos-borde-suave) bg-(--color-pos-panel) px-2 py-1.5">
-      {tickets.map((t, idx) => {
-        const activo = t.id === activeId;
-        const numLineas = t.carrito.filter((p) => p.cantidad > 0).length;
-        return (
-          <div
-            key={t.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => handleCambiarTicket(t.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleCambiarTicket(t.id);
-              }
-            }}
-            className={cn(
-              "group flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors",
-              activo
-                ? "bg-(--color-pagina) text-(--color-blanco)"
-                : "bg-(--color-gris-claro-2) text-foreground hover:opacity-90"
-            )}
-          >
-            <span className="whitespace-nowrap">Venta {idx + 1}</span>
-            {numLineas > 0 && (
-              <span
-                className={cn(
-                  "rounded-full px-1.5 text-[10px] tabular-nums",
-                  activo
-                    ? "bg-(--color-blanco)/25 text-(--color-blanco)"
-                    : "bg-(--color-pagina)/15 text-(--color-pagina)"
-                )}
-              >
-                {numLineas}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCerrarTicket(t.id);
-              }}
-              aria-label={`Cerrar venta ${idx + 1}`}
-              className={cn(
-                "ml-0.5 rounded p-0.5 transition-colors",
-                activo
-                  ? "text-(--color-blanco) hover:bg-(--color-blanco)/20"
-                  : "text-(--color-pos-texto-muted) hover:bg-black/10"
-              )}
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        );
-      })}
-      <button
-        type="button"
-        onClick={handleNuevoTicket}
-        disabled={tickets.length >= LIMITE_TICKETS_ESPERA}
-        title={
-          tickets.length >= LIMITE_TICKETS_ESPERA
-            ? `Máximo ${LIMITE_TICKETS_ESPERA} ventas en espera`
-            : "Nueva venta en espera"
-        }
-        className="shrink-0 rounded-lg p-1.5 text-(--color-pagina) transition-colors hover:bg-(--color-pos-accent-suave) disabled:opacity-40"
-      >
-        <Plus className="size-4" />
-      </button>
-    </div>
-  );
 
   const categoriasFiltro = [
     { id: CATEGORIA_TODO, label: "Todo" },
@@ -342,7 +601,9 @@ const VentasPOS = () => {
         seleccionarLinea={seleccionarLinea}
         deseleccionar={deseleccionar}
         cantidadVisible={cantidadVisible}
-        tabsSlot={ticketsTabs}
+        modoReembolso={modoReembolso}
+        lineaReembolsoActivaId={reembolsoLineaModalId}
+        onAbrirLineaReembolso={abrirConfigLineaReembolso}
       >
           <button
             type="button"
@@ -361,24 +622,78 @@ const VentasPOS = () => {
             </button>
             <button
               type="button"
-              className="text-xs font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
-            >
-              % Porcentaje
-            </button>
-            <button
-              type="button"
+              onClick={toggleModoReembolso}
               className="flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Rembolso
-            </button>
-            <button
-              type="button"
-              className="text-xs font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
-            >
-              Monto fijo
+              {modoReembolso ? "Salir reembolso" : "Reembolso"}
             </button>
           </div>
+
+          {!modoReembolso && (
+          <div
+            data-barcode-listener="off"
+            className="rounded-lg border border-(--color-pos-borde-suave) bg-(--color-pos-accent-suave)/40 p-2.5 space-y-2"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-(--color-pagina)">Descuento por producto</span>
+              {lineaSeleccionada && (lineaSeleccionada.descuentoValor ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => aplicarDescuentoLinea("monto", 0)}
+                  className="text-[10px] font-semibold text-(--color-rojo-obscuro) hover:underline"
+                >
+                  Quitar
+                </button>
+              )}
+            </div>
+            {lineaSeleccionada ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1 text-[10px] font-semibold text-(--color-pos-texto-muted)">
+                    Porcentaje (%)
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={
+                        lineaSeleccionada.descuentoTipo === "porcentaje"
+                          ? lineaSeleccionada.descuentoValor ?? ""
+                          : ""
+                      }
+                      onChange={(e) => aplicarDescuentoLinea("porcentaje", e.target.value)}
+                      className="w-full rounded-md border border-(--color-pos-borde-suave) bg-(--color-pos-panel) px-2 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-(--color-pagina)"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[10px] font-semibold text-(--color-pos-texto-muted)">
+                    Monto fijo (Q)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={
+                        lineaSeleccionada.descuentoTipo === "monto"
+                          ? lineaSeleccionada.descuentoValor ?? ""
+                          : ""
+                      }
+                      onChange={(e) => aplicarDescuentoLinea("monto", e.target.value)}
+                      className="w-full rounded-md border border-(--color-pos-borde-suave) bg-(--color-pos-panel) px-2 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-(--color-pagina)"
+                    />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <p className="text-[11px] text-(--color-pos-texto-muted)">
+                Seleccione un producto para aplicar descuento.
+              </p>
+            )}
+          </div>
+          )}
 
           <button
             type="button"
@@ -387,7 +702,7 @@ const VentasPOS = () => {
             className="w-full mt-1 flex items-center justify-center gap-2 bg-(--color-pos-boton-primario) text-(--color-blanco) font-bold py-3 rounded-xl hover:bg-(--color-pos-boton-primario-hover) transition-colors disabled:opacity-50"
           >
             <Check className="w-5 h-5" />
-            Confirmar compra
+            {modoReembolso ? "Reembolsar" : "Confirmar compra"}
           </button>
       </CarritoPanel>
 
@@ -396,11 +711,19 @@ const VentasPOS = () => {
           <div className="flex flex-wrap items-center gap-3">
             <div data-barcode-listener="off" className="flex flex-1 min-w-48 max-w-md">
               <BuscadorPrincipal
-                placeholder="Buscar producto por nombre o código..."
-                value={busqueda}
+                placeholder={
+                  modoReembolso
+                    ? "Buscar venta por número de ticket..."
+                    : "Buscar producto por nombre o código..."
+                }
+                value={modoReembolso ? reembolsoFiltro : busqueda}
                 onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPagina(1);
+                  if (modoReembolso) {
+                    setReembolsoFiltro(e.target.value);
+                  } else {
+                    setBusqueda(e.target.value);
+                    setPagina(1);
+                  }
                 }}
                 className="max-w-none"
               />
@@ -413,78 +736,183 @@ const VentasPOS = () => {
               >
                 Gastos
               </button>
-              <button
-                type="button"
-                onClick={() => navigate("/pos/cierre")}
-                className="px-4 py-2 rounded-xl bg-(--color-pagina) text-(--color-blanco) text-sm font-semibold hover:opacity-90"
-              >
-                Cerrar turno
-              </button>
+              <CerrarTurnoMenu />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {categoriasFiltro.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  setCategoriaId(c.id);
-                  setPagina(1);
-                }}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
-                  categoriaId === c.id
-                    ? "bg-(--color-pagina) text-(--color-blanco)"
-                    : "bg-(--color-gris-claro-2) text-foreground hover:opacity-90"
-                )}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+          {!modoReembolso && (
+            <div className="flex flex-wrap gap-2">
+              {categoriasFiltro.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setCategoriaId(c.id);
+                    setPagina(1);
+                  }}
+                  className={cn(
+                    "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                    categoriaId === c.id
+                      ? "bg-(--color-pagina) text-(--color-blanco)"
+                      : "bg-(--color-gris-claro-2) text-foreground hover:opacity-90"
+                  )}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
-          {catalogoQ.isLoading && (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
-              {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-                <Skeleton key={i} className="h-[9.5rem] rounded-xl" />
-              ))}
-            </div>
-          )}
-
-          {catalogoQ.isError && (
-            <div className="text-center py-12 px-4 max-w-md mx-auto">
-              <p className="text-(--color-rojo-obscuro) text-sm font-medium">
-                {catalogoQ.error?.message ?? "No se pudo cargar el catálogo."}
-              </p>
-              {String(catalogoQ.error?.message ?? "").includes("permiso") && (
-                <p className="text-(--color-pos-texto-muted) text-xs mt-2 leading-relaxed">
-                  En Usuarios → Roles, asigne al rol del cajero permisos de <strong>CAJAS</strong>:
-                  Leer (catálogo y ticket), Actualizar (cobrar) y Crear (abrir caja). Los cambios
-                  aplican al siguiente request; no hace falta reiniciar el servidor.
-                </p>
+          {!modoReembolso && (
+            <>
+              {catalogoQ.isLoading && (
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
+                  {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                    <Skeleton key={i} className="h-38 rounded-xl" />
+                  ))}
+                </div>
               )}
-            </div>
+
+              {catalogoQ.isError && (
+                <div className="text-center py-12 px-4 max-w-md mx-auto">
+                  <p className="text-(--color-rojo-obscuro) text-sm font-medium">
+                    {catalogoQ.error?.message ?? "No se pudo cargar el catálogo."}
+                  </p>
+                </div>
+              )}
+
+              {!catalogoQ.isLoading && !catalogoQ.isError && (
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
+                  {productosPagina.map((p) => (
+                    <CatalogoProductoCard
+                      key={p.idVariante}
+                      producto={p}
+                      onAgregar={agregarProducto}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!catalogoQ.isLoading && !catalogoQ.isError && totalCount === 0 && (
+                <p className="text-center text-(--color-pos-texto-muted) py-12">Sin resultados.</p>
+              )}
+            </>
           )}
 
-          {!catalogoQ.isLoading && !catalogoQ.isError && (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
-              {productosPagina.map((p) => (
-                <CatalogoProductoCard
-                  key={p.idVariante}
-                  producto={p}
-                  onAgregar={agregarProducto}
-                />
-              ))}
+          {modoReembolso && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <section className="rounded-xl border border-(--color-pos-borde-suave) bg-(--color-pos-panel) min-h-[18rem]">
+                <header className="px-3 py-2 border-b border-(--color-pos-borde-suave) flex items-center gap-2">
+                  <Search className="size-4 text-(--color-pagina)" />
+                  <h3 className="text-sm font-bold">Transacciones para reembolso</h3>
+                </header>
+                <div className="max-h-[24rem] overflow-y-auto">
+                  {ventasReembolsoQ.isLoading && (
+                    <div className="p-3 space-y-2">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} className="h-16 rounded-lg" />
+                      ))}
+                    </div>
+                  )}
+                  {!ventasReembolsoQ.isLoading &&
+                    ventasReembolso.map((v) => (
+                      <button
+                        key={v.idVenta}
+                        type="button"
+                        onClick={() => seleccionarVentaReembolso(v.idVenta)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 border-b border-(--color-pos-borde-suave) hover:bg-(--color-pos-accent-suave)/40 transition-colors",
+                          ventaReembolsoId === v.idVenta && "bg-(--color-pos-accent-suave)"
+                        )}
+                      >
+                        <p className="text-sm font-semibold">Ticket #{v.numeroTicket}</p>
+                        <p className="text-xs text-(--color-pos-texto-muted)">
+                          {fmtFechaBreve(v.fechaHora)} · Vendido {roundVenta(v.totalVendido).toFixed(2)}
+                        </p>
+                        {!v.elegible && (
+                          <p className="text-[11px] text-(--color-rojo-obscuro) mt-0.5">
+                            {v.motivoNoElegible || "No elegible"}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  {!ventasReembolsoQ.isLoading && ventasReembolso.length === 0 && (
+                    <p className="text-center text-sm text-(--color-pos-texto-muted) py-10">
+                      No hay ventas disponibles para reembolso.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-(--color-pos-borde-suave) bg-(--color-pos-panel) min-h-[18rem]">
+                <header className="px-3 py-2 border-b border-(--color-pos-borde-suave)">
+                  <h3 className="text-sm font-bold">Detalle de la venta seleccionada</h3>
+                </header>
+                <div className="p-3">
+                  {!ventaReembolsoId && (
+                    <p className="text-sm text-(--color-pos-texto-muted)">
+                      Seleccione una transacción para cargar sus productos al carrito.
+                    </p>
+                  )}
+                  {preparacionReembolsoQ.isLoading && ventaReembolsoId && (
+                    <Skeleton className="h-24 rounded-lg" />
+                  )}
+                  {preparacionReembolsoQ.data?.data && (
+                    <div className="space-y-3">
+                      {!preparacionReembolsoQ.data.data.elegible && (
+                        <p className="text-xs font-semibold text-(--color-rojo-obscuro)">
+                          {preparacionReembolsoQ.data.data.motivoNoElegible ||
+                            "Venta no elegible para reembolso."}
+                        </p>
+                      )}
+                      {preparacionReembolsoQ.data.data.elegible && (
+                        <>
+                          <p className="text-xs text-(--color-pos-texto-muted)">
+                            Ticket #{preparacionReembolsoQ.data.data.numeroTicket} · Pulse un
+                            producto y confirme con «Listo» para agregarlo al carrito.
+                          </p>
+                          <ul className="space-y-1.5 max-h-[20rem] overflow-y-auto">
+                            {(preparacionReembolsoQ.data.data.lineas ?? []).map((l) => {
+                              const cartId = `reb-${l.idVentaDetalle}`;
+                              const enCarrito = carrito.find((c) => c.id === cartId);
+                              const qReemb = enCarrito?.cantidad ?? 0;
+                              return (
+                                <li key={l.idVentaDetalle}>
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirConfigLineaReembolso(cartId)}
+                                    className={cn(
+                                      "w-full text-left rounded-lg border px-2.5 py-2 transition-colors",
+                                      "border-(--color-pos-borde-suave) hover:bg-(--color-pos-accent-suave)/50",
+                                      reembolsoLineaModalId === cartId &&
+                                        "border-(--color-pagina) bg-(--color-pos-accent-suave)"
+                                    )}
+                                  >
+                                    <p className="text-sm font-semibold leading-snug">{l.nombre}</p>
+                                    <p className="text-[11px] text-(--color-pos-texto-muted) mt-0.5">
+                                      Vendió {l.cantidadVendida} · Disponible {l.cantidadDisponible}
+                                      {qReemb > 0 && (
+                                        <span className="font-semibold text-(--color-pagina)">
+                                          {" "}
+                                          · En reembolso: {qReemb}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
             </div>
           )}
-
-          {!catalogoQ.isLoading && !catalogoQ.isError && totalCount === 0 && (
-            <p className="text-center text-(--color-pos-texto-muted) py-12">Sin resultados.</p>
-          )}
-          
         </div>
       </section>
 
@@ -507,6 +935,25 @@ const VentasPOS = () => {
             type: "success",
           });
         }}
+      />
+
+      <ReembolsoLineaDetalleDialog
+        open={!!reembolsoLineaBorrador}
+        onOpenChange={(v) => {
+          if (!v) cerrarModalReembolso();
+        }}
+        item={reembolsoLineaBorrador}
+        onActualizar={actualizarLineaReembolso}
+        onCantidadChange={(n) => {
+          if (reembolsoLineaBorrador) {
+            cambiarCantidadReembolso(reembolsoLineaBorrador.id, n);
+          }
+        }}
+        motivo={reembolsoMotivo}
+        onMotivoChange={setReembolsoMotivo}
+        observacion={reembolsoObservacion}
+        onObservacionChange={setReembolsoObservacion}
+        onConfirm={confirmarLineaReembolso}
       />
 
       <Dialog open={!!scanModal} onOpenChange={(v) => !v && setScanModal(null)}>

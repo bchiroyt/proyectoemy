@@ -28,11 +28,11 @@ export function TicketVentaPreview({ ticket, className }) {
       )}
     >
       <header className="text-center border-b border-dashed border-(--color-gris-claro) pb-4 mb-4">
-        <div className="inline-block bg-(--color-negro) rounded-md px-4 py-2 mb-3">
+        <div className="ticket-logo-wrap inline-block bg-(--color-negro) rounded-md px-4 py-2 mb-3 print:bg-transparent print:p-0 print:mb-2">
           <img
             src={logo1Img}
             alt="Emy"
-            className="h-10 w-auto mx-auto object-contain"
+            className="ticket-logo-img h-10 w-auto mx-auto object-contain"
           />
         </div>
         <p className="font-bold text-sm">{ticket.nombreNegocio || "Moda y Variedades EMY"}</p>
@@ -46,7 +46,7 @@ export function TicketVentaPreview({ ticket, className }) {
         {ticket.detalles.map((item, idx) => (
           <li
             key={`${item.nombre}-${idx}`}
-            className="bg-(--color-pagina-3) rounded-lg px-3 py-2.5"
+            className="ticket-line-item bg-(--color-pagina-3) rounded-lg px-3 py-2.5"
           >
             <div className="flex justify-between gap-2 items-start">
               <span className="font-bold text-sm leading-snug">{item.nombre}</span>
@@ -57,6 +57,12 @@ export function TicketVentaPreview({ ticket, className }) {
             <p className="text-xs text-(--color-gris-letra) mt-1 tabular-nums">
               {item.cantidad} X {item.precio}
             </p>
+            {item.descuento > 0 && (
+              <p className="text-xs font-semibold text-(--color-pagina) mt-1 flex justify-between tabular-nums">
+                <span>Descuento</span>
+                <span>- {fmtQ(item.descuento)}</span>
+              </p>
+            )}
             {item.notaLinea && (
               <p className="text-xs font-semibold text-(--color-pagina) mt-1.5 flex items-center gap-1">
                 <Tag className="size-3 shrink-0" />
