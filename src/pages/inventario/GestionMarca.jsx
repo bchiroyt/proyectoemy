@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { Trash2, ArrowLeft, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useNavigationStore } from "@/context/useNavigationStore";
 
-import ModalNuevaMarca from "./components/ModalNuevaMarca";
+import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 import ModalConfirmacion from "./components/ModalConfirmacion";
 
 import {
   obtenerMarcas,
+  crearMarca,
+  actualizarMarca,
   eliminarMarca,
 } from "@/services/marcas";
 
 const GestionMarcas = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((s) => s.setTitulo);
 
   const [marcas, setMarcas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,15 +46,27 @@ const GestionMarcas = () => {
   }, []);
 
   useEffect(() => {
+    setTitulo("Marcas");
+  }, [setTitulo]);
+
+  useEffect(() => {
     fetchMarcas();
   }, [fetchMarcas]);
 
-  // GUARDAR
-  const handleGuardar = async () => {
-    await fetchMarcas();
+  const handleGuardar = async (form) => {
+    try {
+      if (marcaEditar) {
+        await actualizarMarca(marcaEditar.idMarca, form);
+      } else {
+        await crearMarca(form);
+      }
 
-    setMarcaEditar(null);
-    setOpenModal(false);
+      await fetchMarcas();
+      setMarcaEditar(null);
+      setOpenModal(false);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   // EDITAR
@@ -87,10 +103,6 @@ const GestionMarcas = () => {
 
   return (
     <div className="p-6 space-y-6">
-
-      <h1 className="text-2xl font-semibold text-(--color-pagina)">
-        Gestión de Marcas
-      </h1>
 
       <div className="flex justify-between items-center">
 
@@ -205,14 +217,16 @@ const GestionMarcas = () => {
 
       </div>
 
-      <ModalNuevaMarca
+      <ModalCatalogoInventario
         open={openModal}
         onClose={() => {
           setOpenModal(false);
           setMarcaEditar(null);
         }}
         onSave={handleGuardar}
-        marcaEditar={marcaEditar}
+        data={marcaEditar}
+        tituloNuevo="Nueva Marca"
+        tituloEditar="Editar Marca"
       />
 
       <ModalConfirmacion

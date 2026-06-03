@@ -3,7 +3,7 @@ import { Printer } from "lucide-react";
 import { useAuthStore } from "@/context/useAuthStore";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
 import { useVentaTicketQuery } from "@/hooks/queries/useVentaQueries";
-import { buildTicketDesdeCobro } from "@/lib/ventaMappers";
+import { buildTicketDesdeCobro, enriquecerTicketEncabezado } from "@/lib/ventaMappers";
 import { imprimirTicket } from "@/lib/printTicket";
 import { TicketVentaPreview } from "@/pages/pos/components/TicketVentaPreview";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,14 +25,18 @@ export function VentaTicketPanel({ onNuevaVenta, className }) {
   const ticketQ = useVentaTicketQuery(idVenta, { enabled: !!idVenta });
 
   const ticket = useMemo(() => {
-    if (ticketQ.data?.data) return ticketQ.data.data;
-    if (!ultimaVenta) return null;
-    return buildTicketDesdeCobro({
-      ventaCreada: ultimaVenta,
-      lineas: ultimaVenta.lineas,
-      pagos: ultimaVenta.pagos,
-      cajeroNombre: nombreMostrar,
-    });
+    let base = null;
+    if (ticketQ.data?.data) {
+      base = ticketQ.data.data;
+    } else if (ultimaVenta) {
+      base = buildTicketDesdeCobro({
+        ventaCreada: ultimaVenta,
+        lineas: ultimaVenta.lineas,
+        pagos: ultimaVenta.pagos,
+        cajeroNombre: nombreMostrar,
+      });
+    }
+    return enriquecerTicketEncabezado(base, { cajeroFallback: nombreMostrar });
   }, [ticketQ.data, ultimaVenta, nombreMostrar]);
 
   const handleImprimir = () => {

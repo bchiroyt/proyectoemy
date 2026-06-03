@@ -1,13 +1,9 @@
 import { useState } from "react";
 import { X, ArrowLeft, Plus, Trash2, Search, CheckCircle, AlertCircle } from "lucide-react";
 
-import ModalNuevaMarca from "./ModalNuevaMarca";
-import ModalCategoria from "./ModalCategoria"; 
-import ModalPresentacion from "./ModalPresentacion";
-import ModalTalla from "./ModalTalla";
-import ModalUbicacion from "./ModalUbicacion";
+import ModalCatalogoInventario from "./ModalCatalogoInventario";
 
-import { obtenerMarcas } from "@/services/marcas";
+import { obtenerMarcas, crearMarca } from "@/services/marcas";
 import { obtenerCategorias, crearCategoria } from "@/services/categorias";
 import { obtenerPresentaciones, crearPresentacion } from "@/services/presentaciones";
 import { obtenerTallas, crearTalla } from "@/services/tallas";
@@ -54,6 +50,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       
       color: "",
       precioVenta: "",
+      precioCompra: "",
       codigoBarras: "",
       
       ubicacion: "",
@@ -177,7 +174,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       return true;
     }
     const algunaVarianteModificada = variantes.some((v) => 
-      v.talla || v.presentacion || v.color.trim() || v.precioVenta || v.codigoBarras || v.ubicacion
+      v.talla || v.presentacion || v.color.trim() || v.precioVenta || v.precioCompra || v.codigoBarras || v.ubicacion
     );
     return algunaVarianteModificada || variantes.length > 1;
   };
@@ -198,7 +195,8 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     const tieneVariantesInvalidas = variantes.some((v) => {
       const tieneEspecificacion = !!v.talla || !!v.presentacion || !!v.color.trim();
       const precioInvalido = v.precioVenta !== "" && Number(v.precioVenta) < 0;
-      return !tieneEspecificacion || precioInvalido;
+      const costoInvalido = v.precioCompra !== "" && Number(v.precioCompra) < 0;
+      return !tieneEspecificacion || precioInvalido || costoInvalido;
     });
 
     return tieneVariantesInvalidas;
@@ -216,6 +214,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         openPresDropdown: false,
         color: "",
         precioVenta: "",
+        precioCompra: "",
         codigoBarras: "",
         ubicacion: "",
         busquedaUbic: "",
@@ -261,6 +260,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         openPresDropdown: false,
         color: "",
         precioVenta: "",
+        precioCompra: "",
         codigoBarras: "",
         ubicacion: "",
         busquedaUbic: "",
@@ -291,6 +291,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           presentacion: v.presentacion ? Number(v.presentacion) : null,
           color: v.color || null,
           precioVenta: v.precioVenta ? Number(v.precioVenta) : null,
+          precioCompra: v.precioCompra ? Number(v.precioCompra) : null,
           idUbicacionDefault: v.ubicacion ? Number(v.ubicacion) : null,
           codigosExternos: v.codigoBarras
             ? [
@@ -613,18 +614,33 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-600 block">Precio Venta</label>
+                          <label className="text-xs font-semibold text-gray-600 block">Precio venta</label>
                           <input
                             type="number"
                             value={v.precioVenta}
                             onChange={(e) => handleCambioVariante(index, "precioVenta", e.target.value)}
-                            placeholder="Precio Venta"
+                            placeholder="Precio venta"
                             className={`w-full border p-3 rounded-lg bg-white outline-none transition-colors ${
                               v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
                             }`}
                           />
                         </div>
 
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-600 block">Precio costo</label>
+                          <input
+                            type="number"
+                            value={v.precioCompra}
+                            onChange={(e) => handleCambioVariante(index, "precioCompra", e.target.value)}
+                            placeholder="Precio costo"
+                            className={`w-full border p-3 rounded-lg bg-white outline-none transition-colors ${
+                              v.precioCompra !== "" && Number(v.precioCompra) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Código de barras</label>
                           <input
@@ -804,74 +820,77 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       )}
 
       {/* Modales Secundarios de Creación en BD */}
-      <ModalNuevaMarca
+      <ModalCatalogoInventario
         open={openMarcaModal}
         onClose={() => setOpenMarcaModal(false)}
-        onSave={async () => {
+        onSave={async (form) => {
           try {
+            await crearMarca(form);
+
             const marcasData = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
             const listaActualizada = marcasData?.items || [];
             setMarcas(listaActualizada);
 
             const marcaReciente = listaActualizada.find(
-              (m) => m?.nombre?.toLowerCase() === busquedaMarca.trim().toLowerCase()
+              (m) => m?.nombre?.toLowerCase() === form.nombre.trim().toLowerCase()
             );
 
             if (marcaReciente) {
               setMarcaSeleccionada(marcaReciente.idMarca);
             }
           } catch (error) {
-            console.error("Error al refrescar marcas:", error);
+            console.error("Error al guardar marca:", error);
+          } finally {
+            setBusquedaMarca("");
+            setOpenMarcaModal(false);
           }
-          setBusquedaMarca(""); 
-          setOpenMarcaModal(false);
         }}
+        tituloNuevo="Nueva Marca"
       />
 
-      <ModalCategoria
+      <ModalCatalogoInventario
         open={openCategoriaModal}
         onClose={() => setOpenCategoriaModal(false)}
-        onSave={async (formLocal) => {
+        onSave={async (form) => {
           try {
             const payload = {
-              nombre: formLocal.nombre,
-              descripcion: formLocal.descripcion,
-              estado: formLocal.estado,
+              nombre: form.nombre,
+              descripcion: form.descripcion,
+              estado: form.activo,
             };
-            
+
             const respuestaApi = await crearCategoria(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
-            
             const idFinal = dataReal?.idCategoria || dataReal?.id || Date.now();
 
             const categoriaFormateada = {
               idCategoria: idFinal,
-              nombre: formLocal.nombre,
-              descripcion: formLocal.descripcion,
-              estado: formLocal.estado
+              nombre: form.nombre,
+              descripcion: form.descripcion,
+              estado: form.activo,
             };
 
             setCategorias((prev) => [...prev, categoriaFormateada]);
             setCategoriaSeleccionada(idFinal);
-            setBusquedaCat(""); 
-            
+            setBusquedaCat("");
           } catch (error) {
             console.error("Error al guardar categoría:", error);
           } finally {
             setOpenCategoriaModal(false);
           }
         }}
+        tituloNuevo="Nueva Categoría"
       />
 
-      <ModalPresentacion
+      <ModalCatalogoInventario
         open={openPresentacionModal}
         onClose={() => setOpenPresentacionModal(false)}
-        onSave={async (formLocal) => {
+        onSave={async (form) => {
           try {
             const payload = {
-              nombre: formLocal.nombre,
-              descripcion: formLocal.descripcion,
-              activo: formLocal.estado === "Activo"
+              nombre: form.nombre,
+              descripcion: form.descripcion,
+              estado: form.activo,
             };
             const respuestaApi = await crearPresentacion(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
@@ -898,17 +917,18 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             setOpenPresentacionModal(false);
           }
         }}
+        tituloNuevo="Nueva Presentación"
       />
 
-      <ModalTalla
+      <ModalCatalogoInventario
         open={openTallaModal}
         onClose={() => setOpenTallaModal(false)}
-        onSave={async (formLocal) => {
+        onSave={async (form) => {
           try {
             const payload = {
-              nombre: formLocal.nombre,
-              descripcion: formLocal.descripcion,
-              activo: formLocal.activo
+              nombre: form.nombre,
+              descripcion: form.descripcion,
+              activo: form.activo,
             };
             const respuestaApi = await crearTalla(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
@@ -935,17 +955,19 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             setOpenTallaModal(false);
           }
         }}
+        tituloNuevo="Nueva Talla"
+        nombrePlaceholder="Nombre (Ej: M, L, XL)"
       />
 
-      <ModalUbicacion
+      <ModalCatalogoInventario
         open={openUbicacionModal}
         onClose={() => setOpenUbicacionModal(false)}
-        onSave={async (formLocal) => {
+        onSave={async (form) => {
           try {
             const payload = {
-              nombre: formLocal.nombre,
-              descripcion: formLocal.descripcion,
-              activo: formLocal.activo
+              nombre: form.nombre,
+              descripcion: form.descripcion,
+              activo: form.activo,
             };
             const respuestaApi = await crearUbicacion(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
@@ -972,6 +994,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             setOpenUbicacionModal(false);
           }
         }}
+        tituloNuevo="Nueva Ubicación"
       />
     </div>
   );

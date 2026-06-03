@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -63,7 +62,7 @@ const estadoClass = (estado) => {
   return "bg-slate-100 text-slate-600 border-slate-200";
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 const Compras = () => {
   const navigate = useNavigate();
@@ -110,8 +109,8 @@ const Compras = () => {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 md:gap-4">
-      <div className="sticky top-0 z-10 flex w-full flex-wrap items-center gap-1 border-b border-border bg-(--color-blanco) p-2 shadow-sm">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="sticky top-0 z-10 flex w-full shrink-0 flex-wrap items-center gap-1 border-b border-border bg-(--color-blanco) p-2 shadow-sm">
         <div className="flex flex-1 justify-start gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -183,9 +182,8 @@ const Compras = () => {
           />
           </div>
         </div>
-      
 
-        <div className="flex-1 overflow-y-auto p-2 md:p-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-4">
       {listQ.isLoading ? (
         <div className="space-y-2 rounded-xl border border-(--color-gris-claro-2) bg-(--color-blanco) p-4">
           <Skeleton className="h-10 w-full" />
@@ -197,11 +195,11 @@ const Compras = () => {
           {getApiErrorMessage(listQ.error, "No se pudieron cargar las compras.")}
         </div>
       ) : (
-        <div className="flex-1 min-h-0 rounded-xl border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-sm overflow-hidden flex flex-col">
-          <ScrollArea className="flex-1 min-h-0 h-[320px] sm:h-[420px] md:h-full md:max-h-[calc(100vh-220px)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-sm">
+          <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-(--color-gris-calro) hover:bg-(--color-gris-claro-2)">
+                <TableRow className="sticky top-0 z-10 bg-(--color-gris-calro) hover:bg-(--color-gris-claro-2) shadow-[0_1px_0_0_var(--color-gris-claro-2)]">
                   <TableHead className="w-12 text-[10px] uppercase font-bold text-(--color-gris-letra)">
                     No.
                   </TableHead>
@@ -214,8 +212,11 @@ const Compras = () => {
                   <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra) min-w-[140px]">
                     Proveedor
                   </TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
-                    Comprobante
+                  <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra) min-w-[100px]">
+                    No. ref.
+                  </TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra) min-w-[110px]">
+                    Tipo comprob.
                   </TableHead>
                   <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra) text-right">
                     Total
@@ -255,7 +256,28 @@ const Compras = () => {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{row.comprobante}</TableCell>
+                      <TableCell className="font-mono text-sm text-(--color-negro)">
+                        {row.numeroReferencia ? (
+                          <span className="truncate block max-w-[140px]" title={row.numeroReferencia}>
+                            {row.numeroReferencia}
+                          </span>
+                        ) : (
+                          <span className="text-(--color-gris-letra)">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.tipoComprobante ? (
+                          <Badge
+                            variant="outline"
+                            className="w-fit max-w-full truncate border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700"
+                            title={row.tipoComprobante}
+                          >
+                            {row.tipoComprobante}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-(--color-gris-letra)">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums font-semibold text-(--color-negro)">
                         {fmtQ(row.total)}
                       </TableCell>
@@ -324,7 +346,7 @@ const Compras = () => {
                 })}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         </div>
       )}
 

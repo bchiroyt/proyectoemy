@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useNavigationStore } from "@/context/useNavigationStore";
 
-import ModalUbicacion from "./components/ModalUbicacion";
+import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 
 import {
   obtenerUbicaciones,
@@ -13,6 +14,7 @@ import {
 
 const GestionUbicaciones = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((s) => s.setTitulo);
 
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,6 +42,10 @@ const GestionUbicaciones = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    setTitulo("Ubicaciones");
+  }, [setTitulo]);
 
   useEffect(() => {
     fetchUbicaciones();
@@ -97,10 +103,6 @@ const GestionUbicaciones = () => {
 
   return (
     <div className="p-6 space-y-6">
-
-      <h1 className="text-2xl font-semibold text-(--color-pagina)">
-        Gestión de Ubicaciones
-      </h1>
 
       <div className="flex justify-between items-center">
 
@@ -215,7 +217,7 @@ const GestionUbicaciones = () => {
 
       </div>
 
-      <ModalUbicacion
+      <ModalCatalogoInventario
         open={openModal}
         onClose={() => {
           setOpenModal(false);
@@ -223,6 +225,8 @@ const GestionUbicaciones = () => {
         }}
         onSave={handleGuardar}
         data={editando}
+        tituloNuevo="Nueva Ubicación"
+        tituloEditar="Editar Ubicación"
       />
 
       {deleteModal && (

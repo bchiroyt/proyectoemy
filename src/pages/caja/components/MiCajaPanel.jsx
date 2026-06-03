@@ -6,9 +6,9 @@ import {
   useCajaResumenCierreQuery,
 } from "@/hooks/queries/useCajaQueries";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Lock, Banknote, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
-import { fmtQ } from "@/lib/cajaMappers";
+import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";import { fmtQ } from "@/lib/cajaMappers";
 import { ArqueoParcialDialog } from "@/pages/caja/components/ArqueoParcialDialog";
+import { SinCajaActivaCard } from "@/pages/caja/components/SinCajaActivaCard";
 import { Badge } from "@/components/ui/badge";
 
 export function MiCajaPanel() {
@@ -29,22 +29,7 @@ export function MiCajaPanel() {
   }
 
   if (!caja) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center p-8">
-        <Banknote className="size-16 text-(--color-gris-claro-2) mb-4" />
-        <h3 className="text-xl font-bold text-(--color-negro)">No tienes una caja activa</h3>
-        <p className="text-sm text-(--color-gris-letra) mb-6 text-center max-w-sm">
-          Abra su turno con un arqueo inicial para operar en el POS.
-        </p>
-        <Button
-          onClick={() => navigate("/pos/apertura")}
-          className="bg-(--color-pagina) text-(--color-blanco) hover:bg-(--color-borde-button) px-8 py-6 rounded-xl font-bold text-lg"
-        >
-          <Lock className="mr-2 size-5" />
-          Abrir caja
-        </Button>
-      </div>
-    );
+    return <SinCajaActivaCard variant="panel" />;
   }
 
   return (

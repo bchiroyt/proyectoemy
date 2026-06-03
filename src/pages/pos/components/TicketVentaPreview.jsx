@@ -1,7 +1,7 @@
 import { Tag } from "lucide-react";
 import { fmtQ } from "@/lib/cajaMappers";
 import { cn } from "@/lib/utils";
-import logo1Img from "@/assets/logo1.jpeg";
+import { TicketEncabezadoImagen } from "@/pages/pos/components/TicketEncabezadoImagen";
 
 function fmtFechaTicket(valor) {
   if (!valor) return "";
@@ -17,8 +17,6 @@ function fmtFechaTicket(valor) {
 export function TicketVentaPreview({ ticket, className }) {
   if (!ticket) return null;
 
-  const direccion = "Calle principal Sololá";
-
   return (
     <article
       className={cn(
@@ -27,18 +25,16 @@ export function TicketVentaPreview({ ticket, className }) {
         className
       )}
     >
-      <header className="text-center border-b border-dashed border-(--color-gris-claro) pb-4 mb-4">
-        <div className="ticket-logo-wrap inline-block bg-(--color-negro) rounded-md px-4 py-2 mb-3 print:bg-transparent print:p-0 print:mb-2">
-          <img
-            src={logo1Img}
-            alt="Emy"
-            className="ticket-logo-img h-10 w-auto mx-auto object-contain"
-          />
-        </div>
-        <p className="font-bold text-sm">{ticket.nombreNegocio || "Moda y Variedades EMY"}</p>
-        <p className="text-xs text-(--color-gris-letra) mt-0.5">{direccion}</p>
-        <p className="text-xs font-medium mt-3">
-          Servido por <span className="font-bold">{ticket.cajero || "Cajero"}</span>
+      <header className="ticket-header border-b border-dashed border-(--color-gris-claro) pb-4 mb-4 text-center">
+        <TicketEncabezadoImagen className="mb-3" />
+        <p className="ticket-header-text font-bold text-sm text-(--color-negro)">
+          {ticket.nombreNegocio}
+        </p>
+        <p className="ticket-header-text text-xs text-(--color-negro) mt-0.5">
+          {ticket.direccion}
+        </p>
+        <p className="ticket-header-text text-xs font-medium text-(--color-negro) mt-3">
+          Servido por <span className="font-bold">{ticket.cajero}</span>
         </p>
       </header>
 

@@ -1,6 +1,6 @@
 import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
 import { throwIfEnvelopeFailed } from "@/lib/apiNormalizer";
-import { mapVentaCreada, mapVentaTicket, unwrapVentaPaged } from "@/lib/ventaMappers";
+import { mapVentaCreada, mapVentaTicket, unwrapVentaPaged, unwrapVentasResumenPaged } from "@/lib/ventaMappers";
 
 /**
  * Catálogo de variantes para POS.
@@ -43,6 +43,42 @@ export async function crearVenta(body) {
         getApiErrorMessage(
           err,
           "Sin permiso para cobrar (asigne CAJAS · Actualizar al rol del cajero)."
+        )
+      );
+    }
+    throw err;
+  }
+}
+
+/** GET /api/Ventas — listado paginado (requiere VENTAS · Leer). */
+export async function fetchVentas({
+  page = 1,
+  pageSize = 10,
+  idCaja,
+  idUsuario,
+  idCliente,
+  numeroTicket,
+  fechaDesde,
+  fechaHasta,
+} = {}) {
+  const params = { page, pageSize };
+  if (idCaja != null) params.idCaja = idCaja;
+  if (idUsuario != null) params.idUsuario = idUsuario;
+  if (idCliente != null) params.idCliente = idCliente;
+  if (numeroTicket?.trim()) params.numeroTicket = numeroTicket.trim();
+  if (fechaDesde) params.fechaDesde = fechaDesde;
+  if (fechaHasta) params.fechaHasta = fechaHasta;
+
+  try {
+    const { data } = await apiClient.get("/api/Ventas", { params });
+    throwIfEnvelopeFailed(data, "No se pudo cargar el historial de ventas.");
+    return unwrapVentasResumenPaged(data);
+  } catch (err) {
+    if (err.response?.status === 403) {
+      throw new Error(
+        getApiErrorMessage(
+          err,
+          "Sin permiso para ver ventas (asigne VENTAS · Leer al rol del cajero)."
         )
       );
     }

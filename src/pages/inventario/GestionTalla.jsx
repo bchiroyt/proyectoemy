@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import ModalTalla from "./components/ModalTalla";
+import { useNavigationStore } from "@/context/useNavigationStore";
+import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 
 import {
   obtenerTallas,
@@ -12,6 +13,7 @@ import {
 
 const GestionTallas = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((s) => s.setTitulo);
 
   const [tallas, setTallas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -38,6 +40,10 @@ const GestionTallas = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    setTitulo("Tallas");
+  }, [setTitulo]);
 
   useEffect(() => {
     fetchTallas();
@@ -87,9 +93,6 @@ const GestionTallas = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold text-(--color-pagina)">
-        Gestión de Tallas
-      </h1>
 
       <div className="flex justify-between items-center">
         <button
@@ -194,7 +197,7 @@ const GestionTallas = () => {
         </table>
       </div>
 
-      <ModalTalla
+      <ModalCatalogoInventario
         open={openModal}
         onClose={() => {
           setOpenModal(false);
@@ -202,6 +205,9 @@ const GestionTallas = () => {
         }}
         onSave={handleGuardar}
         data={editando}
+        tituloNuevo="Nueva Talla"
+        tituloEditar="Editar Talla"
+        nombrePlaceholder="Nombre (Ej: M, L, XL)"
       />
 
       {deleteModal && (

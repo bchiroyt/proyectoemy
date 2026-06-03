@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { Minus, Plus, Search, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { Search, Trash2 } from "lucide-react";
 import { useVariantesBuscarQuery } from "@/hooks/queries/useComprasQueries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  elegirVarianteParaAgregar,
+  valorInputCantidad,
+  valorInputCosto,
+} from "@/lib/compraVarianteUtils";
+import { buscarVariantesCompra } from "@/services/productosService";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,6 +29,14 @@ const fmtQ = (n) =>
     currency: "GTQ",
     minimumFractionDigits: 2,
   }).format(n);
+
+const thClass =
+  "h-7 py-0 px-2 text-[10px] leading-tight uppercase font-bold text-(--color-gris-letra)";
+const tdClass = "py-1 px-2 align-middle";
+
+/** Sin flechas de incremento del navegador en type=number */
+const inputNumClass =
+  "h-7 tabular-nums text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]";
 
 function VarianteOpcion({ v, onElegir }) {
   const idVariante = v.idVariante ?? v.IdVariante;
@@ -49,28 +65,28 @@ function VarianteOpcion({ v, onElegir }) {
         if (!deshabilitado) onElegir(v);
       }}
       className={cn(
-        "w-full text-left px-3 py-2.5 text-sm border-b border-(--color-gris-claro-2) last:border-0",
+        "w-full min-w-0 text-left px-3 py-2 text-sm border-b border-(--color-gris-claro-2) last:border-0",
         deshabilitado ? "cursor-not-allowed opacity-50" : "hover:bg-(--color-pagina-hover)"
       )}
     >
-      <div className="flex justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-medium text-(--color-negro) truncate">{nombre}</p>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p className="truncate font-medium text-(--color-negro)">{nombre}</p>
           {detalle ? (
-            <p className="text-xs text-(--color-gris-letra) truncate">{detalle}</p>
+            <p className="truncate text-xs text-(--color-gris-letra)">{detalle}</p>
           ) : null}
           {sinId ? (
             <span className="text-[10px] font-bold uppercase text-(--color-rojo)">Sin id variante</span>
           ) : null}
         </div>
-        <span className="shrink-0 font-mono text-xs text-(--color-gris-letra)">{sku}</span>
+        <span className="shrink-0 font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
       </div>
     </button>
   );
 }
 
 /**
- * Líneas de compra estilo Odoo: tabla de productos + una fila final solo para buscar y agregar.
+ * Líneas de compra estilo Odoo: tabla con scroll + buscador fijo abajo (resultados en portal).
  */
 export function CompraLineasProductos({
   lineas,
@@ -78,16 +94,22 @@ export function CompraLineasProductos({
   disabled = false,
   onAgregar,
   onQuitar,
-  onSetCant,
-  onSetRecibida,
-  onSetCostoReal,
-  onUpdateLinea,
+  onSetCantidadPresupuesto,
+  onSetCantidadDirecta,
+  onSetCostoPresupuesto,
+  onSetCostoUnitarioDirecta,
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [debounced, setDebounced] = useState("");
   const [listaAbierta, setListaAbierta] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
   const inputRef = useRef(null);
-  const contenedorRef = useRef(null);
+  const buscadorRef = useRef(null);
+  const menuRef = useRef(null);
+  const lineasEndRef = useRef(null);
+  const cantidadLineasPrev = useRef(lineas.length);
+  const procesandoEnterRef = useRef(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(busqueda.trim()), 300);
@@ -102,77 +124,227 @@ export function CompraLineasProductos({
   const buscando = variantesQ.isFetching && debounced.length >= 1;
 
   useEffect(() => {
-    setListaAbierta(debounced.length >= 1);
+    if (debounced.length >= 1) setListaAbierta(true);
   }, [debounced]);
 
   useEffect(() => {
+    if (lineas.length > cantidadLineasPrev.current) {
+      window.requestAnimationFrame(() => {
+        lineasEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+      });
+    }
+    cantidadLineasPrev.current = lineas.length;
+  }, [lineas.length]);
+
+  const actualizarPosicionMenu = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const espacioAbajo = window.innerHeight - rect.bottom;
+    const espacioArriba = rect.top;
+    const maxH = 280;
+    const abrirArriba = espacioAbajo < 200 && espacioArriba > espacioAbajo;
+
+    if (abrirArriba) {
+      const altura = Math.min(maxH, espacioArriba - 12);
+      setMenuStyle({
+        position: "fixed",
+        left: rect.left,
+        width: rect.width,
+        bottom: window.innerHeight - rect.top + 4,
+        maxHeight: altura,
+        zIndex: 9999,
+      });
+    } else {
+      const altura = Math.min(maxH, espacioAbajo - 12);
+      setMenuStyle({
+        position: "fixed",
+        left: rect.left,
+        width: rect.width,
+        top: rect.bottom + 4,
+        maxHeight: altura,
+        zIndex: 9999,
+      });
+    }
+  }, []);
+
+  const mostrarLista = listaAbierta && debounced.length >= 1;
+
+  useLayoutEffect(() => {
+    if (!mostrarLista) {
+      setMenuStyle(null);
+      return;
+    }
+    actualizarPosicionMenu();
+    window.addEventListener("resize", actualizarPosicionMenu);
+    window.addEventListener("scroll", actualizarPosicionMenu, true);
+    return () => {
+      window.removeEventListener("resize", actualizarPosicionMenu);
+      window.removeEventListener("scroll", actualizarPosicionMenu, true);
+    };
+  }, [mostrarLista, actualizarPosicionMenu, resultados.length, buscando]);
+
+  useEffect(() => {
     const cerrarSiClickFuera = (e) => {
-      if (!contenedorRef.current?.contains(e.target)) {
-        setListaAbierta(false);
+      const target = e.target;
+      if (
+        buscadorRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
       }
+      setListaAbierta(false);
     };
     document.addEventListener("mousedown", cerrarSiClickFuera);
     return () => document.removeEventListener("mousedown", cerrarSiClickFuera);
   }, []);
 
-  const elegirVariante = (v) => {
-    onAgregar(v);
-    setBusqueda("");
-    setDebounced("");
-    setListaAbierta(false);
-    window.requestAnimationFrame(() => inputRef.current?.focus());
-  };
+  const elegirVariante = useCallback(
+    (v) => {
+      onAgregar(v);
+      setBusqueda("");
+      setDebounced("");
+      setListaAbierta(false);
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    },
+    [onAgregar]
+  );
 
-  const mostrarLista =
-    listaAbierta && debounced.length >= 1 && (buscando || resultados.length > 0);
+  const buscarVariantesInmediato = useCallback(
+    async (criterio) => {
+      const q = criterio.trim();
+      if (!q) return [];
+
+      const cacheKey = ["productos", "variantes-buscar", q];
+      const enCache = queryClient.getQueryData(cacheKey);
+      if (Array.isArray(enCache) && enCache.length > 0) {
+        return enCache;
+      }
+
+      const raw = await buscarVariantesCompra(q);
+      if (raw && raw.exito === false) {
+        throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
+      }
+      const items = raw?.data ?? raw?.Data ?? [];
+      queryClient.setQueryData(cacheKey, items);
+      return items;
+    },
+    [queryClient]
+  );
+
+  const confirmarBusquedaEnter = useCallback(async () => {
+    if (disabled || procesandoEnterRef.current) return;
+
+    const criterio = busqueda.trim();
+    if (!criterio) return;
+
+    procesandoEnterRef.current = true;
+    setDebounced(criterio);
+    setListaAbierta(true);
+
+    try {
+      let items = resultados;
+      const cacheActual = debounced === criterio && !variantesQ.isFetching;
+      if (!cacheActual || !items.length) {
+        items = await buscarVariantesInmediato(criterio);
+      }
+
+      const elegida = elegirVarianteParaAgregar(items, criterio);
+      if (elegida) {
+        elegirVariante(elegida);
+      }
+    } catch {
+      /* La query en pantalla mostrará el error si aplica */
+    } finally {
+      procesandoEnterRef.current = false;
+    }
+  }, [
+    disabled,
+    busqueda,
+    debounced,
+    resultados,
+    variantesQ.isFetching,
+    buscarVariantesInmediato,
+    elegirVariante,
+  ]);
+
+  const colSpan = isDirecta ? 6 : 6;
+
+  const menuPortal =
+    mostrarLista && menuStyle
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role="listbox"
+            style={menuStyle}
+            className="overflow-x-hidden overflow-y-auto rounded-lg border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-xl"
+          >
+            {buscando && resultados.length === 0 ? (
+              <p className="px-3 py-2.5 text-xs text-(--color-gris-letra)">Buscando…</p>
+            ) : null}
+            {!buscando && resultados.length === 0 ? (
+              <p className="px-3 py-2.5 text-xs text-(--color-gris-letra)">
+                Sin resultados para «{debounced}»
+              </p>
+            ) : null}
+            {resultados.map((v, idx) => (
+              <VarianteOpcion
+                key={v.idVariante ?? v.IdVariante ?? v.sku ?? idx}
+                v={v}
+                onElegir={elegirVariante}
+              />
+            ))}
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
-    <Card className="border-(--color-gris-claro-2) shadow-sm overflow-hidden">
-      <CardHeader className="py-3 px-4 border-b border-(--color-gris-claro-2)">
-        <CardTitle className="text-sm font-bold">Líneas de producto</CardTitle>
-        <p className="text-xs text-(--color-gris-letra) mt-0.5">
-          Escriba en la última fila para buscar y agregar. Cada producto aparece como una línea nueva.
+    <Card className="flex min-h-0 flex-1 flex-col gap-0 border-(--color-gris-claro-2) py-0 shadow-sm">
+      <CardHeader className="shrink-0 space-y-0 border-b border-(--color-gris-claro-2) py-1.5 px-3">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-xs font-bold leading-none">Líneas de producto</CardTitle>
+          {lineas.length > 0 ? (
+            <span className="shrink-0 rounded-full bg-(--color-pagina)/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-(--color-pagina)">
+              {lineas.length} {lineas.length === 1 ? "línea" : "líneas"}
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-0.5 text-[10px] text-(--color-gris-letra)">
+          Busque abajo y elija un producto. La tabla hace scroll si hay muchas líneas.
         </p>
       </CardHeader>
 
-      <ScrollArea className="h-[min(420px,55vh)]">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-(--color-gris-claro-2) hover:bg-(--color-gris-claro-2)">
-              <TableHead className="text-[10px] uppercase font-bold text-(--color-gris-letra) min-w-[200px]">
-                Producto
-              </TableHead>
-              <TableHead className="text-[10px] uppercase font-bold w-24">SKU</TableHead>
-              <TableHead className="text-[10px] uppercase font-bold text-right w-24">
-                {isDirecta ? "Costo est." : "Costo"}
-              </TableHead>
-              <TableHead className="text-[10px] uppercase font-bold text-center w-32">
-                Solicitada
-              </TableHead>
+      <div className="relative min-h-0 flex-1">
+        <ScrollArea className="h-full min-h-[10rem]">
+          <Table className={isDirecta ? "min-w-[520px]" : "min-w-[640px]"}>
+          <TableHeader className="sticky top-0 z-[1] bg-(--color-gris-claro-2)">
+            <TableRow className="hover:bg-(--color-gris-claro-2)">
+              <TableHead className={cn(thClass, "min-w-[160px]")}>Producto</TableHead>
+              <TableHead className={cn(thClass, "w-20")}>SKU</TableHead>
               {isDirecta ? (
                 <>
-                  <TableHead className="text-[10px] uppercase font-bold text-right w-24">
-                    Recibida
-                  </TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold text-right w-24">
-                    Costo real
-                  </TableHead>
+                  <TableHead className={cn(thClass, "text-center w-28")}>Cantidad</TableHead>
+                  <TableHead className={cn(thClass, "text-right w-24")}>Costo unit.</TableHead>
                 </>
-              ) : null}
-              <TableHead className="text-[10px] uppercase font-bold text-right w-28">
-                Subtotal
-              </TableHead>
-              <TableHead className="w-12" />
+              ) : (
+                <>
+                  <TableHead className={cn(thClass, "text-right w-20")}>Costo</TableHead>
+                  <TableHead className={cn(thClass, "text-center w-28")}>Cantidad</TableHead>
+                </>
+              )}
+              <TableHead className={cn(thClass, "text-right w-24")}>Subtotal</TableHead>
+              <TableHead className={cn(thClass, "w-9")} />
             </TableRow>
           </TableHeader>
           <TableBody>
             {lineas.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={isDirecta ? 8 : 6}
-                  className="py-6 text-center text-sm text-(--color-gris-letra)"
+                  colSpan={colSpan}
+                  className="py-8 text-center text-xs text-(--color-gris-letra)"
                 >
-                  Sin productos. Use la fila de abajo para agregar el primero.
+                  Sin productos. Use el buscador de abajo para agregar el primero.
                 </TableCell>
               </TableRow>
             ) : null}
@@ -180,7 +352,6 @@ export function CompraLineasProductos({
             {lineas.map((row, idx) => {
               const cantUI = isDirecta ? row.cantidadRecibida : row.cantidadSolicitada;
               const costoUI = isDirecta ? row.costoReal : row.costoEstimado;
-              const mayor = isDirecta && row.cantidadRecibida > row.cantidadSolicitada;
               const rowKey =
                 row.idDetalleCompra ??
                 row.idVariante ??
@@ -188,173 +359,129 @@ export function CompraLineasProductos({
 
               return (
                 <TableRow key={rowKey}>
-                  <TableCell>
+                  <TableCell className={tdClass}>
                     <div>
-                      <p className="font-medium text-(--color-negro) text-sm">{row.nombre}</p>
+                      <p className="text-xs font-medium leading-tight text-(--color-negro)">{row.nombre}</p>
                       {row.detalle ? (
-                        <p className="text-xs text-(--color-gris-letra)">{row.detalle}</p>
+                        <p className="text-[10px] text-(--color-gris-letra)">{row.detalle}</p>
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{row.sku}</TableCell>
-                  <TableCell className="text-right">
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      disabled={disabled}
-                      className="h-8 text-right tabular-nums text-sm"
-                      value={row.costoEstimado}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        onUpdateLinea(row.idVariante, {
-                          costoEstimado: Number.isFinite(val) ? val : 0,
-                        });
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="size-8"
-                        disabled={disabled}
-                        onClick={() => onSetCant(row.idVariante, -1)}
-                      >
-                        <Minus className="size-3.5" />
-                      </Button>
-                      <span className="w-8 text-center text-sm font-semibold tabular-nums">
-                        {row.cantidadSolicitada}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="size-8"
-                        disabled={disabled}
-                        onClick={() => onSetCant(row.idVariante, 1)}
-                      >
-                        <Plus className="size-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableCell className={cn(tdClass, "font-mono text-[10px]")}>{row.sku}</TableCell>
                   {isDirecta ? (
                     <>
-                      <TableCell>
+                      <TableCell className={tdClass}>
                         <Input
-                          type="number"
-                          min={0}
-                          step="1"
+                          type="text"
+                          inputMode="numeric"
                           disabled={disabled}
-                          className={cn(
-                            "h-8 text-right tabular-nums text-sm",
-                            mayor ? "border-amber-400 bg-amber-50" : ""
-                          )}
-                          value={row.cantidadRecibida}
-                          onChange={(e) => onSetRecibida(row.idVariante, e.target.value)}
+                          placeholder="0"
+                          className={cn(inputNumClass, "w-20 text-center")}
+                          value={valorInputCantidad(row.cantidadRecibida, row.cantidadText)}
+                          onChange={(e) => onSetCantidadDirecta(row.idVariante, e.target.value)}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={cn(tdClass, "text-right")}>
                         <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           disabled={disabled}
-                          className="h-8 text-right tabular-nums text-sm"
-                          value={row.costoReal}
-                          onChange={(e) => onSetCostoReal(row.idVariante, e.target.value)}
+                          placeholder="0.00"
+                          className={cn(inputNumClass, "w-24 text-right")}
+                          value={valorInputCosto(row.costoReal, row.costoText)}
+                          onChange={(e) => onSetCostoUnitarioDirecta(row.idVariante, e.target.value)}
                         />
                       </TableCell>
                     </>
-                  ) : null}
-                  <TableCell className="text-right tabular-nums font-semibold text-sm">
+                  ) : (
+                    <>
+                      <TableCell className={cn(tdClass, "text-right")}>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          disabled={disabled}
+                          placeholder="0.00"
+                          className={cn(inputNumClass, "w-24 text-right")}
+                          value={valorInputCosto(row.costoEstimado, row.costoText)}
+                          onChange={(e) => onSetCostoPresupuesto(row.idVariante, e.target.value)}
+                        />
+                      </TableCell>
+                      <TableCell className={tdClass}>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          disabled={disabled}
+                          placeholder="1"
+                          className={cn(inputNumClass, "w-20 text-center")}
+                          value={valorInputCantidad(row.cantidadSolicitada, row.cantidadText)}
+                          onChange={(e) => onSetCantidadPresupuesto(row.idVariante, e.target.value)}
+                        />
+                      </TableCell>
+                    </>
+                  )}
+                  <TableCell className={cn(tdClass, "text-right tabular-nums text-xs font-semibold")}>
                     {fmtQ(cantUI * costoUI)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={cn(tdClass, "p-1")}>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-8 text-(--color-gris-letra) hover:text-(--color-rojo)"
+                      className="size-7 text-(--color-gris-letra) hover:text-(--color-rojo)"
                       disabled={disabled}
                       onClick={() => onQuitar(row.idVariante)}
                     >
-                      <Trash2 className="size-4" />
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </TableCell>
                 </TableRow>
               );
             })}
-
-            <TableRow className="bg-(--color-gris-claro-2)/40 hover:bg-(--color-gris-claro-2)/40">
-              <TableCell colSpan={isDirecta ? 8 : 6} className="p-0">
-                <div ref={contenedorRef} className="relative p-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-(--color-pagina)" />
-                    <Input
-                      ref={inputRef}
-                      disabled={disabled}
-                      placeholder="Buscar producto por nombre, SKU o código y presione para agregar…"
-                      value={busqueda}
-                      onChange={(e) => setBusqueda(e.target.value)}
-                      onFocus={() => {
-                        if (debounced.length >= 1) setListaAbierta(true);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          setListaAbierta(false);
-                          return;
-                        }
-                        if (e.key === "Enter" && resultados.length > 0) {
-                          const primera = resultados.find((v) => {
-                            const id = v.idVariante ?? v.IdVariante;
-                            const disp = v.disponibleParaCompra ?? v.DisponibleParaCompra;
-                            return id != null && Number(id) > 0 && disp !== false;
-                          });
-                          if (primera) {
-                            e.preventDefault();
-                            elegirVariante(primera);
-                          }
-                        }
-                      }}
-                      className={cn(
-                        "h-10 pl-10 border-(--color-gris-claro-2) bg-(--color-blanco)",
-                        "placeholder:text-(--color-gris-letra) focus-visible:ring-(--color-pagina)/30"
-                      )}
-                      autoComplete="off"
-                    />
-                  </div>
-
-                  {mostrarLista ? (
-                    <div
-                      className="absolute left-2 right-2 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-lg"
-                      role="listbox"
-                    >
-                      {buscando && resultados.length === 0 ? (
-                        <p className="px-3 py-3 text-xs text-(--color-gris-letra)">Buscando…</p>
-                      ) : null}
-                      {!buscando && resultados.length === 0 ? (
-                        <p className="px-3 py-3 text-xs text-(--color-gris-letra)">
-                          Sin resultados para «{debounced}»
-                        </p>
-                      ) : null}
-                      {resultados.map((v, idx) => (
-                        <VarianteOpcion
-                          key={v.idVariante ?? v.IdVariante ?? v.sku ?? idx}
-                          v={v}
-                          onElegir={elegirVariante}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+            <TableRow className="h-0 border-0 hover:bg-transparent">
+              <TableCell colSpan={colSpan} className="h-0 p-0" aria-hidden>
+                <div ref={lineasEndRef} className="h-px w-full" />
               </TableCell>
             </TableRow>
           </TableBody>
         </Table>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
+
+      <div
+        ref={buscadorRef}
+        className="relative shrink-0 border-t border-(--color-gris-claro-2) bg-(--color-gris-claro-2)/30 p-2"
+      >
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-(--color-pagina)" />
+          <Input
+            ref={inputRef}
+            disabled={disabled}
+            placeholder="Escanee código o busque por nombre — Enter agrega"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            onFocus={() => {
+              if (debounced.length >= 1) {
+                setListaAbierta(true);
+                actualizarPosicionMenu();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setListaAbierta(false);
+                return;
+              }
+              if (e.key === "Enter") {
+                e.preventDefault();
+                confirmarBusquedaEnter();
+              }
+            }}
+            className="h-9 bg-(--color-blanco) pl-9 text-sm border-(--color-gris-claro-2) focus-visible:ring-(--color-pagina)/40"
+            autoComplete="off"
+          />
+        </div>
+      </div>
+
+      {menuPortal}
     </Card>
   );
 }

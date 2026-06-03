@@ -12,21 +12,19 @@ import {
   useEliminarDetalleCompraMutation,
   useProveedoresCompraQuery,
 } from "@/hooks/queries/useComprasQueries";
+import { CompraDatosGenerales } from "@/pages/compras/components/CompraDatosGenerales";
 import { CompraLineasProductos } from "@/pages/compras/components/CompraLineasProductos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { AlertTriangle, ArrowLeft, ClipboardList, Info, Zap } from "lucide-react";
+import { ArrowLeft, ClipboardList, Info, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  aplicarInputCantidad,
+  aplicarInputCosto,
+  resolverCostoCompraVariante,
+  sincronizarLineaCompraDirecta,
+} from "@/lib/compraVarianteUtils";
 
 const fmtQ = (n) =>
   new Intl.NumberFormat("es-GT", {
@@ -45,8 +43,7 @@ function mapVarianteToLinea(v) {
   const color = v.color ?? v.Color ?? "";
   const tallaNombre = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
   const detalle = [color, tallaNombre].filter(Boolean).join(" · ");
-  const precio = v.precioVentaActual ?? v.PrecioVentaActual;
-  const costo = precio != null ? Number(precio) : 0;
+  const costo = resolverCostoCompraVariante(v);
   return {
     idDetalleCompra: undefined,
     idVariante,
@@ -101,7 +98,6 @@ const NuevaCompra = () => {
   const [notas, setNotas] = useState("");
   const [lineas, setLineas] = useState([]);
   const [formError, setFormError] = useState("");
-  const [confirmarMayor, setConfirmarMayor] = useState(false);
   const initialLineasRef = useRef(null);
 
   const provQ = useProveedoresCompraQuery();
@@ -166,77 +162,89 @@ const NuevaCompra = () => {
     0
   );
 
-  const algunaMayor = useMemo(
-    () => isDirecta && lineas.some((l) => l.cantidadRecibida > l.cantidadSolicitada),
-    [isDirecta, lineas]
-  );
-
   const agregar = (v) => {
     const nueva = mapVarianteToLinea(v);
     setLineas((prev) => {
       const ex = prev.find((x) => x.idVariante === nueva.idVariante);
       if (ex) {
-        return prev.map((x) =>
-          x.idVariante === nueva.idVariante
-            ? {
-                ...x,
-                cantidadSolicitada: x.cantidadSolicitada + 1,
-                cantidadRecibida: x.cantidadRecibida + 1,
-              }
-            : x
-        );
+        return prev.map((x) => {
+          if (x.idVariante !== nueva.idVariante) return x;
+          const cant = x.cantidadRecibida + 1;
+          const nuevaCant = x.cantidadSolicitada + 1;
+          const linea = {
+            ...x,
+            cantidadSolicitada: nuevaCant,
+            cantidadRecibida: cant,
+            cantidadText: String(nuevaCant),
+          };
+          return isDirecta ? sincronizarLineaCompraDirecta(linea) : linea;
+        });
       }
-      return [...prev, nueva];
+      const linea = isDirecta ? sincronizarLineaCompraDirecta(nueva) : nueva;
+      return [...prev, linea];
     });
   };
 
-  const setCant = (idVariante, delta) => {
-    setLineas((prev) =>
-      prev
-        .map((x) => {
-          if (x.idVariante !== idVariante) return x;
-          const nuevaSolicitada = Math.max(1, x.cantidadSolicitada + delta);
-          const ajustarRecibida =
-            x.cantidadRecibida === x.cantidadSolicitada ? nuevaSolicitada : x.cantidadRecibida;
-          return {
-            ...x,
-            cantidadSolicitada: nuevaSolicitada,
-            cantidadRecibida: ajustarRecibida,
-          };
-        })
-        .filter((x) => x.cantidadSolicitada > 0)
-    );
-  };
-
-  const setRecibidaLinea = (idVariante, valor) => {
-    const num = Number(valor);
+  const setCantidadPresupuesto = (idVariante, valor) => {
+    const parsed = aplicarInputCantidad(valor);
+    if (!parsed) return;
     setLineas((prev) =>
       prev.map((x) =>
         x.idVariante === idVariante
-          ? { ...x, cantidadRecibida: Number.isFinite(num) ? Math.max(0, num) : 0 }
+          ? {
+              ...x,
+              cantidadSolicitada: parsed.cantidad,
+              cantidadRecibida: parsed.cantidad,
+              cantidadText: parsed.cantidadText,
+            }
           : x
       )
     );
   };
 
-  const setCostoReal = (idVariante, valor) => {
-    const num = Number(valor);
+  const setCantidadDirecta = (idVariante, valor) => {
+    const parsed = aplicarInputCantidad(valor);
+    if (!parsed) return;
+    setLineas((prev) =>
+      prev.map((x) => {
+        if (x.idVariante !== idVariante) return x;
+        return sincronizarLineaCompraDirecta({
+          ...x,
+          cantidadRecibida: parsed.cantidad,
+          cantidadText: parsed.cantidadText,
+        });
+      })
+    );
+  };
+
+  const setCostoPresupuesto = (idVariante, valor) => {
+    const parsed = aplicarInputCosto(valor);
+    if (!parsed) return;
     setLineas((prev) =>
       prev.map((x) =>
         x.idVariante === idVariante
-          ? { ...x, costoReal: Number.isFinite(num) ? Math.max(0, num) : 0 }
+          ? { ...x, costoEstimado: parsed.costo, costoText: parsed.costoText }
           : x
       )
+    );
+  };
+
+  const setCostoUnitarioDirecta = (idVariante, valor) => {
+    const parsed = aplicarInputCosto(valor);
+    if (!parsed) return;
+    setLineas((prev) =>
+      prev.map((x) => {
+        if (x.idVariante !== idVariante) return x;
+        return sincronizarLineaCompraDirecta({
+          ...x,
+          costoReal: parsed.costo,
+          costoText: parsed.costoText,
+        });
+      })
     );
   };
 
   const quitar = (idVariante) => setLineas((prev) => prev.filter((x) => x.idVariante !== idVariante));
-
-  const updateLinea = (idVariante, patch) => {
-    setLineas((prev) =>
-      prev.map((x) => (x.idVariante === idVariante ? { ...x, ...patch } : x))
-    );
-  };
 
   const buildHeaderBody = () => {
     const idTipo =
@@ -276,31 +284,29 @@ const NuevaCompra = () => {
     try {
       if (isDirecta) {
         for (const l of lineas) {
-          if (!(l.costoReal > 0)) {
-            setFormError("Debe ingresar el costo real (mayor a cero) de los productos recibidos.");
+          const sync = sincronizarLineaCompraDirecta(l);
+          if (!(sync.costoReal > 0)) {
+            setFormError("Debe ingresar el costo unitario (mayor a cero) de cada producto.");
             return;
           }
-          if (l.cantidadRecibida < 0) {
-            setFormError("Las cantidades recibidas no pueden ser negativas.");
+          if (sync.cantidadRecibida <= 0) {
+            setFormError("La cantidad debe ser mayor a cero en cada línea.");
             return;
           }
-        }
-        if (algunaMayor && !confirmarMayor) {
-          setFormError(
-            "Hay productos con cantidad recibida mayor a la solicitada. Marca la casilla para confirmar."
-          );
-          return;
         }
         const body = {
           ...header,
-          confirmarCantidadMayorSolicitada: confirmarMayor,
-          detalles: lineas.map((l) => ({
-            idVariante: l.idVariante,
-            cantidadSolicitada: l.cantidadSolicitada,
-            cantidadRecibida: l.cantidadRecibida,
-            costoEstimado: l.costoEstimado,
-            costoReal: l.costoReal,
-          })),
+          confirmarCantidadMayorSolicitada: false,
+          detalles: lineas.map((l) => {
+            const sync = sincronizarLineaCompraDirecta(l);
+            return {
+              idVariante: sync.idVariante,
+              cantidadSolicitada: sync.cantidadSolicitada,
+              cantidadRecibida: sync.cantidadRecibida,
+              costoEstimado: sync.costoEstimado,
+              costoReal: sync.costoReal,
+            };
+          }),
         };
         await crearDirectaMut.mutateAsync(body);
         navigate("/compras");
@@ -308,6 +314,12 @@ const NuevaCompra = () => {
       }
 
       if (!isEdit) {
+        for (const l of lineas) {
+          if (!(l.cantidadSolicitada > 0)) {
+            setFormError("La cantidad debe ser mayor a cero en cada línea.");
+            return;
+          }
+        }
         const body = {
           ...header,
           detalles: lineas.map((l) => ({
@@ -444,121 +456,47 @@ const NuevaCompra = () => {
         </p>
       ) : null}
 
-      <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4">
-        <Card className="border-(--color-gris-claro-2) shadow-sm">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-bold text-(--color-negro)">
-              Datos generales de la orden
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">Proveedor</Label>
-                {provQ.isLoading ? (
-                  <div className="h-10 rounded-md bg-(--color-gris-claro-2) animate-pulse" />
-                ) : (
-                  <Select value={proveedor} onValueChange={setProveedor} disabled={loadingEdit}>
-                    <SelectTrigger className="bg-(--color-gris-claro-2) h-10">
-                      <SelectValue placeholder="Seleccione…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {proveedores.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
-                  Fecha de pedido
-                </Label>
-                <Input
-                  type="date"
-                  value={fechaPedido}
-                  onChange={(e) => setFechaPedido(e.target.value)}
-                  className="bg-(--color-gris-claro-2) h-10"
-                  disabled={loadingEdit}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
-                  No. documento / Ref.
-                </Label>
-                <Input
-                  value={documentoRef}
-                  onChange={(e) => setDocumentoRef(e.target.value)}
-                  placeholder="REF-00123"
-                  className="bg-(--color-gris-claro-2) h-10"
-                  disabled={loadingEdit}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase font-bold text-(--color-gris-letra)">
-                  Tipo comprobante (id)
-                </Label>
-                <Select value={tipoComprobante} onValueChange={setTipoComprobante} disabled={loadingEdit}>
-                  <SelectTrigger className="bg-(--color-gris-claro-2) h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin comprobante</SelectItem>
-                    <SelectItem value="1">Nota de crédito</SelectItem>
-                    <SelectItem value="2">Factura</SelectItem>
-                    <SelectItem value="3">Envio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-2">
+        <CompraDatosGenerales
+          proveedor={proveedor}
+          onProveedorChange={setProveedor}
+          proveedores={proveedores}
+          proveedoresLoading={provQ.isLoading}
+          fechaPedido={fechaPedido}
+          onFechaPedidoChange={setFechaPedido}
+          documentoRef={documentoRef}
+          onDocumentoRefChange={setDocumentoRef}
+          tipoComprobante={tipoComprobante}
+          onTipoComprobanteChange={setTipoComprobante}
+          disabled={loadingEdit}
+        />
 
-        <div className="grid gap-4 xl:grid-cols-[1fr_320px] items-start">
-          <div className="space-y-4 min-w-0">
+        <div className="mt-3 grid min-h-0 flex-1 gap-3 xl:grid-cols-[1fr_280px]">
+          <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
             <CompraLineasProductos
               lineas={lineas}
               isDirecta={isDirecta}
               disabled={loadingEdit}
               onAgregar={agregar}
               onQuitar={quitar}
-              onSetCant={setCant}
-              onSetRecibida={setRecibidaLinea}
-              onSetCostoReal={setCostoReal}
-              onUpdateLinea={updateLinea}
+              onSetCantidadPresupuesto={setCantidadPresupuesto}
+              onSetCantidadDirecta={setCantidadDirecta}
+              onSetCostoPresupuesto={setCostoPresupuesto}
+              onSetCostoUnitarioDirecta={setCostoUnitarioDirecta}
             />
 
-            <div className="flex items-start gap-2 rounded-lg border border-(--color-gris-claro-2) bg-(--color-gris-claro-2)/80 px-4 py-3 text-xs text-(--color-gris-letra)">
+            <div className="flex shrink-0 items-start gap-2 rounded-lg border border-(--color-gris-claro-2) bg-(--color-gris-claro-2)/80 px-3 py-2 text-[11px] leading-snug text-(--color-gris-letra)">
               <Info className="size-4 shrink-0 text-(--color-pagina) mt-0.5" />
               <p>
                 {isDirecta
-                  ? "En modo directo se registra y cierra la compra inmediatamente, ingresando lo realmente recibido y el costo real. El inventario se actualiza al guardar."
+                  ? "Compra directa: indique cantidad y costo unitario por producto. Al guardar se cierra la compra y actualiza el inventario."
                   : "Se guarda como presupuesto (estado EN_PROCESO). Más tarde puedes recibirlo desde la lista para confirmar cantidades, costos y entrar al inventario."}
               </p>
             </div>
 
-            {isDirecta && algunaMayor ? (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                <AlertTriangle className="size-4 mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="font-semibold">Cantidad recibida mayor a la solicitada</p>
-                  <Label className="mt-2 flex items-center gap-2 text-sm font-medium cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={confirmarMayor}
-                      onChange={(e) => setConfirmarMayor(e.target.checked)}
-                      className="size-4 accent-amber-600"
-                    />
-                    Confirmo que se recibió más cantidad de la solicitada
-                  </Label>
-                </div>
-              </div>
-            ) : null}
           </div>
 
-          <div className="space-y-4 min-w-0">
+          <div className="flex shrink-0 flex-col gap-3 min-w-0 xl:max-h-full xl:overflow-y-auto">
             <Card
               className={cn(
                 "border-0 shadow-md text-(--color-blanco) overflow-hidden",

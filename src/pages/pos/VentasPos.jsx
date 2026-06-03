@@ -4,18 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { cn } from "@/lib/utils";
-import {
-  useBarcodeScanner,
-  BARCODE_DEFAULT_MAX_INTER_KEY_MS,
-} from "@/hooks/useBarcodeScanner";
+import { useBarcodeScanner, BARCODE_DEFAULT_MAX_INTER_KEY_MS } from "@/hooks/useBarcodeScanner";
 import { fetchProductoByCodigo } from "@/services/posProductoService";
 import { useMiCajaActivaQuery } from "@/hooks/queries/useCajaQueries";
-import {
-  useVentaCatalogoQuery,
-  useVentaCategoriasQuery,
-} from "@/hooks/queries/useVentaQueries";
+import { useVentaCatalogoQuery, useVentaCategoriasQuery } from "@/hooks/queries/useVentaQueries";
 import { MovimientoCajaDialog } from "@/pages/caja/components/MovimientoCajaDialog";
 import { CambiarCajeroDialog } from "@/pages/caja/components/CambiarCajeroDialog";
+import { HistorialTransaccionesDialog } from "@/pages/caja/components/HistorialTransaccionesDialog";
 import { useHeaderUserActionStore } from "@/context/useHeaderUserActionStore";
 import { useHeaderTicketsStore } from "@/context/useHeaderTicketsStore";
 import { CatalogoProductoCard } from "@/pages/pos/components/CatalogoProductoCard";
@@ -26,26 +21,14 @@ import { useCarritoCantidadTeclado } from "@/hooks/useCarritoCantidadTeclado";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
 import { ID_UBICACION_REEMBOLSO } from "@/lib/reembolsoMappers";
 import { subtotalLinea, roundVenta } from "@/lib/ventaMappers";
-import {
-  useReembolsoPreparacionQuery,
-  useReembolsoVentasDisponiblesQuery,
-  QK_REEMBOLSOS,
-} from "@/hooks/queries/useReembolsoQueries";
-import {
-  usePosTicketsStore,
-  LIMITE_TICKETS_ESPERA,
-} from "@/context/usePosTicketsStore";
+import { useReembolsoPreparacionQuery, useReembolsoVentasDisponiblesQuery,
+  QK_REEMBOLSOS } from "@/hooks/queries/useReembolsoQueries";
+import { usePosTicketsStore, LIMITE_TICKETS_ESPERA } from "@/context/usePosTicketsStore";
 import Toast from "@/components/ui/Toast";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
+  DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 8;
@@ -77,6 +60,7 @@ const VentasPOS = () => {
   const [flashRowId, setFlashRowId] = useState(null);
   const [scanModal, setScanModal] = useState(null);
   const [gastosOpen, setGastosOpen] = useState(false);
+  const [historialOpen, setHistorialOpen] = useState(false);
   const [cambiarCajeroOpen, setCambiarCajeroOpen] = useState(false);
   const [reembolsoFiltro, setReembolsoFiltro] = useState("");
   const [reembolsoLineaModalId, setReembolsoLineaModalId] = useState(null);
@@ -607,6 +591,7 @@ const VentasPOS = () => {
       >
           <button
             type="button"
+            onClick={() => setHistorialOpen(true)}
             className="w-full text-sm font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
           >
             Historial de transacciones
@@ -915,6 +900,12 @@ const VentasPOS = () => {
           )}
         </div>
       </section>
+
+      <HistorialTransaccionesDialog
+        open={historialOpen}
+        onOpenChange={setHistorialOpen}
+        idCaja={idCaja}
+      />
 
       <MovimientoCajaDialog
         open={gastosOpen}

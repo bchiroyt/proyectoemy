@@ -34,12 +34,15 @@ const estadoBadge = (estado) => {
 const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
   if (!compra) return null;
 
+  const esRecibida = compra.estado === "Recibido";
   const subtotal = compra.items.reduce(
-    (acc, it) => acc + it.cantidad * it.precioUnitario,
+    (acc, it) => acc + (it.totalLinea ?? it.cantidad * it.precioUnitario),
     0
   );
   const descuento = 0;
-  const total = subtotal - descuento;
+  const totalEncabezado = Number(compra.total ?? 0);
+  const total =
+    esRecibida && totalEncabezado > 0 ? totalEncabezado : subtotal - descuento;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -70,6 +73,16 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
                   <Store className="size-3.5 shrink-0" />
                   <span className="truncate">{compra.proveedor.nombre}</span>
                 </span>
+                {compra.numeroReferencia ? (
+                  <span className="font-mono">
+                    Ref. {compra.numeroReferencia}
+                  </span>
+                ) : null}
+                {compra.tipoComprobante ? (
+                  <Badge variant="outline" className="text-[10px] font-semibold">
+                    {compra.tipoComprobante}
+                  </Badge>
+                ) : null}
               </div>
             </div>
             <Button
@@ -114,7 +127,7 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
                       Cant.
                     </TableHead>
                     <TableHead className="text-[10px] uppercase font-bold text-slate-600 text-right">
-                      P. unit.
+                      {esRecibida ? "P. unit. final" : "P. unit. est."}
                     </TableHead>
                     <TableHead className="text-[10px] uppercase font-bold text-slate-600 text-right">
                       Total
@@ -138,7 +151,7 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
                         {fmtQ(row.precioUnitario)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        {fmtQ(row.cantidad * row.precioUnitario)}
+                        {fmtQ(row.totalLinea ?? row.cantidad * row.precioUnitario)}
                       </TableCell>
                     </TableRow>
                   ))}

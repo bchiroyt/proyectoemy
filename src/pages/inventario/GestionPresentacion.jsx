@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import ModalPresentacion from "./components/ModalPresentacion";
+import { useNavigationStore } from "@/context/useNavigationStore";
+import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 
 import {
   obtenerPresentaciones,
@@ -12,6 +13,7 @@ import {
 
 const GestionPresentacion = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((s) => s.setTitulo);
 
   const [presentaciones, setPresentaciones] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,15 +42,25 @@ const GestionPresentacion = () => {
   }, []);
 
   useEffect(() => {
+    setTitulo("Presentación");
+  }, [setTitulo]);
+
+  useEffect(() => {
     fetchPresentaciones();
   }, [fetchPresentaciones]);
 
   const handleGuardar = async (form) => {
     try {
+      const payload = {
+        nombre: form.nombre,
+        descripcion: form.descripcion,
+        estado: form.activo,
+      };
+
       if (editando) {
-        await actualizarPresentacion(editando.idPresentacion, form);
+        await actualizarPresentacion(editando.idPresentacion, payload);
       } else {
-        await crearPresentacion(form);
+        await crearPresentacion(payload);
       }
 
       await fetchPresentaciones();
@@ -89,9 +101,6 @@ const GestionPresentacion = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold text-(--color-pagina)">
-        Gestión de Presentaciones
-      </h1>
 
       <div className="flex justify-between items-center">
         <button
@@ -194,7 +203,7 @@ const GestionPresentacion = () => {
         </table>
       </div>
 
-      <ModalPresentacion
+      <ModalCatalogoInventario
         open={openModal}
         onClose={() => {
           setOpenModal(false);
@@ -202,6 +211,8 @@ const GestionPresentacion = () => {
         }}
         onSave={handleGuardar}
         data={editando}
+        tituloNuevo="Nueva Presentación"
+        tituloEditar="Editar Presentación"
       />
 
       {deleteModal && (

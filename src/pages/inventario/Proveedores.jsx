@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Search, Phone, Mail, MapPin, Loader2, X, CheckCircle, AlertCircle, Pencil, Trash2, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useNavigationStore } from "@/context/useNavigationStore";
+import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 
 // IMPORTAMOS TU CLIENTE CONFIGURADO
 import { apiClient } from "@/lib/apiClient";
 
 const Proveedores = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((state) => state.setTitulo);
 
   // ESTADOS PRINCIPALES
+  
   const [proveedores, setProveedores] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(false);
@@ -75,6 +79,10 @@ const Proveedores = () => {
   useEffect(() => {
     cargarProveedores();
   }, []);
+
+  useEffect(() => {
+    setTitulo("Gestión de proveedores");
+  }, [setTitulo]);
 
   // POST / PATCH: ENVIAR FORMULARIO (GUARDAR O ACTUALIZAR)
   const handleGuardar = async (e) => {
@@ -189,50 +197,35 @@ const Proveedores = () => {
   return (
     <div className="p-6 space-y-6 relative">
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-800">
-            Gestión de Proveedores
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Administra, edita, activa o desactiva los proveedores de tu catálogo de forma directa.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => navigate("/inventario")}
-          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition-colors cursor-pointer text-sm font-medium"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Regresar
-        </button>
-      </div>
-
       {/* ACCIONES */}
       <div className="flex justify-between items-center gap-4">
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar proveedor por nombre..."
-            className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-600 text-sm"
-          />
-        </div>
-
-        <button
+      <button
           type="button"
           onClick={() => {
             setModoEditar(false);
             setModalAbierto(true);
           }}
-          className="flex items-center gap-2 bg-green-600 text-white px-5 py-3 rounded-xl hover:bg-green-700 transition-colors cursor-pointer text-sm font-medium"
+          className="flex items-center gap-2 bg-(--color-pagina) text-(--color-blanco) px-5 py-3 rounded-xl hover:bg-(--color-pagina) transition-colors cursor-pointer text-sm font-medium"
         >
           <Plus className="w-4 h-4" />
           Nuevo proveedor
         </button>
+
+        <div className="relative w-full max-w-md">
+          <BuscadorPrincipal />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate("/inventario")}
+          className="flex items-center gap-2 bg-(--color-pagina-2) text-(--color-blanco) px-4 py-2 rounded-xl hover:bg-(--color-pagina) transition-colors cursor-pointer text-sm font-medium"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Regresar
+        </button>
+
+
+        
       </div>
 
       {/* TABLA PRINCIPAL */}

@@ -1,4 +1,8 @@
 import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
+import {
+  TICKET_NEGOCIO_DIRECCION,
+  TICKET_NEGOCIO_NOMBRE,
+} from "@/constants/ticketConfig";
 
 /** Etiqueta legible para tarjetas y carrito (nombre + variantes) */
 export function buildNombreDisplay(raw) {
@@ -55,6 +59,53 @@ export function mapCatalogoProducto(raw) {
 
 export function mapCatalogoList(payload) {
   return unwrapList(payload).map(mapCatalogoProducto).filter(Boolean);
+}
+
+export function mapVentaResumen(raw) {
+  if (!raw) return null;
+  const idVenta = toNumberOrNull(pick(raw, "idVenta", "IdVenta"));
+  if (idVenta == null) return null;
+
+  return {
+    idVenta,
+    numeroTicket: pick(raw, "numeroTicket", "NumeroTicket") ?? "",
+    fechaHora: pick(raw, "fechaHora", "FechaHora") ?? null,
+    idCaja: toNumberOrNull(pick(raw, "idCaja", "IdCaja")),
+    usuarioNombre: pick(raw, "usuarioNombre", "UsuarioNombre") ?? "",
+    estadoVenta: pick(raw, "estadoVenta", "EstadoVenta") ?? "",
+    total: Number(pick(raw, "total", "Total") ?? 0),
+  };
+}
+
+export function mapVentasResumenList(payload) {
+  return unwrapList(payload).map(mapVentaResumen).filter(Boolean);
+}
+
+export function unwrapVentasResumenPaged(resp) {
+  const exito = pick(resp, "exito", "Exito") !== false;
+  const mensaje = pick(resp, "mensaje", "Mensaje") ?? "";
+  const inner = pick(resp, "data", "Data") ?? resp;
+  const itemsRaw = pick(inner, "items", "Items") ?? inner;
+  const items = mapVentasResumenList(itemsRaw);
+  const page = Number(pick(inner, "page", "Page") ?? 1) || 1;
+  const pageSize = Number(pick(inner, "pageSize", "PageSize") ?? 10) || 10;
+  const totalCount =
+    Number(
+      pick(inner, "totalCount", "TotalCount", "totalRecords", "TotalRecords") ??
+        items.length
+    ) || 0;
+  const totalPages =
+    Number(pick(inner, "totalPages", "TotalPages") ?? Math.max(1, Math.ceil(totalCount / pageSize))) ||
+    1;
+  return { exito, mensaje, items, page, pageSize, totalCount, totalPages };
+}
+
+export function etiquetaEstadoVenta(estado) {
+  const valor = String(estado ?? "").trim().toUpperCase();
+  if (valor === "CONFIRMADA") return "Pagado";
+  if (valor === "REEMBOLSADA") return "Reembolsado";
+  if (valor === "PARC_REEMBOLSADA") return "Reembolso parcial";
+  return estado || "—";
 }
 
 export function unwrapVentaPaged(resp) {
@@ -178,22 +229,41 @@ function mapTicketPago(raw) {
   };
 }
 
+export function enriquecerTicketEncabezado(ticket, { cajeroFallback = "" } = {}) {
+  if (!ticket) return null;
+
+  const nombre =
+    String(ticket.nombreNegocio ?? "").trim() || TICKET_NEGOCIO_NOMBRE;
+  const direccion =
+    String(ticket.direccion ?? "").trim() || TICKET_NEGOCIO_DIRECCION;
+  const cajero =
+    String(ticket.cajero ?? cajeroFallback ?? "").trim() || "Cajero";
+
+  return {
+    ...ticket,
+    nombreNegocio: nombre,
+    direccion,
+    cajero,
+  };
+}
+
 export function mapVentaTicket(raw) {
   if (!raw) return null;
   const data = pick(raw, "data", "Data") ?? raw;
   const detallesRaw = pick(data, "detalles", "Detalles") ?? [];
   const pagosRaw = pick(data, "pagos", "Pagos") ?? [];
 
-  return {
+  return enriquecerTicketEncabezado({
     nombreNegocio: pick(data, "nombreNegocio", "NombreNegocio") ?? "",
     cajero: pick(data, "cajero", "Cajero") ?? "",
+    direccion: pick(data, "direccion", "Direccion") ?? "",
     numeroDocumento: pick(data, "numeroDocumento", "NumeroDocumento") ?? "",
     fechaHora: pick(data, "fechaHora", "FechaHora") ?? null,
     detalles: unwrapList(detallesRaw).map(mapTicketDetalle).filter(Boolean),
     total: Number(pick(data, "total", "Total") ?? 0),
     pagos: unwrapList(pagosRaw).map(mapTicketPago).filter(Boolean),
     cambio: Number(pick(data, "cambio", "Cambio") ?? 0),
-  };
+  });
 }
 
 /** Construye ticket desde datos locales tras el cobro (si GET ticket no está disponible). */
@@ -207,19 +277,23 @@ export function buildTicketDesdeCobro({ ventaCreada, lineas, pagos, cajeroNombre
     notaLinea: l.notaLinea ?? null,
   }));
 
-  return {
-    nombreNegocio: "Moda y Variedades EMY",
-    cajero: cajeroNombre ?? "",
-    numeroDocumento: ventaCreada?.numeroTicket ?? "",
-    fechaHora: new Date().toISOString(),
-    detalles,
-    total: ventaCreada?.total ?? 0,
-    pagos: (pagos ?? []).map((p) => ({
-      metodoPago: p.nombre,
-      montoAplicado: p.montoAplicado,
-      montoRecibido: p.montoRecibido,
-      cambio: Math.max(0, p.montoRecibido - p.montoAplicado),
-    })),
-    cambio: ventaCreada?.cambio ?? 0,
-  };
+  return enriquecerTicketEncabezado(
+    {
+      nombreNegocio: TICKET_NEGOCIO_NOMBRE,
+      direccion: TICKET_NEGOCIO_DIRECCION,
+      cajero: cajeroNombre ?? "",
+      numeroDocumento: ventaCreada?.numeroTicket ?? "",
+      fechaHora: new Date().toISOString(),
+      detalles,
+      total: ventaCreada?.total ?? 0,
+      pagos: (pagos ?? []).map((p) => ({
+        metodoPago: p.nombre,
+        montoAplicado: p.montoAplicado,
+        montoRecibido: p.montoRecibido,
+        cambio: Math.max(0, p.montoRecibido - p.montoAplicado),
+      })),
+      cambio: ventaCreada?.cambio ?? 0,
+    },
+    { cajeroFallback: cajeroNombre }
+  );
 }

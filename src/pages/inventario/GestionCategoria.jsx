@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import ModalCategoria from "./components/ModalCategoria";
+import { useNavigationStore } from "@/context/useNavigationStore";
+import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 
 import {
   obtenerCategorias,
@@ -12,6 +13,7 @@ import {
 
 const GestionCategorias = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((s) => s.setTitulo);
 
   const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,6 +48,10 @@ const GestionCategorias = () => {
   }, []);
 
   useEffect(() => {
+    setTitulo("Categorías");
+  }, [setTitulo]);
+
+  useEffect(() => {
     fetchCategorias();
   }, [fetchCategorias]);
 
@@ -54,7 +60,7 @@ const GestionCategorias = () => {
       const payload = {
         nombre: form.nombre,
         descripcion: form.descripcion,
-        estado: form.estado,
+        estado: form.activo,
       };
 
       if (editando) {
@@ -103,10 +109,6 @@ const GestionCategorias = () => {
 
   return (
     <div className="p-6 space-y-6">
-
-      <h1 className="text-2xl font-semibold text-(--color-pagina)">
-        Gestión de Categorías
-      </h1>
 
       <div className="flex justify-between items-center">
 
@@ -220,7 +222,7 @@ const GestionCategorias = () => {
 
       </div>
 
-      <ModalCategoria
+      <ModalCatalogoInventario
         open={openModal}
         onClose={() => {
           setOpenModal(false);
@@ -228,6 +230,8 @@ const GestionCategorias = () => {
         }}
         onSave={handleGuardar}
         data={editando}
+        tituloNuevo="Nueva Categoría"
+        tituloEditar="Editar Categoría"
       />
 
       {deleteModal && (

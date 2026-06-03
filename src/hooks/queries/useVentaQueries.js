@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { crearVenta, fetchVentaCatalogo, fetchVentaTicket } from "@/services/ventaService";
+import { crearVenta, fetchVentaCatalogo, fetchVentaTicket, fetchVentas } from "@/services/ventaService";
 
 export const QK_VENTA_CATALOGO = "ventas";
 export const QK_VENTA_CATEGORIAS = "ventas-categorias";
+export const QK_VENTAS_HISTORIAL = "ventas-historial";
 
 export function useVentaCatalogoQuery(
   { page = 1, pageSize = 8, criterio } = {},
@@ -50,6 +51,24 @@ export function useVentaTicketQuery(idVenta, options = {}) {
     queryFn: () => fetchVentaTicket(id),
     enabled: Number.isFinite(id) && id > 0,
     retry: 1,
+    ...options,
+  });
+}
+
+export function useVentasHistorialQuery(
+  { page = 1, pageSize = 10, idCaja } = {},
+  options = {}
+) {
+  const idCajaNorm = idCaja != null ? Number(idCaja) : undefined;
+  return useQuery({
+    queryKey: [QK_VENTAS_HISTORIAL, { page, pageSize, idCaja: idCajaNorm }],
+    queryFn: () =>
+      fetchVentas({
+        page,
+        pageSize,
+        idCaja: idCajaNorm,
+      }),
+    staleTime: 15_000,
     ...options,
   });
 }

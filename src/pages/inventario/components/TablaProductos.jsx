@@ -68,11 +68,11 @@ const TablaProductos = ({ productos = [], loading = false }) => {
 
   return (
     <>
-      <div className="mx-6 bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-
+      <div className="mx-4 mb-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm md:mx-6">
+        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
         <table className="w-full text-sm">
 
-          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+          <thead className="sticky top-0 z-10 bg-gray-50 text-xs uppercase text-gray-500 shadow-[0_1px_0_0_#f3f4f6]">
             <tr>
               {/* <th className="p-4 text-left">No.</th> */}
               <th className="p-4 text-left">Producto</th>
@@ -250,7 +250,7 @@ const TablaProductos = ({ productos = [], loading = false }) => {
           </tbody>
 
         </table>
-
+        </div>
       </div>
 
       {/* MODAL DETALLE */}

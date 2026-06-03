@@ -26,7 +26,6 @@ const menuItems = [
     { icon: ShoppingCart, label: "Compras", to: "/compras" },
     //{ icon: PlusCircle, label: "Nuevo Producto", to: "/nuevo-producto" },
     { icon: Store, label: "POS", to: "/pos" },
-    
     { icon: Landmark, label: "Contabilidad", to: "/contabilidad" },
     { icon: Users, label: "Usuarios", to: "/usuarios" },
     { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard" },

@@ -224,28 +224,35 @@
 }
 
 @media print {
-  html,
-  body {
+  /* Forzar que la clase inyectada por JS active el comportamiento correcto */
+  html, body {
+    display: block !important;
     width: 80mm !important;
-    min-width: 80mm !important;
     max-width: 80mm !important;
-    height: auto !important;
-    min-height: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
-    background: #fff !important;
   }
 
+  /* Ocultar la interfaz general de la aplicación */
   body * {
     visibility: hidden;
   }
 
   .ticket-print-area,
   .ticket-print-area * {
+    visibility: visible !important;
+  }
+
+  /* Hacer visible únicamente el tique y lo que contiene */
+  html.printing-ticket .ticket-print-area,
+  html.printing-ticket .ticket-print-area * {
     visibility: visible;
   }
 
+  /* Estabilizar el contenedor del tique */
   .ticket-page,
   .ticket-page > * {
     height: auto !important;
@@ -260,46 +267,57 @@
   }
 
   .ticket-print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 72mm;
-    max-width: 72mm;
-    margin: 0;
-    padding: 2mm 4mm 3mm;
-    border: none !important;
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 74mm !important;      /* Aprovecha mejor el ancho de la Epson */
+    max-width: 74mm !important;
+    height: auto !important;     /* Que crezca según los productos */
+    min-height: 100px !important; /* Forzamos una altura mínima inicial para romper el tique en blanco */
+    margin: 0 !important;
+    padding: 2mm !important;
+    background: #ffffff !important;
     box-shadow: none !important;
-    border-radius: 0 !important;
-    page-break-after: avoid;
-    page-break-inside: avoid;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    border: none !important;
   }
 
+  /* --- LOGO E IMAGEN OPTIMIZADOS --- */
   .ticket-print-area .ticket-logo-wrap {
-    background: transparent !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 auto 3mm !important;
+    text-align: center !important;
   }
 
   .ticket-print-area .ticket-logo-img {
-    display: block !important;
-    max-width: 48mm !important;
-    width: auto !important;
-    height: auto !important;
-    max-height: 18mm !important;
-    margin: 0 auto 2mm !important;
-    object-fit: contain;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    display: inline-block !important;
+    width: 140px !important;     /* Cambiamos a pixeles fijos de renderizado web */
+    height: 60px !important;     /* Forzamos alto fijo para que el navegador no calcule 0px */
+    object-fit: contain !important;
+    filter: grayscale(100%) contrast(250%) !important;
   }
 
-  /* Versión compacta en papel: menos relleno y sin “tarjetas” de color */
+  .ticket-print-area .ticket-header-text {
+    display: block !important;
+    visibility: visible !important;
+    color: #000000 !important;
+    font-size: 9pt !important;
+    line-height: 1.35 !important;
+  }
+
+  .ticket-print-area .ticket-header-text.font-bold,
+  .ticket-print-area .ticket-header-text .font-bold {
+    font-weight: 700 !important;
+  }
+
+  /* Líneas de productos compactas sin fondos grises de pantalla */
   .ticket-print-area .ticket-line-item {
+    display: block !important;
     background: transparent !important;
-    border-radius: 0 !important;
     padding: 1.5mm 0 !important;
-    border-bottom: 1px dashed #ccc;
+    border-bottom: 1px dashed #000000 !important;
   }
 
   .ticket-print-area header,
@@ -309,10 +327,32 @@
     margin-bottom: 2mm;
   }
 
+  /* CORRECCIÓN: Ocultar Layout externo pero NO el header del ticket */
   .ticket-actions,
   [data-sidebar],
-  header,
   .ticket-page > p {
+    display: none !important;
+  }
+
+  /* Versión compacta en papel: menos relleno y sin “tarjetas” de color */
+  .ticket-print-area .ticket-line-item {
+    background: transparent !important;
+    border-radius: 0 !important;
+    padding: 1.5mm 0 !important;
+    border-bottom: 1px dashed #000000 !important;
+  }
+
+  .ticket-print-area header,
+  .ticket-print-area footer {
+    padding-top: 1mm !important;
+    padding-bottom: 1mm !important;
+    margin-bottom: 2mm !important;
+  }
+
+  .ticket-actions,
+  [data-sidebar],
+  .ticket-page > p,
+  div:has(> .ticket-actions) { 
     display: none !important;
   }
 }

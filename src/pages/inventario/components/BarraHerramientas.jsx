@@ -63,15 +63,6 @@ const BarraHerramientas = ({
           + Crear Producto
         </button>
 
-        <button
-          onClick={() =>
-            navigate("/inventario/compras")
-          }
-          className="xl:text-sm bg-(--color-pagina-2) text-white px-5 py-2 rounded-xl hover:opacity-90 transition cursor-pointer"
-        >
-          Nueva Compra
-        </button>
-
       </div>
 
       {/* CENTRO */}
