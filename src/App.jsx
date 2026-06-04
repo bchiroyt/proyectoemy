@@ -24,6 +24,9 @@ import Gestiontallas from "./pages/inventario/GestionTalla";
 import Gestionpresentaciones from "./pages/inventario/GestionPresentacion";
 import ReporteStock from "./pages/inventario/ReporteStock";
 import Proveedores from "./pages/inventario/Proveedores";
+import Gastos from "./pages/contabilidad/Gastos";
+import Deudas from "./pages/contabilidad/Deudas";
+import Pagos from "./pages/contabilidad/Pagos";
 
 function DefaultRedirect() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -214,6 +217,36 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Proveedores />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gastos"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Gastos />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/deudas"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Deudas />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pagos"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Pagos />
               </MainLayout>
             </ProtectedRoute>
           }
