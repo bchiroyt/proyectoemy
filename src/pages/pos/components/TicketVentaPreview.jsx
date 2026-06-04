@@ -17,6 +17,11 @@ function fmtFechaTicket(valor) {
 export function TicketVentaPreview({ ticket, className }) {
   if (!ticket) return null;
 
+  const totalDescuento = ticket.detalles.reduce(
+    (sum, item) => sum + (Number(item.descuento) || 0),
+    0
+  );
+
   return (
     <article
       className={cn(
@@ -39,37 +44,40 @@ export function TicketVentaPreview({ ticket, className }) {
       </header>
 
       <ul className="space-y-2 mb-4">
-        {ticket.detalles.map((item, idx) => (
-          <li
-            key={`${item.nombre}-${idx}`}
-            className="ticket-line-item bg-(--color-pagina-3) rounded-lg px-3 py-2.5"
-          >
-            <div className="flex justify-between gap-2 items-start">
-              <span className="font-bold text-sm leading-snug">{item.nombre}</span>
-              <span className="font-bold text-sm tabular-nums shrink-0">
-                {item.subtotal % 1 === 0 ? item.subtotal : item.subtotal.toFixed(2)}
-              </span>
-            </div>
-            <p className="text-xs text-(--color-gris-letra) mt-1 tabular-nums">
-              {item.cantidad} X {item.precio}
-            </p>
-            {item.descuento > 0 && (
-              <p className="text-xs font-semibold text-(--color-pagina) mt-1 flex justify-between tabular-nums">
-                <span>Descuento</span>
-                <span>- {fmtQ(item.descuento)}</span>
-              </p>
-            )}
-            {item.notaLinea && (
-              <p className="text-xs font-semibold text-(--color-pagina) mt-1.5 flex items-center gap-1">
-                <Tag className="size-3 shrink-0" />
-                {item.notaLinea}
-              </p>
-            )}
-          </li>
-        ))}
+        {ticket.detalles.map((item, idx) => {
+          const tieneDescuento = item.descuento > 0;
+          return (
+            <li
+              key={`${item.nombre}-${idx}`}
+              className="ticket-line-item bg-(--color-pagina-3) rounded-lg px-3 py-2.5"
+            >
+              <div className="flex justify-between items-baseline gap-4 w-full">
+                <span className="font-bold text-sm text-(--color-negro) leading-snug break-words max-w-[65%]">
+                  {item.nombre}
+                </span>
+                <span className="shrink-0 text-right text-sm font-bold text-(--color-negro) tabular-nums">
+                  {item.cantidad} x {fmtQ(item.precio)}
+                </span>
+              </div>
+              {tieneDescuento && (
+                <div className="flex justify-between items-baseline text-xs font-semibold text-(--color-pagina) mt-1 pl-2 w-full">
+                  <span>Descuento</span>
+                  <span className="tabular-nums">- {fmtQ(item.descuento)}</span>
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="space-y-2 border-t border-dashed border-(--color-gris-claro) pt-4">
+        {totalDescuento > 0 && (
+          <div className="flex justify-between items-baseline text-sm font-bold text-(--color-pagina)">
+            <span>Total Descuento</span>
+            <span className="tabular-nums">- {fmtQ(totalDescuento)}</span>
+          </div>
+        )}
+
         <div className="flex justify-between items-baseline">
           <span className="text-lg font-black">Total</span>
           <span className="text-2xl font-black tabular-nums">{fmtQ(ticket.total)}</span>
