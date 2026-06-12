@@ -41,6 +41,8 @@ const ModalDetalleProducto = ({
   // Estado para controlar el sub-modal personalizado de confirmación de salida
   const [openConfirmarSalida, setOpenConfirmarSalida] = useState(false);
 
+
+
   // Obtener el ID del producto de forma segura
   const idProducto = producto?.idProducto || producto?.id_producto || (typeof producto === "number" || typeof producto === "string" ? producto : null);
 
@@ -52,6 +54,7 @@ const ModalDetalleProducto = ({
       try {
         setCargandoDetalle(true);
         const respuesta = await apiClient.get(`/api/Productos/${idProducto}`);
+        console.info(`[ModalDetalleProducto] Respuesta de /api/Productos/${idProducto}:`, respuesta);
         if (respuesta?.data?.exito && respuesta?.data?.data) {
           setEstadoProducto(respuesta.data.data);
         }
@@ -211,7 +214,7 @@ const ModalDetalleProducto = ({
                       Categoría
                     </p>
                     <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">
-                      {estadoProducto.categoriaNombre || "---"}
+                      {estadoProducto.categoriaNombre || estadoProducto.categoria || "---"}
                     </p>
                   </div>
 
@@ -220,7 +223,7 @@ const ModalDetalleProducto = ({
                       Marca
                     </p>
                     <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">
-                      {estadoProducto.marcaNombre || "---"}
+                      {estadoProducto.marcaNombre || estadoProducto.marca || "---"}
                     </p>
                   </div>
 
@@ -261,6 +264,7 @@ const ModalDetalleProducto = ({
                       const idActual = v.idVariante || index;
                       const esModoEdicion = editandoId === idActual;
                       const tieneCambios = verificarCambios(v);
+                      const stockActual = v.stockActual ?? v.stock ?? 0;
 
                       return (
                         <Card key={idActual} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
@@ -334,8 +338,8 @@ const ModalDetalleProducto = ({
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                   Stock
                                 </p>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${v.stock > 0 ? 'bg-slate-100 text-slate-800' : 'bg-red-50 text-red-600'}`}>
-                                  {v.stock ?? 0}
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${Number(stockActual) > 0 ? 'bg-slate-100 text-slate-800' : 'bg-red-50 text-red-600'}`}>
+                                  {stockActual}
                                 </span>
                               </div>
 
