@@ -84,7 +84,7 @@ const Inventario = () => {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="sticky top-0 z-10 flex w-full shrink-0 flex-wrap items-center gap-1 border-b border-border bg-(--color-blanco) p-2 shadow-sm">
+      <div className="sticky top-0 z-30 flex w-full shrink-0 flex-wrap items-center gap-1 overflow-visible border-b border-border bg-(--color-blanco) p-2 shadow-sm">
 
         {loading ? (
           <div className="flex items-center gap-3 py-1">

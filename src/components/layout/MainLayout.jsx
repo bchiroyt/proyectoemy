@@ -4,8 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import AppSidebar from "./AppSidebar";
 import Header from "./Header";
 
-/** POS en operación: sin menú lateral (ventas y cierre de turno). */
-const RUTAS_SIN_SIDEBAR = new Set(["/pos/ventas", "/pos/cierre"]);
+/** POS en operación: sin menú lateral (ventas, cobro y cierre de turno). */
+const RUTAS_SIN_SIDEBAR = new Set(["/pos/ventas", "/pos/cobro", "/pos/cierre"]);
 const ocultarSidebarEnRuta = (pathname) => RUTAS_SIN_SIDEBAR.has(pathname);
 
 const MainLayout = ({ children }) => {

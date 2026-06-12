@@ -101,6 +101,27 @@
   --color-verde-claro: #02ED14;
   --color-esmeralda-hover: #07A854;
   --color-verde: #07730C;
+  --color-texto-principal: #1f2937;
+  --color-texto-secundario: #374151;
+  --color-texto-terciario: #4b5563;
+  --color-gris-fondo: #f3f4f6;
+  --color-gris-fondo-suave: #f9fafb;
+  --color-gris-borde: #d1d5db;
+  --color-gris-separador: #f3f4f6;
+  --color-gris-oscuro: #1f2937;
+  --color-gris-oscuro-hover: #374151;
+  --color-overlay: color-mix(in srgb, var(--color-negro) 40%, transparent);
+  --color-overlay-oscuro: color-mix(in srgb, var(--color-negro) 50%, transparent);
+  --color-verde-texto: var(--color-pagina-2);
+  --color-verde-acento: var(--color-verde);
+  --color-verde-fondo: color-mix(in srgb, var(--color-pagina-2) 10%, var(--color-blanco));
+  --color-verde-fondo-hover: color-mix(in srgb, var(--color-pagina-2) 6%, var(--color-blanco));
+  --color-verde-borde: color-mix(in srgb, var(--color-pagina-2) 25%, var(--color-blanco));
+  --color-rojo-fondo: color-mix(in srgb, var(--color-rojo) 8%, var(--color-blanco));
+  --color-rojo-borde: color-mix(in srgb, var(--color-rojo) 20%, var(--color-blanco));
+  --color-rosa-fondo: color-mix(in srgb, var(--color-pagina) 10%, var(--color-blanco));
+  --color-pagina-hover: var(--color-borde-button);
+  --color-exito: var(--color-esmeralda-hover);
 
   /* POS / Emy-POS (pantalla ventas y afines) */
   --color-pos-fondo: var(--color-pagina-4);

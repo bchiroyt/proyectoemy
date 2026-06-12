@@ -80,7 +80,7 @@ const BarraHerramientas = ({
       
         {/* CONFIGURACIÓN */}
         <div
-          className="relative"
+          className="relative z-50"
           ref={configRef}
         >
 
@@ -94,7 +94,7 @@ const BarraHerramientas = ({
           </button>
 
           {openConfig && (
-            <div className="absolute right-0 top-12 bg-white shadow-lg rounded-xl p-2 w-52 z-10 border border-gray-100">
+            <div className="absolute right-0 top-12 z-50 w-52 rounded-xl border border-gray-100 bg-white p-2 shadow-lg">
 
               <button
                 onClick={() => {

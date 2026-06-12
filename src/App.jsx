@@ -24,6 +24,7 @@ import Gestiontallas from "./pages/inventario/GestionTalla";
 import Gestionpresentaciones from "./pages/inventario/GestionPresentacion";
 import ReporteStock from "./pages/inventario/ReporteStock";
 import Proveedores from "./pages/inventario/Proveedores";
+import GestionAjuste from "./pages/inventario/GestionAjuste";
 import Gastos from "./pages/contabilidad/Gastos";
 import Deudas from "./pages/contabilidad/Deudas";
 import Pagos from "./pages/contabilidad/Pagos";
@@ -217,6 +218,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Proveedores />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario/ajuste"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <GestionAjuste />
               </MainLayout>
             </ProtectedRoute>
           }

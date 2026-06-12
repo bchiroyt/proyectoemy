@@ -110,7 +110,7 @@ const AperturaCaja = () => {
       <div
         data-barcode-listener="off"
         className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-lg max-w-7xl mx-auto w-full"
-      >
+      > 
         <header className="shrink-0 flex flex-wrap items-start justify-between gap-2 border-b border-(--color-gris-claro-2) px-3 py-2 sm:px-4 sm:py-2.5">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-(--color-negro)">Conteo inicial</h2>

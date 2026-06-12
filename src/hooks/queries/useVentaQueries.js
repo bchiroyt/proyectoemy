@@ -6,7 +6,7 @@ export const QK_VENTA_CATEGORIAS = "ventas-categorias";
 export const QK_VENTAS_HISTORIAL = "ventas-historial";
 
 export function useVentaCatalogoQuery(
-  { page = 1, pageSize = 8, criterio } = {},
+  { page = 1, pageSize = 20, criterio } = {},
   options = {}
 ) {
   const criterioNorm = String(criterio ?? "").trim() || undefined;

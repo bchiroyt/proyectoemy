@@ -72,6 +72,12 @@ export function varianteCompraElegible(v) {
   return id != null && Number(id) > 0 && disp !== false;
 }
 
+/** Variante con id válido (ajustes, búsqueda general). */
+export function varianteAjusteElegible(v) {
+  const id = v?.idVariante ?? v?.IdVariante;
+  return id != null && Number(id) > 0;
+}
+
 function normalizarCodigo(valor) {
   return String(valor ?? "").trim().toLowerCase();
 }
@@ -89,11 +95,11 @@ function codigosConocidosVariante(v) {
 /**
  * Prioriza coincidencia exacta de código (lector) y, si no, un único resultado o el primero elegible.
  */
-export function elegirVarianteParaAgregar(items, criterio) {
+export function elegirVariantePorCriterio(items, criterio, esElegible = varianteAjusteElegible) {
   const q = normalizarCodigo(criterio);
   if (!q) return null;
 
-  const elegibles = (items ?? []).filter(varianteCompraElegible);
+  const elegibles = (items ?? []).filter(esElegible);
   if (!elegibles.length) return null;
 
   const exacta = elegibles.find((v) => codigosConocidosVariante(v).includes(q));
@@ -102,4 +108,8 @@ export function elegirVarianteParaAgregar(items, criterio) {
   if (elegibles.length === 1) return elegibles[0];
 
   return elegibles[0];
+}
+
+export function elegirVarianteParaAgregar(items, criterio) {
+  return elegirVariantePorCriterio(items, criterio, varianteCompraElegible);
 }

@@ -30,9 +30,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
   DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import Paginacion from "@/components/shared/Paginacion";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 30;
 const CATEGORIA_TODO = "todo";
+const CATALOGO_GRID_CLASS =
+  "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 w-full";
 
 const VentasPOS = () => {
   const setTitulo = useNavigationStore((state) => state.setTitulo);
@@ -155,6 +158,9 @@ const VentasPOS = () => {
   });
   const productosPagina = catalogoQ.data?.items ?? [];
   const totalCount = catalogoQ.data?.totalCount ?? 0;
+  const totalPages = catalogoQ.data?.totalPages ?? 1;
+  const from = totalCount === 0 ? 0 : (pagina - 1) * PAGE_SIZE + 1;
+  const to = Math.min(from + PAGE_SIZE - 1, totalCount);
 
   useEffect(() => {
     if (!miCajaQ.isLoading && !miCajaQ.data?.data) {
@@ -713,7 +719,19 @@ const VentasPOS = () => {
                 className="max-w-none"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
+              {!modoReembolso && (
+                <Paginacion
+                  from={from}
+                  to={to}
+                  total={totalCount}
+                  onPrev={() => setPagina((p) => Math.max(1, p - 1))}
+                  onNext={() => setPagina((p) => Math.min(totalPages, p + 1))}
+                  disablePrev={pagina <= 1}
+                  disableNext={pagina >= totalPages}
+                  isLoading={catalogoQ.isLoading}
+                />
+              )}
               <button
                 type="button"
                 onClick={() => setGastosOpen(true)}
@@ -753,7 +771,7 @@ const VentasPOS = () => {
           {!modoReembolso && (
             <>
               {catalogoQ.isLoading && (
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
+                <div className={CATALOGO_GRID_CLASS}>
                   {Array.from({ length: PAGE_SIZE }).map((_, i) => (
                     <Skeleton key={i} className="h-38 rounded-xl" />
                   ))}
@@ -769,7 +787,7 @@ const VentasPOS = () => {
               )}
 
               {!catalogoQ.isLoading && !catalogoQ.isError && (
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-w-[1200px]">
+                <div className={CATALOGO_GRID_CLASS}>
                   {productosPagina.map((p) => (
                     <CatalogoProductoCard
                       key={p.idVariante}

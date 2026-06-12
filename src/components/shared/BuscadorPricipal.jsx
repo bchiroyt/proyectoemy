@@ -2,13 +2,22 @@ import React, { useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-const BuscadorPrincipal = ({ 
-  value, 
-  onChange, 
-  placeholder = "Buscar...", 
-  className = "" 
+const BuscadorPrincipal = ({
+  value,
+  onChange,
+  placeholder = "Buscar...",
+  className = "",
+  onFocus,
+  onKeyDown,
+  autoComplete,
+  inputRef,
 }) => {
   const searchInputRef = useRef(null);
+  const setInputRef = (node) => {
+    searchInputRef.current = node;
+    if (typeof inputRef === "function") inputRef(node);
+    else if (inputRef) inputRef.current = node;
+  };
 
   // Atajo de teclado global Ctrl + K
   useEffect(() => {
@@ -26,10 +35,13 @@ const BuscadorPrincipal = ({
     <div className={`relative w-full max-w-md ${className}`}>
       <Search className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-(--color-gris-letra)" />
       <Input
-        ref={searchInputRef}
+        ref={setInputRef}
         placeholder={placeholder}
         value={value}
         onChange={onChange}
+        onFocus={onFocus}
+        onKeyDown={onKeyDown}
+        autoComplete={autoComplete}
         className="h-10 w-full border-(--color-pagina-2) bg-(--color-pagina-2)/10 pl-9 shadow-sm focus-visible:ring-(--color-pagina-2)"
       />
       {/* Indicador visual del atajo */}
