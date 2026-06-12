@@ -3,15 +3,15 @@ import BarraHerramientas from "./components/BarraHerramientas";
 import Modulos from "./components/Modulos";
 import TablaProductos from "./components/TablaProductos";
 import ModalNuevoProducto from "./components/ModalNuevoProducto";
-import { obtenerProductos } from "@/services/productos";
+import { obtenerProductos, buscarVariantesCompra } from "@/services/productos";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Skeleton } from "@/components/ui/skeleton";
+
 const PAGE_SIZE = 50;
 
 const Inventario = () => {
   const setTitulo = useNavigationStore((s) => s.setTitulo);
-  const [openModal, setOpenModal] =
-    useState(false);
+  const [openModal, setOpenModal] = useState(false);
   const [productos, setProductos] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [page, setPage] = useState(1);
@@ -19,36 +19,61 @@ const Inventario = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
+  // ESTADOS PARA EL EFECTO DEBOUNCE
+  const [busqueda, setBusqueda] = useState("");          
+  const [debouncedQuery, setDebouncedQuery] = useState(""); 
+
+  // EFECTO DEBOUNCE: Espera 500ms desde que el usuario deja de escribir
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setDebouncedQuery(busqueda);
+      setPage(1); 
+    }, 500); 
+
+    return () => clearTimeout(temporizador);
+  }, [busqueda]);
+
+  // FUNCIÓN FETCH: Maneja la lógica de filtrado por variantes o carga general
   const fetchProductos = useCallback(async () => {
     try {
       setLoadingProductos(true);
+      
+      if (debouncedQuery.trim() !== "") {
+        console.info("[Inventario] Buscando variantes por criterio:", debouncedQuery);
+        
+        const res = await buscarVariantesCompra(debouncedQuery);
+        const listaFiltrada = res?.data || res || [];
+        
+        setProductos(listaFiltrada);
+        setTotalRecords(listaFiltrada.length);
+        setTotalPages(1); 
+      } else {
+        console.info("[Inventario] Cargando catálogo general paginado");
+        
+        const data = await obtenerProductos({
+          Page: page,
+          PageSize: PAGE_SIZE,
+        });
 
-      const data = await obtenerProductos({
-        Page: page,
-        PageSize: PAGE_SIZE,
-      });
-
-      console.info("[Inventario] Data recibida de /api/Productos:", data);
-
-      setProductos(data.items || []);
-      setTotalRecords(data.totalRecords || 0);
-      setTotalPages(data.totalPages || 1);
+        setProductos(data.items || []);
+        setTotalRecords(data.totalRecords || 0);
+        setTotalPages(data.totalPages || 1);
+      }
     } catch (error) {
-      console.error("Error obteniendo productos:", error);
+      console.error("Error obteniendo productos/variantes:", error);
       setProductos([]);
       setTotalRecords(0);
       setTotalPages(1);
     } finally {
       setLoadingProductos(false);
     }
-  }, [page]);
+  }, [page, debouncedQuery]); 
 
   useEffect(() => {
     setTitulo("Inventario");
     const timer = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(timer);
   }, [setTitulo]);
-
 
   useEffect(() => {
     fetchProductos();
@@ -64,11 +89,11 @@ const Inventario = () => {
       total: totalRecords,
       onPrev: () => setPage((p) => Math.max(1, p - 1)),
       onNext: () => setPage((p) => Math.min(totalPages, p + 1)),
-      disablePrev: page <= 1,
-      disableNext: page >= totalPages,
+      disablePrev: page <= 1 || debouncedQuery.trim() !== "", 
+      disableNext: page >= totalPages || debouncedQuery.trim() !== "", 
       isLoading: loadingProductos,
     }),
-    [from, to, totalRecords, totalPages, page, loadingProductos]
+    [from, to, totalRecords, totalPages, page, loadingProductos, debouncedQuery]
   );
 
   const handleProductoCreado = useCallback(() => {
@@ -76,16 +101,17 @@ const Inventario = () => {
       fetchProductos();
       return;
     }
-
     setPage(1);
   }, [fetchProductos, page]);
 
-  
+  // ADAPTACIÓN: Función idéntica a la de usuarios.jsx que recibe el evento 'e' directo del input original
+  const handleSearchChange = (e) => {
+    setBusqueda(e.target.value);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="sticky top-0 z-10 flex w-full shrink-0 flex-wrap items-center gap-1 border-b border-border bg-(--color-blanco) p-2 shadow-sm">
-
         {loading ? (
           <div className="flex items-center gap-3 py-1">
             <Skeleton className="h-9 w-48 rounded-lg" />
@@ -95,6 +121,9 @@ const Inventario = () => {
           <BarraHerramientas
             onNuevoProducto={() => setOpenModal(true)}
             pagination={pagination}
+            busqueda={busqueda}
+            // Pasamos nuestra función adaptada que procesa el evento del navegador
+            setBusqueda={handleSearchChange}
           />
         )}
       </div>
@@ -155,9 +184,7 @@ const Inventario = () => {
 
       <ModalNuevoProducto
         open={openModal}
-        onClose={() =>
-          setOpenModal(false)
-        }
+        onClose={() => setOpenModal(false)}
         onSuccess={handleProductoCreado}
       />
     </div>

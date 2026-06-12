@@ -15,15 +15,16 @@ import { useNavigate } from "react-router-dom";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 import Paginacion from "@/components/shared/Paginacion";
 
+// RECIBIMOS CORRECTAMENTE LAS PROPS DE CONTROL DESDE INVENTARIO.JSX
 const BarraHerramientas = ({
   onNuevoProducto,
   pagination,
+  busqueda,
+  setBusqueda
 }) => {
-  const [openConfig, setOpenConfig] =
-    useState(false);
+  const [openConfig, setOpenConfig] = useState(false);
 
   const navigate = useNavigate();
-
   const configRef = useRef(null);
 
   // CERRAR DROPDOWN AL HACER CLICK AFUERA
@@ -55,35 +56,29 @@ const BarraHerramientas = ({
 
       {/* IZQUIERDA */}
       <div className="flex items-center gap-3 flex-1">
-
         <button
           onClick={onNuevoProducto}
-          className="xl:text-sm  bg-(--color-pagina) text-white px-5 py-2 rounded-xl hover:opacity-90 transition cursor-pointer"
+          className="xl:text-sm bg-(--color-pagina) text-white px-5 py-2 rounded-xl hover:opacity-90 transition cursor-pointer"
         >
           + Crear Producto
         </button>
-
       </div>
 
       {/* CENTRO */}
       <div className="flex justify-center flex-1">
-
-        <BuscadorPrincipal />
-        
-
+        {/* LE PASAMOS LOS ESTADOS AL COMPONENTE NIETO BUSCADOR */}
+        <BuscadorPrincipal value={busqueda} onChange={setBusqueda} />
       </div>
 
       {/* DERECHA */}
       <div className="flex items-center gap-3 flex-1 justify-end">
-
-      <Paginacion {...pagination} />
+        <Paginacion {...pagination} />
       
         {/* CONFIGURACIÓN */}
         <div
           className="relative"
           ref={configRef}
         >
-
           <button
             onClick={() =>
               setOpenConfig(!openConfig)
@@ -95,7 +90,6 @@ const BarraHerramientas = ({
 
           {openConfig && (
             <div className="absolute right-0 top-12 bg-white shadow-lg rounded-xl p-2 w-52 z-10 border border-gray-100">
-
               <button
                 onClick={() => {
                   navigate("/inventario/reporte-stock");
@@ -125,12 +119,9 @@ const BarraHerramientas = ({
               >
                 Proveedores
               </button>
-
             </div>
           )}
-
         </div>
-
       </div>
 
     </div>
