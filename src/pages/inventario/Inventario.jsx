@@ -6,7 +6,11 @@ import TablaProductos from "./components/TablaProductos";
 import ModalNuevoProducto from "./components/ModalNuevoProducto";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QK_PRODUCTOS, useProductosListQuery } from "@/hooks/queries/useProductosQueries";
+import {
+  QK_PRODUCTOS,
+  useProductosBuscarQuery,
+  useProductosListQuery,
+} from "@/hooks/queries/useProductosQueries";
 
 const PAGE_SIZE = 50;
 
@@ -16,14 +20,38 @@ const Inventario = () => {
   const [openModal, setOpenModal] = useState(false);
   const [page, setPage] = useState(1);
   const [skeletonMaxElapsed, setSkeletonMaxElapsed] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const productosQ = useProductosListQuery({ page, pageSize: PAGE_SIZE });
-  const productos = productosQ.data?.items ?? [];
-  const totalRecords = productosQ.data?.totalRecords ?? 0;
-  const totalPages = productosQ.data?.totalPages ?? 1;
-  const loadingProductos = productosQ.isLoading || productosQ.isFetching;
-  const datosListos = productosQ.isFetched || productosQ.isError;
+  const isSearching = debouncedQuery.trim() !== "";
+
+  const productosQ = useProductosListQuery(
+    { page, pageSize: PAGE_SIZE },
+    { enabled: !isSearching }
+  );
+  const buscarQ = useProductosBuscarQuery(debouncedQuery, { enabled: isSearching });
+
+  const productos = isSearching ? (buscarQ.data ?? []) : (productosQ.data?.items ?? []);
+  const totalRecords = isSearching
+    ? productos.length
+    : (productosQ.data?.totalRecords ?? 0);
+  const totalPages = isSearching ? 1 : (productosQ.data?.totalPages ?? 1);
+  const loadingProductos = isSearching
+    ? buscarQ.isLoading || buscarQ.isFetching
+    : productosQ.isLoading || productosQ.isFetching;
+  const datosListos = isSearching
+    ? buscarQ.isFetched || buscarQ.isError
+    : productosQ.isFetched || productosQ.isError;
   const showSkeleton = !skeletonMaxElapsed && !datosListos;
+
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setDebouncedQuery(busqueda);
+      setPage(1);
+    }, 500);
+
+    return () => clearTimeout(temporizador);
+  }, [busqueda]);
 
   useEffect(() => {
     setTitulo("Inventario");
@@ -41,26 +69,27 @@ const Inventario = () => {
       total: totalRecords,
       onPrev: () => setPage((p) => Math.max(1, p - 1)),
       onNext: () => setPage((p) => Math.min(totalPages, p + 1)),
-      disablePrev: page <= 1,
-      disableNext: page >= totalPages,
+      disablePrev: page <= 1 || isSearching,
+      disableNext: page >= totalPages || isSearching,
       isLoading: loadingProductos,
     }),
-    [from, to, totalRecords, totalPages, page, loadingProductos]
+    [from, to, totalRecords, totalPages, page, loadingProductos, isSearching]
   );
 
   const handleProductoCreado = useCallback(() => {
-    if (page === 1) {
-      queryClient.invalidateQueries({ queryKey: [QK_PRODUCTOS, "lista"] });
-      return;
+    queryClient.invalidateQueries({ queryKey: [QK_PRODUCTOS] });
+    if (page !== 1) {
+      setPage(1);
     }
-
-    setPage(1);
   }, [page, queryClient]);
+
+  const handleSearchChange = (e) => {
+    setBusqueda(e.target.value);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="sticky top-0 z-30 flex w-full shrink-0 flex-wrap items-center gap-1 overflow-visible border-b border-border bg-(--color-blanco) p-2 shadow-sm">
-
         {showSkeleton ? (
           <div className="flex items-center gap-3 py-1">
             <Skeleton className="h-9 w-48 rounded-lg" />
@@ -70,6 +99,8 @@ const Inventario = () => {
           <BarraHerramientas
             onNuevoProducto={() => setOpenModal(true)}
             pagination={pagination}
+            busqueda={busqueda}
+            setBusqueda={handleSearchChange}
           />
         )}
       </div>

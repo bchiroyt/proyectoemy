@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { obtenerProductos } from "@/services/productos";
+import { obtenerProductos, buscarVariantesCompra } from "@/services/productos";
 
 export const QK_PRODUCTOS = "productos";
 
@@ -29,5 +29,22 @@ export function useProductosListQuery({ page = 1, pageSize = 50 } = {}, options 
       return unwrapProductosPaged(data);
     },
     ...options,
+  });
+}
+
+export function useProductosBuscarQuery(criterio, options = {}) {
+  const q = (criterio ?? "").trim();
+  const { enabled = true, ...rest } = options;
+  return useQuery({
+    queryKey: [QK_PRODUCTOS, "buscar", q],
+    queryFn: async () => {
+      const raw = await buscarVariantesCompra(q);
+      if (raw && raw.exito === false) {
+        throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
+      }
+      return raw?.data ?? raw?.Data ?? raw ?? [];
+    },
+    enabled: enabled && q.length >= 1,
+    ...rest,
   });
 }
