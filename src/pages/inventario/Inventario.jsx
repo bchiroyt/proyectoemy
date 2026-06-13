@@ -1,58 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import BarraHerramientas from "./components/BarraHerramientas";
 import Modulos from "./components/Modulos";
 import TablaProductos from "./components/TablaProductos";
 import ModalNuevoProducto from "./components/ModalNuevoProducto";
-import { obtenerProductos } from "@/services/productos";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QK_PRODUCTOS, useProductosListQuery } from "@/hooks/queries/useProductosQueries";
+
 const PAGE_SIZE = 50;
 
 const Inventario = () => {
   const setTitulo = useNavigationStore((s) => s.setTitulo);
-  const [openModal, setOpenModal] =
-    useState(false);
-  const [productos, setProductos] = useState([]);
-  const [loadingProductos, setLoadingProductos] = useState(false);
+  const queryClient = useQueryClient();
+  const [openModal, setOpenModal] = useState(false);
   const [page, setPage] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [skeletonMaxElapsed, setSkeletonMaxElapsed] = useState(false);
 
-  const fetchProductos = useCallback(async () => {
-    try {
-      setLoadingProductos(true);
-
-      const data = await obtenerProductos({
-        Page: page,
-        PageSize: PAGE_SIZE,
-      });
-
-      console.info("[Inventario] Data recibida de /api/Productos:", data);
-
-      setProductos(data.items || []);
-      setTotalRecords(data.totalRecords || 0);
-      setTotalPages(data.totalPages || 1);
-    } catch (error) {
-      console.error("Error obteniendo productos:", error);
-      setProductos([]);
-      setTotalRecords(0);
-      setTotalPages(1);
-    } finally {
-      setLoadingProductos(false);
-    }
-  }, [page]);
+  const productosQ = useProductosListQuery({ page, pageSize: PAGE_SIZE });
+  const productos = productosQ.data?.items ?? [];
+  const totalRecords = productosQ.data?.totalRecords ?? 0;
+  const totalPages = productosQ.data?.totalPages ?? 1;
+  const loadingProductos = productosQ.isLoading || productosQ.isFetching;
+  const datosListos = productosQ.isFetched || productosQ.isError;
+  const showSkeleton = !skeletonMaxElapsed && !datosListos;
 
   useEffect(() => {
     setTitulo("Inventario");
-    const timer = setTimeout(() => setLoading(false), 2000);
+    const timer = setTimeout(() => setSkeletonMaxElapsed(true), 1000);
     return () => clearTimeout(timer);
   }, [setTitulo]);
-
-
-  useEffect(() => {
-    fetchProductos();
-  }, [fetchProductos]);
 
   const from = totalRecords === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, totalRecords);
@@ -73,20 +50,18 @@ const Inventario = () => {
 
   const handleProductoCreado = useCallback(() => {
     if (page === 1) {
-      fetchProductos();
+      queryClient.invalidateQueries({ queryKey: [QK_PRODUCTOS, "lista"] });
       return;
     }
 
     setPage(1);
-  }, [fetchProductos, page]);
-
-  
+  }, [page, queryClient]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="sticky top-0 z-30 flex w-full shrink-0 flex-wrap items-center gap-1 overflow-visible border-b border-border bg-(--color-blanco) p-2 shadow-sm">
 
-        {loading ? (
+        {showSkeleton ? (
           <div className="flex items-center gap-3 py-1">
             <Skeleton className="h-9 w-48 rounded-lg" />
             <Skeleton className="h-9 w-32 rounded-lg" />
@@ -100,7 +75,7 @@ const Inventario = () => {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {loading ? (
+        {showSkeleton ? (
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
             <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               {[...Array(4)].map((_, i) => (
@@ -155,9 +130,7 @@ const Inventario = () => {
 
       <ModalNuevoProducto
         open={openModal}
-        onClose={() =>
-          setOpenModal(false)
-        }
+        onClose={() => setOpenModal(false)}
         onSuccess={handleProductoCreado}
       />
     </div>

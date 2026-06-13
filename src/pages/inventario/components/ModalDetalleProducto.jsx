@@ -74,12 +74,25 @@ const ModalDetalleProducto = ({
     }
   }, [open]);
 
-  const handleIntentoCierre = () => {
+  const handleIntentoCierre = (nextOpen) => {
+    if (nextOpen) return;
     if (editandoId !== null) {
       setOpenConfirmarSalida(true);
-    } else {
-      onClose();
+      return;
     }
+    onClose();
+  };
+
+  const handleSalirSinGuardar = () => {
+    cancelarEdicion();
+    setOpenConfirmarSalida(false);
+    onClose();
+  };
+
+  const solicitarConfirmacionSalida = (event) => {
+    if (editandoId === null) return;
+    event.preventDefault();
+    setOpenConfirmarSalida(true);
   };
 
   const iniciarEdicion = (v, idActual) => {
@@ -166,7 +179,49 @@ const ModalDetalleProducto = ({
   return (
     <>
       <Dialog open={open} onOpenChange={handleIntentoCierre}>
-        <DialogContent className="w-[95vw] md:w-[90vw] !max-w-[1100px] p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white max-h-[90vh] flex flex-col z-50">
+        <DialogContent
+          className="flex min-h-0 w-[95vw] !max-w-[1100px] flex-col max-h-[90vh] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl md:w-[90vw] z-50"
+          onInteractOutside={solicitarConfirmacionSalida}
+          onEscapeKeyDown={solicitarConfirmacionSalida}
+        >
+          {openConfirmarSalida && (
+            <div className="absolute inset-0 z-[60]">
+              <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
+              <div className="absolute left-1/2 top-1/2 z-[61] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2">
+                <div
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-labelledby="confirmar-salida-titulo"
+                  aria-describedby="confirmar-salida-descripcion"
+                  className="rounded-2xl border-t-4 border-pink-600 bg-white p-6 shadow-2xl"
+                >
+                <h4 id="confirmar-salida-titulo" className="text-center text-md font-semibold text-gray-800">
+                  ¿Estás seguro de salir?
+                </h4>
+                <p id="confirmar-salida-descripcion" className="mt-2 text-center text-sm text-gray-500">
+                  No se guardarán los cambios
+                </p>
+                <div className="mt-4 flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleSalirSinGuardar}
+                    className="w-full rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600"
+                  >
+                    Sí, salir
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOpenConfirmarSalida(false)}
+                    className="w-full rounded-xl border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    No, continuar
+                  </Button>
+                </div>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* HEADER (Permanente para satisfacer los requerimientos de Radix UI) */}
           <div className="p-6 md:p-8 pb-4 flex flex-col justify-start shrink-0 relative">
@@ -410,36 +465,6 @@ const ModalDetalleProducto = ({
           )}
         </DialogContent>
       </Dialog>
-
-      {/* SUB-MODAL DE CONFIRMACIÓN */}
-      {openConfirmarSalida && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl flex flex-col border-t-4 border-pink-600 p-6 space-y-4">
-            <h4 className="text-md font-semibold text-gray-800 text-center">¿Estás seguro de salir?</h4>
-            <p className="text-sm text-gray-500 text-center shadow-none">No se guardarán los cambios</p>
-            <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  cancelarEdicion();
-                  setOpenConfirmarSalida(false);
-                  onClose(); 
-                }}
-                className="w-full bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-all cursor-pointer text-sm"
-              >
-                Sí, salir
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpenConfirmarSalida(false)}
-                className="w-full border border-gray-200 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-50 transition-all cursor-pointer text-sm"
-              >
-                No, continuar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

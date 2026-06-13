@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, History, Trash2, Eye, Calendar, User, PlusCircle, FileText, Info, 
@@ -63,7 +63,7 @@ const GestionAjuste = () => {
   const variantesQ = useVariantesBuscarQuery(debounced, {
     enabled: debounced.length >= 1,
   });
-  const resultados = variantesQ.data ?? [];
+  const resultados = useMemo(() => variantesQ.data ?? [], [variantesQ.data]);
   const buscandoProductos = variantesQ.isFetching && debounced.length >= 1;
 
   // 2. Cargar Historial
