@@ -1,7 +1,7 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarDays, Store, FileText, Printer, Download, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,9 +47,9 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-  showCloseButton={false}
-  className="h-[95vh] sm:h-[90vh] w-[95vw] sm:max-w-[1100px] sm:w-full gap-0 overflow-hidden p-0 flex flex-col transition-all duration-300"
->
+        showCloseButton={false}
+        className="h-[95vh] sm:h-[90vh] w-[95vw] sm:max-w-[1100px] sm:w-full gap-0 overflow-hidden p-0 flex flex-col transition-all duration-300"
+      >
         <DialogHeader className="border-b border-(--color-gris-claro-2) px-5 py-4 text-left shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1 min-w-0">

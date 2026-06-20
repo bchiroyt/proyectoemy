@@ -10,7 +10,7 @@ import {
   useAplicarReembolsoMutation,
   usePrevisualizarReembolsoMutation,
 } from "@/hooks/queries/useReembolsoQueries";
-import { useMiCajaActivaQuery } from "@/hooks/queries/useCajaQueries";
+import { useMiCajaActivaQuery, useMetodosPagoQuery } from "@/hooks/queries/useCajaQueries";
 import { getMetodosPagoConfig } from "@/constants/metodosPago";
 import { montoBaseLineaReembolso } from "@/lib/reembolsoMappers";
 import { buildVentaCrearBody, roundVenta, subtotalLinea } from "@/lib/ventaMappers";
@@ -51,7 +51,13 @@ const CobroCaja = () => {
 
   const [mostrarTicket, setMostrarTicket] = useState(false);
 
-  const metodos = useMemo(() => getMetodosPagoConfig(), []);
+  const metodosQ = useMetodosPagoQuery();
+  const metodos = useMemo(() => {
+    if (metodosQ.data?.data?.length) {
+      return metodosQ.data.data;
+    }
+    return getMetodosPagoConfig();
+  }, [metodosQ.data?.data]);
   const metodoEfectivo = metodos.find((m) => m.clave === "efectivo");
   const metodoBanco = metodos.find((m) => m.clave === "banco");
 

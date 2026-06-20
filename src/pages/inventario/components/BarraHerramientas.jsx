@@ -31,7 +31,7 @@ const BarraHerramientas = ({
         <button
           type="button"
           onClick={onNuevoProducto}
-          className="rounded-xl bg-(--color-pagina) px-5 py-2 text-white transition hover:opacity-90 xl:text-sm"
+          className="rounded-xl bg-(--color-pagina) px-5 py-2 text-(--color-blanco) transition hover:opacity-90 xl:text-sm"
         >
           + Crear Producto
         </button>

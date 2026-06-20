@@ -42,7 +42,8 @@ export function useProductosBuscarQuery(criterio, options = {}) {
       if (raw && raw.exito === false) {
         throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
       }
-      return raw?.data ?? raw?.Data ?? raw ?? [];
+      const lista = raw?.data ?? raw?.Data ?? raw ?? [];
+      return Array.isArray(lista) ? lista : [];
     },
     enabled: enabled && q.length >= 1,
     ...rest,

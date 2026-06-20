@@ -16,6 +16,9 @@ import Contabilidad from "./pages/contabilidad/Contabilidad";
 import Compras from "./pages/compras/Compras";
 import NuevaCompra from "./pages/compras/NuevaCompra";
 import NuevoProducto from "./pages/producto/NuevoProducto";
+import NuevaCotizacion from "./pages/mayoreo/NuevaCotizacion";
+import Mayoreo from "./pages/mayoreo/Mayoreo";
+import FinalizarCotizacion from "./pages/mayoreo/FinalizarCotizacion";
 import { useAuthStore } from "./context/useAuthStore";
 import GestionCategorias from "./pages/inventario/GestionCategoria";// --- Importaciones de la versión antigua ---
 import GestionMarcas from "./pages/inventario/GestionMarca";
@@ -146,6 +149,46 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Contabilidad />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mayoreo"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Mayoreo />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mayoreo/nueva"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <NuevaCotizacion />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mayoreo/:idCotizacion/editar"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <NuevaCotizacion />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mayoreo/:idCotizacion/finalizar"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <FinalizarCotizacion />
               </MainLayout>
             </ProtectedRoute>
           }

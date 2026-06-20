@@ -4,13 +4,13 @@ import { X, Loader2 } from "lucide-react";
 // IMPORTACIONES DE TU ARQUITECTURA
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { obtenerKardexPorProducto } from "@/services/kardex";
+import { resolverIdProducto } from "@/lib/productoUtils";
 
 const ModalKardexProducto = ({ open, onClose, producto }) => {
   const [movimientos, setMovimientos] = useState([]);
   const [cargando, setCargando] = useState(false);
 
-  // Captura el ID de forma segura
-  const idProducto = producto?.idProducto || producto?.id_producto || producto?.id;
+  const idProducto = resolverIdProducto(producto);
 
   useEffect(() => {
     const cargarKardex = async () => {
@@ -19,7 +19,7 @@ const ModalKardexProducto = ({ open, onClose, producto }) => {
       try {
         setCargando(true);
         const res = await obtenerKardexPorProducto(idProducto);
-        
+
         // Estructura estándar RespuestaBase de tu C# (.exito y .data)
         if (res?.exito && res?.data) {
           setMovimientos(Array.isArray(res.data) ? res.data : []);
@@ -47,8 +47,8 @@ const ModalKardexProducto = ({ open, onClose, producto }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border-t-4 border-pink-600">
-        
+      <div className="bg-(--color-blanco) w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border-t-4 border-pink-600">
+
         {/* HEADER */}
         <div className="flex justify-between items-center p-6 border-b shrink-0">
           <div>
@@ -60,7 +60,7 @@ const ModalKardexProducto = ({ open, onClose, producto }) => {
             </p>
           </div>
 
-          <button 
+          <button
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
           >
@@ -121,11 +121,10 @@ const ModalKardexProducto = ({ open, onClose, producto }) => {
                           </td>
                           <td className="p-4">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
-                                esEntrada
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${esEntrada
                                   ? "bg-green-50 text-green-700 border border-green-100"
                                   : "bg-pink-50 text-pink-600 border border-pink-100"
-                              }`}
+                                }`}
                             >
                               {tipo || "SALIDA"}
                             </span>

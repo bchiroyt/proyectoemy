@@ -97,3 +97,35 @@ export const fetchDenominacionesActivas = async () => {
   throwIfEnvelopeFailed(data, "No se pudieron cargar las denominaciones.");
   return { ...unwrapCajaEnvelope(data), data: mapDenominacionesList(data) };
 };
+
+export const fetchCajaMovimientoTipos = async () => {
+  const { data } = await apiClient.get("/api/Cajas/movimientos/tipos");
+  throwIfEnvelopeFailed(data, "No se pudieron cargar los tipos de movimiento.");
+  const envelope = unwrapCajaEnvelope(data);
+  const list = Array.isArray(envelope.data) ? envelope.data : [];
+  const mappedList = list
+    .map((t) => ({
+      idTipoMovimientoCaja: Number(t.idTipoMovimientoCaja ?? t.id),
+      nombre: t.nombre ?? t.Nombre ?? "",
+      naturaleza: String(t.naturaleza ?? t.Naturaleza ?? "").toUpperCase(),
+      requiereMotivo: Boolean(t.requiereMotivo ?? t.RequiereMotivo ?? true),
+    }))
+    .filter((t) => t.idTipoMovimientoCaja > 0 && t.nombre);
+  return { ...envelope, data: mappedList };
+};
+
+export const fetchMetodosPago = async () => {
+  const { data } = await apiClient.get("/api/MetodosPago");
+  throwIfEnvelopeFailed(data, "No se pudieron cargar los métodos de pago.");
+  const envelope = unwrapCajaEnvelope(data);
+  const list = Array.isArray(envelope.data) ? envelope.data : [];
+  const mappedList = list
+    .map((m) => ({
+      clave: String(m.clave ?? m.Clave ?? m.nombre ?? m.Nombre ?? "").toLowerCase(),
+      idMetodoPago: Number(m.idMetodoPago ?? m.IdMetodoPago ?? m.id),
+      nombre: String(m.nombre ?? m.Nombre ?? "").toUpperCase() || "PAGO",
+      permiteCambio: Boolean(m.permiteCambio ?? m.PermiteCambio ?? false),
+    }))
+    .filter((m) => m.idMetodoPago > 0 && m.clave);
+  return { ...envelope, data: mappedList };
+};

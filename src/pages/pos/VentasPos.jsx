@@ -20,15 +20,19 @@ import { CerrarTurnoMenu } from "@/pages/pos/components/CerrarTurnoMenu";
 import { useCarritoCantidadTeclado } from "@/hooks/useCarritoCantidadTeclado";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
 import { ID_UBICACION_REEMBOLSO } from "@/lib/reembolsoMappers";
-import { subtotalLinea, roundVenta } from "@/lib/ventaMappers";
-import { useReembolsoPreparacionQuery, useReembolsoVentasDisponiblesQuery,
-  QK_REEMBOLSOS } from "@/hooks/queries/useReembolsoQueries";
+import { subtotalLinea, roundVenta, descuentoMontoLinea } from "@/lib/ventaMappers";
+import {
+  useReembolsoPreparacionQuery, useReembolsoVentasDisponiblesQuery,
+  QK_REEMBOLSOS
+} from "@/hooks/queries/useReembolsoQueries";
 import { usePosTicketsStore, LIMITE_TICKETS_ESPERA } from "@/context/usePosTicketsStore";
 import Toast from "@/components/ui/Toast";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
-  DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import Paginacion from "@/components/shared/Paginacion";
 
@@ -69,6 +73,8 @@ const VentasPOS = () => {
   const [reembolsoLineaModalId, setReembolsoLineaModalId] = useState(null);
   const [reembolsoLineaBorrador, setReembolsoLineaBorrador] = useState(null);
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [mostrarInputsDescuento, setMostrarInputsDescuento] = useState(false);
   const reembolsoSesion = usePosVentaStore((s) => s.reembolsoSesion);
   const setReembolsoSesion = usePosVentaStore((s) => s.setReembolsoSesion);
   const resetReembolsoSesion = usePosVentaStore((s) => s.resetReembolsoSesion);
@@ -129,6 +135,12 @@ const VentasPOS = () => {
       prevActiveIdRef.current = activeId;
     }
   }, [activeId, deseleccionar]);
+
+  useEffect(() => {
+    if (!lineaSeleccionadaId) {
+      setMostrarInputsDescuento(false);
+    }
+  }, [lineaSeleccionadaId]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedCriterio(busqueda.trim()), 350);
@@ -287,10 +299,10 @@ const VentasPOS = () => {
         prev.map((p) =>
           p.id === lineaSeleccionadaId
             ? {
-                ...p,
-                descuentoTipo: valido ? tipo : null,
-                descuentoValor: valido ? valor : null,
-              }
+              ...p,
+              descuentoTipo: valido ? tipo : null,
+              descuentoValor: valido ? valor : null,
+            }
             : p
         )
       );
@@ -551,13 +563,13 @@ const VentasPOS = () => {
       totalLineas,
       enReembolso
         ? {
-            tipo: "reembolso",
-            reembolso: {
-              idVenta: ventaReembolsoId,
-              motivo: reembolsoMotivo.trim(),
-              observacion: reembolsoObservacion.trim() || null,
-            },
-          }
+          tipo: "reembolso",
+          reembolso: {
+            idVenta: ventaReembolsoId,
+            motivo: reembolsoMotivo.trim(),
+            observacion: reembolsoObservacion.trim() || null,
+          },
+        }
         : { tipo: "venta", reembolso: null }
     );
     navigate("/pos/cobro");
@@ -595,52 +607,90 @@ const VentasPOS = () => {
         lineaReembolsoActivaId={reembolsoLineaModalId}
         onAbrirLineaReembolso={abrirConfigLineaReembolso}
       >
+        <button
+          type="button"
+          onClick={() => setHistorialOpen(true)}
+          className="w-full text-sm font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
+        >
+          Historial de transacciones
+        </button>
+
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => setHistorialOpen(true)}
-            className="w-full text-sm font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
+            onClick={() => {
+              if (lineaSeleccionada) {
+                setInfoModalOpen(true);
+              } else {
+                setToast({
+                  open: true,
+                  message: "Por favor, seleccione un producto en el carrito para ver su información.",
+                  type: "warning",
+                });
+              }
+            }}
+            className="flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
           >
-            Historial de transacciones
+            <Info className="w-3.5 h-3.5" />
+            Información
           </button>
+          <button
+            type="button"
+            onClick={toggleModoReembolso}
+            className="flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            {modoReembolso ? "Salir reembolso" : "Reembolso"}
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
-            >
-              <Info className="w-3.5 h-3.5" />
-              Información
-            </button>
-            <button
-              type="button"
-              onClick={toggleModoReembolso}
-              className="flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-(--color-pos-accent-suave) text-(--color-pagina) hover:bg-(--color-pos-accent-suave-hover) transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              {modoReembolso ? "Salir reembolso" : "Reembolso"}
-            </button>
-          </div>
-
-          {!modoReembolso && (
+        {!modoReembolso && (
           <div
             data-barcode-listener="off"
-            className="rounded-lg border border-(--color-pos-borde-suave) bg-(--color-pos-accent-suave)/40 p-2.5 space-y-2"
+            className={cn(
+              "rounded-lg border border-(--color-pos-borde-suave) bg-(--color-pos-accent-suave)/40 p-2.5 space-y-2 transition-all duration-200",
+              lineaSeleccionada && !mostrarInputsDescuento && "hover:bg-(--color-pos-accent-suave-hover)/60 cursor-pointer"
+            )}
+            onClick={() => {
+              if (lineaSeleccionada && !mostrarInputsDescuento) {
+                setMostrarInputsDescuento(true);
+              }
+            }}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--color-pagina)">Descuento por producto</span>
-              {lineaSeleccionada && (lineaSeleccionada.descuentoValor ?? 0) > 0 && (
-                <button
-                  type="button"
-                  onClick={() => aplicarDescuentoLinea("monto", 0)}
-                  className="text-[10px] font-semibold text-(--color-rojo-obscuro) hover:underline"
-                >
-                  Quitar
-                </button>
+              {lineaSeleccionada && (
+                <div className="flex items-center gap-2">
+                  {(lineaSeleccionada.descuentoValor ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        aplicarDescuentoLinea("monto", 0);
+                      }}
+                      className="text-[10px] font-semibold text-(--color-rojo-obscuro) hover:underline"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                  {mostrarInputsDescuento && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMostrarInputsDescuento(false);
+                      }}
+                      className="text-[10px] font-semibold text-(--color-pos-texto-muted) hover:underline"
+                    >
+                      Ocultar
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             {lineaSeleccionada ? (
-              <>
-                <div className="grid grid-cols-2 gap-2">
+              mostrarInputsDescuento ? (
+                <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
                   <label className="flex flex-col gap-1 text-[10px] font-semibold text-(--color-pos-texto-muted)">
                     Porcentaje (%)
                     <input
@@ -677,24 +727,28 @@ const VentasPOS = () => {
                     />
                   </label>
                 </div>
-              </>
+              ) : (
+                <p className="text-[11px] text-(--color-pos-texto-muted)">
+                  Presione aquí para agregar descuento.
+                </p>
+              )
             ) : (
               <p className="text-[11px] text-(--color-pos-texto-muted)">
                 Seleccione un producto para aplicar descuento.
               </p>
             )}
           </div>
-          )}
+        )}
 
-          <button
-            type="button"
-            onClick={irACobro}
-            disabled={carrito.every((p) => p.cantidad <= 0)}
-            className="w-full mt-1 flex items-center justify-center gap-2 bg-(--color-pos-boton-primario) text-(--color-blanco) font-bold py-3 rounded-xl hover:bg-(--color-pos-boton-primario-hover) transition-colors disabled:opacity-50"
-          >
-            <Check className="w-5 h-5" />
-            {modoReembolso ? "Reembolsar" : "Confirmar compra"}
-          </button>
+        <button
+          type="button"
+          onClick={irACobro}
+          disabled={carrito.every((p) => p.cantidad <= 0)}
+          className="w-full mt-1 flex items-center justify-center gap-2 bg-(--color-pos-boton-primario) text-(--color-blanco) font-bold py-3 rounded-xl hover:bg-(--color-pos-boton-primario-hover) transition-colors disabled:opacity-50"
+        >
+          <Check className="w-5 h-5" />
+          {modoReembolso ? "Reembolsar" : "Confirmar compra"}
+        </button>
       </CarritoPanel>
 
       <section className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -720,18 +774,7 @@ const VentasPOS = () => {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2 ml-auto">
-              {!modoReembolso && (
-                <Paginacion
-                  from={from}
-                  to={to}
-                  total={totalCount}
-                  onPrev={() => setPagina((p) => Math.max(1, p - 1))}
-                  onNext={() => setPagina((p) => Math.min(totalPages, p + 1))}
-                  disablePrev={pagina <= 1}
-                  disableNext={pagina >= totalPages}
-                  isLoading={catalogoQ.isLoading}
-                />
-              )}
+
               <button
                 type="button"
                 onClick={() => setGastosOpen(true)}
@@ -740,6 +783,17 @@ const VentasPOS = () => {
                 Gastos
               </button>
               <CerrarTurnoMenu />
+
+              <Paginacion
+                from={from}
+                to={to}
+                total={totalCount}
+                onPrev={() => setPagina((p) => Math.max(1, p - 1))}
+                onNext={() => setPagina((p) => Math.min(totalPages, p + 1))}
+                disablePrev={pagina <= 1}
+                disableNext={pagina >= totalPages}
+                isLoading={catalogoQ.isLoading}
+              />
             </div>
           </div>
 
@@ -890,7 +944,7 @@ const VentasPOS = () => {
                                       "w-full text-left rounded-lg border px-2.5 py-2 transition-colors",
                                       "border-(--color-pos-borde-suave) hover:bg-(--color-pos-accent-suave)/50",
                                       reembolsoLineaModalId === cartId &&
-                                        "border-(--color-pagina) bg-(--color-pos-accent-suave)"
+                                      "border-(--color-pagina) bg-(--color-pos-accent-suave)"
                                     )}
                                   >
                                     <p className="text-sm font-semibold leading-snug">{l.nombre}</p>
@@ -994,6 +1048,162 @@ const VentasPOS = () => {
               className="bg-(--color-pagina) text-(--color-blanco) hover:bg-(--color-borde-button)"
             >
               Volver al carrito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={infoModalOpen} onOpenChange={setInfoModalOpen}>
+        <DialogContent className="sm:max-w-lg bg-(--color-pos-panel) border border-(--color-pos-borde-suave) text-foreground rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-(--color-pagina) text-xl font-bold">
+              <Info className="size-5" />
+              Detalle del Producto
+            </DialogTitle>
+            <DialogDescription className="text-(--color-pos-texto-muted) text-sm mt-1">
+              Información técnica y comercial de la variante seleccionada.
+            </DialogDescription>
+          </DialogHeader>
+
+          {lineaSeleccionada && (
+            <div className="space-y-4 py-2">
+              {/* Encabezado con Nombre y SKU */}
+              <div className="border-b border-(--color-pos-borde-suave) pb-3">
+                <h3 className="text-lg font-bold text-foreground leading-snug">
+                  {lineaSeleccionada.nombre}
+                </h3>
+                {lineaSeleccionada.sku && (
+                  <p className="text-xs font-mono text-(--color-pos-texto-muted) mt-1">
+                    SKU: {lineaSeleccionada.sku}
+                  </p>
+                )}
+              </div>
+
+              {/* Grid de Información Principal */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl border border-(--color-pos-borde-suave) p-3 bg-(--color-pos-fondo)/50">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--color-pos-texto-muted) block mb-0.5">
+                    Categoría
+                  </span>
+                  <span className="font-semibold">
+                    {lineaSeleccionada.categoria || "—"}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-(--color-pos-borde-suave) p-3 bg-(--color-pos-fondo)/50">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--color-pos-texto-muted) block mb-0.5">
+                    Marca
+                  </span>
+                  <span className="font-semibold">
+                    {lineaSeleccionada.marca || "—"}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-(--color-pos-borde-suave) p-3 bg-(--color-pos-fondo)/50">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--color-pos-texto-muted) block mb-0.5">
+                    Precio Venta
+                  </span>
+                  <span className="font-bold text-(--color-pagina)">
+                    Q {Number(lineaSeleccionada.precio || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-(--color-pos-borde-suave) p-3 bg-(--color-pos-fondo)/50">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--color-pos-texto-muted) block mb-0.5">
+                    Stock Disponible
+                  </span>
+                  <span className={cn(
+                    "font-semibold",
+                    (lineaSeleccionada.stockActual ?? 0) <= 0 ? "text-(--color-rojo-obscuro)" : "text-foreground"
+                  )}>
+                    {lineaSeleccionada.stockActual != null ? `${lineaSeleccionada.stockActual} uds.` : "No definido"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid de Atributos Específicos */}
+              <div className="grid grid-cols-3 gap-2 text-xs border-t border-b border-(--color-pos-borde-suave) py-3">
+                <div className="text-center">
+                  <span className="text-[9px] font-bold uppercase text-(--color-pos-texto-muted) block mb-0.5">
+                    Talla
+                  </span>
+                  <span className="font-medium bg-(--color-pos-fondo) px-2.5 py-1 rounded-md inline-block">
+                    {lineaSeleccionada.talla || "N/A"}
+                  </span>
+                </div>
+                <div className="text-center">
+                  <span className="text-[9px] font-bold uppercase text-(--color-pos-texto-muted) block mb-0.5">
+                    Color
+                  </span>
+                  <span className="font-medium bg-(--color-pos-fondo) px-2.5 py-1 rounded-md inline-block">
+                    {lineaSeleccionada.color || "N/A"}
+                  </span>
+                </div>
+                <div className="text-center">
+                  <span className="text-[9px] font-bold uppercase text-(--color-pos-texto-muted) block mb-0.5">
+                    Presentación
+                  </span>
+                  <span className="font-medium bg-(--color-pos-fondo) px-2.5 py-1 rounded-md inline-block">
+                    {lineaSeleccionada.presentacion || "N/A"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Descripción */}
+              {lineaSeleccionada.descripcion && (
+                <div className="text-xs">
+                  <span className="font-bold text-(--color-pos-texto-muted) block mb-1">
+                    Descripción:
+                  </span>
+                  <p className="text-foreground/90 bg-(--color-pos-fondo)/30 p-2.5 rounded-xl border border-(--color-pos-borde-suave) leading-relaxed">
+                    {lineaSeleccionada.descripcion}
+                  </p>
+                </div>
+              )}
+
+              {/* Resumen del Carrito */}
+              <div className="bg-(--color-pos-accent-suave)/40 border border-(--color-pos-borde-suave) rounded-xl p-3.5 space-y-2">
+                <span className="text-xs font-bold text-(--color-pagina) block">
+                  Estado en el carrito actual
+                </span>
+                <div className="grid grid-cols-3 gap-2 text-xs text-center">
+                  <div>
+                    <span className="text-[9px] font-semibold text-(--color-pos-texto-muted) block mb-0.5">
+                      Cantidad
+                    </span>
+                    <span className="font-bold text-sm">
+                      {lineaSeleccionada.cantidad}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-semibold text-(--color-pos-texto-muted) block mb-0.5">
+                      Descuento
+                    </span>
+                    <span className="font-bold text-sm text-(--color-esmeralda-hover)">
+                      {lineaSeleccionada.descuentoValor > 0
+                        ? (lineaSeleccionada.descuentoTipo === "porcentaje"
+                          ? `-${lineaSeleccionada.descuentoValor}%`
+                          : `-Q${Number(descuentoMontoLinea(lineaSeleccionada)).toFixed(2)}`)
+                        : "Q0.00"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-semibold text-(--color-pos-texto-muted) block mb-0.5">
+                      Subtotal
+                    </span>
+                    <span className="font-bold text-sm text-(--color-pagina)">
+                      Q {Number(subtotalLinea(lineaSeleccionada)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => setInfoModalOpen(false)}
+              className="bg-(--color-pagina) text-(--color-blanco) hover:bg-(--color-borde-button) rounded-xl w-full sm:w-auto"
+            >
+              Entendido
             </Button>
           </DialogFooter>
         </DialogContent>

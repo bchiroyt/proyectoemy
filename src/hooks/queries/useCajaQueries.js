@@ -12,11 +12,15 @@ import {
   registrarArqueoParcial,
   fetchMovimientosCaja,
   fetchDenominacionesActivas,
+  fetchCajaMovimientoTipos,
+  fetchMetodosPago,
 } from "@/services/cajaService";
 
 export const QK_MI_CAJA = ["cajas", "mi-caja-activa"];
 export const QK_CAJAS_ABIERTAS = ["cajas", "abiertas"];
 export const QK_DENOMINACIONES = ["cajas", "denominaciones"];
+export const QK_CAJA_MOVIMIENTO_TIPOS = ["cajas", "movimientos", "tipos"];
+export const QK_METODOS_PAGO = ["cajas", "metodos-pago"];
 export const qkCaja = (id) => ["cajas", id];
 export const qkCajaResumen = (id) => ["cajas", id, "resumen-cierre"];
 export const qkCajaMovimientos = (id) => ["cajas", id, "movimientos"];
@@ -73,6 +77,24 @@ export function useCajaMovimientosQuery(idCaja, options = {}) {
     queryKey: qkCajaMovimientos(idCaja),
     queryFn: () => fetchMovimientosCaja(idCaja),
     enabled: Number(idCaja) > 0,
+    ...options,
+  });
+}
+
+export function useCajaMovimientoTiposQuery(options = {}) {
+  return useQuery({
+    queryKey: QK_CAJA_MOVIMIENTO_TIPOS,
+    queryFn: fetchCajaMovimientoTipos,
+    staleTime: 300_000,
+    ...options,
+  });
+}
+
+export function useMetodosPagoQuery(options = {}) {
+  return useQuery({
+    queryKey: QK_METODOS_PAGO,
+    queryFn: fetchMetodosPago,
+    staleTime: 600_000,
     ...options,
   });
 }

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { X, ArrowLeft, Plus, Trash2, Search, CheckCircle, AlertCircle } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { X, ArrowLeft, Plus, Trash2, Search, CheckCircle, AlertCircle, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import ModalCatalogoInventario from "./ModalCatalogoInventario";
 
@@ -10,6 +11,215 @@ import { obtenerTallas, crearTalla } from "@/services/tallas";
 import { obtenerUbicaciones, crearUbicacion } from "@/services/ubicaciones";
 
 import { crearProducto } from "@/services/productos";
+
+function BuscadorCombo({
+  placeholder,
+  value,
+  onChange,
+  items,
+  idField,
+  nameField,
+  onLoadData,
+  onAddNew,
+  limit = 5,
+}) {
+  const selectedItem = useMemo(() => {
+    return (items || []).find((item) => String(item?.[idField]) === String(value));
+  }, [items, value, idField]);
+
+  const selectedName = selectedItem ? selectedItem[nameField] : "";
+  const [inputValor, setInputValor] = useState(selectedName);
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [prevValue, setPrevValue] = useState(value);
+  const [prevSelectedName, setPrevSelectedName] = useState(selectedName);
+
+  if (value !== prevValue || selectedName !== prevSelectedName) {
+    setPrevValue(value);
+    setPrevSelectedName(selectedName);
+    setInputValor(selectedName);
+  }
+
+  const latestState = useRef({ inputValor, selectedName, onChange });
+  useEffect(() => {
+    latestState.current = { inputValor, selectedName, onChange };
+  });
+
+  // Cerrar el menú al hacer click fuera
+  useEffect(() => {
+    const clickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        const { inputValor: val, selectedName: name, onChange: changeFn } = latestState.current;
+        if (val.trim() === "") {
+          changeFn("");
+          setInputValor("");
+        } else {
+          setInputValor(name);
+        }
+      }
+    };
+    document.addEventListener("mousedown", clickOutside);
+    document.addEventListener("click", clickOutside);
+    return () => {
+      document.removeEventListener("mousedown", clickOutside);
+      document.removeEventListener("click", clickOutside);
+    };
+  }, []);
+
+  const query = inputValor.trim().toLowerCase();
+
+  const matches = useMemo(() => {
+    const isSelectedName = selectedItem && inputValor === selectedItem[nameField];
+    const filterText = isSelectedName ? "" : query;
+
+    const list = items || [];
+    if (!filterText) {
+      return list.slice(0, limit);
+    }
+    return list
+      .filter((item) => item?.[nameField]?.toLowerCase().includes(filterText))
+      .slice(0, limit);
+  }, [items, query, selectedItem, nameField, inputValor, limit]);
+
+  const handleSelect = (item) => {
+    onChange(item[idField]);
+    setInputValor(item[nameField]);
+    setIsOpen(false);
+    inputRef.current?.blur();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (matches.length > 0) {
+        handleSelect(matches[0]);
+      }
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+      if (selectedItem) {
+        setInputValor(selectedItem[nameField]);
+      } else {
+        setInputValor("");
+      }
+      inputRef.current?.blur();
+    } else if (e.key === "Tab") {
+      setIsOpen(false);
+      if (inputValor.trim() === "") {
+        onChange("");
+        setInputValor("");
+      } else {
+        setInputValor(selectedName);
+      }
+    }
+  };
+
+  const handleFocus = (e) => {
+    setIsOpen(true);
+    e.target.select();
+    if (onLoadData && (!items || items.length === 0)) {
+      onLoadData();
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative flex-1">
+      <div className="flex gap-2">
+        <div className="relative flex-1 flex items-center">
+          <input
+            ref={inputRef}
+            value={inputValor}
+            onChange={(e) => {
+              setInputValor(e.target.value);
+              setIsOpen(true);
+            }}
+            onFocus={handleFocus}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="w-full border p-3 pr-10 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors bg-white text-sm text-gray-700"
+            autoComplete="off"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-gray-400">
+            {inputValor && (
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => {
+                  onChange("");
+                  setInputValor("");
+                  setIsOpen(true);
+                  inputRef.current?.focus();
+                }}
+                className="hover:text-gray-600 transition-colors p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <ChevronDown className="w-4 h-4 opacity-50 pointer-events-none" />
+          </div>
+        </div>
+        {onAddNew && (
+          <button
+            type="button"
+            onClick={onAddNew}
+            className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0 animate-in fade-in zoom-in duration-200"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
+          {matches.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-400 italic">
+              Sin coincidencias
+            </div>
+          ) : (
+            <div className="py-1">
+              {matches.map((item, idx) => {
+                const isSelected = selectedItem && String(item[idField]) === String(selectedItem[idField]);
+                return (
+                  <div
+                    key={item[idField]}
+                    onClick={() => handleSelect(item)}
+                    className={cn(
+                      "flex items-center justify-between px-3 py-2 text-sm cursor-pointer select-none transition-colors",
+                      isSelected
+                        ? "bg-(--color-pagina)/10 text-(--color-pagina) font-semibold"
+                        : "text-gray-700 hover:bg-gray-100",
+                      idx === 0 && !isSelected ? "bg-gray-50 font-medium" : ""
+                    )}
+                  >
+                    <span className="truncate pr-2">{item[nameField]}</span>
+                    {idx === 0 && (
+                      <span className="shrink-0 text-[10px] text-gray-400 font-normal border border-gray-200 px-1 rounded bg-white">
+                        Enter
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const VARIANTE_VACIA = {
+  talla: "",
+  presentacion: "",
+  color: "",
+  precioVenta: "",
+  precioCompra: "",
+  stockMinimo: "10",
+  codigoBarras: "",
+  ubicacion: "",
+  preciomayoreo: "",
+};
 
 const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [step, setStep] = useState(1);
@@ -27,10 +237,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
   const [marcaSeleccionada, setMarcaSeleccionada] = useState("");
 
-  const [busquedaCat, setBusquedaCat] = useState("");
-  const [openCatDropdown, setOpenCatDropdown] = useState(false);
-  const [busquedaMarca, setBusquedaMarca] = useState("");
-  const [openMarcaDropdown, setOpenMarcaDropdown] = useState(false);
+
 
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
@@ -38,32 +245,14 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [tallas, setTallas] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
 
-  const [variantes, setVariantes] = useState([
-    {
-      talla: "",
-      busquedaTalla: "",
-      openTallaDropdown: false,
-      
-      presentacion: "",
-      busquedaPres: "",
-      openPresDropdown: false,
-      
-      color: "",
-      precioVenta: "",
-      precioCompra: "",
-      codigoBarras: "",
-      
-      ubicacion: "",
-      busquedaUbic: "",
-      openUbicDropdown: false,
-    },
-  ]);
+  const [variantes, setVariantes] = useState([{ ...VARIANTE_VACIA }]);
 
   const [openMarcaModal, setOpenMarcaModal] = useState(false);
   const [openCategoriaModal, setOpenCategoriaModal] = useState(false);
   const [openPresentacionModal, setOpenPresentacionModal] = useState(false);
   const [openTallaModal, setOpenTallaModal] = useState(false);
   const [openUbicacionModal, setOpenUbicacionModal] = useState(false);
+  const [activeVariantIndex, setActiveVariantIndex] = useState(null);
 
   const mostrarAviso = (tipo, mensaje) => {
     setNotificacion({ mostrar: true, tipo, mensaje });
@@ -74,98 +263,48 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     }
   };
 
-  const toggleCategoriasDropdown = async () => {
-    const nuevoEstado = !openCatDropdown;
-    setOpenCatDropdown(nuevoEstado);
-    if (nuevoEstado) {
-      try {
-        const data = await obtenerCategorias({ Activo: true, Page: 1, PageSize: 500 });
-        setCategorias(data?.items || []);
-      } catch (error) {
-        console.error("Error al cargar categorías en demanda:", error);
-      }
+  const cargarCategorias = async () => {
+    try {
+      const data = await obtenerCategorias({ Activo: true, Page: 1, PageSize: 500 });
+      setCategorias(data?.items || []);
+    } catch (error) {
+      console.error("Error al cargar categorías:", error);
     }
   };
 
-  const toggleMarcasDropdown = async () => {
-    const nuevoEstado = !openMarcaDropdown;
-    setOpenMarcaDropdown(nuevoEstado);
-    if (nuevoEstado) {
-      try {
-        const data = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
-        setMarcas(data?.items || []);
-      } catch (error) {
-        console.error("Error al cargar marcas en demanda:", error);
-      }
+  const cargarMarcas = async () => {
+    try {
+      const data = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
+      setMarcas(data?.items || []);
+    } catch (error) {
+      console.error("Error al cargar marcas:", error);
     }
   };
 
-  const togglePresentacionesDropdown = async (index) => {
-    const nuevasVariantes = [...variantes];
-    const nuevoEstado = !nuevasVariantes[index].openPresDropdown;
-    
-    variantes.forEach((_, i) => {
-      if (i !== index) nuevasVariantes[i].openPresDropdown = false;
-      nuevasVariantes[i].openTallaDropdown = false;
-      nuevasVariantes[i].openUbicDropdown = false;
-    });
-
-    nuevasVariantes[index].openPresDropdown = nuevoEstado;
-    setVariantes(nuevasVariantes);
-
-    if (nuevoEstado) {
-      try {
-        const data = await obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 });
-        setPresentaciones(data?.items || []);
-      } catch (error) {
-        console.error("Error al cargar presentaciones en demanda:", error);
-      }
+  const cargarPresentaciones = async () => {
+    try {
+      const data = await obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 });
+      setPresentaciones(data?.items || []);
+    } catch (error) {
+      console.error("Error al cargar presentaciones:", error);
     }
   };
 
-  const toggleTallasDropdown = async (index) => {
-    const nuevasVariantes = [...variantes];
-    const nuevoEstado = !nuevasVariantes[index].openTallaDropdown;
-    
-    variantes.forEach((_, i) => {
-      nuevasVariantes[i].openPresDropdown = false;
-      if (i !== index) nuevasVariantes[i].openTallaDropdown = false;
-      nuevasVariantes[i].openUbicDropdown = false;
-    });
-
-    nuevasVariantes[index].openTallaDropdown = nuevoEstado;
-    setVariantes(nuevasVariantes);
-
-    if (nuevoEstado) {
-      try {
-        const data = await obtenerTallas({ Activo: true, Page: 1, PageSize: 500 });
-        setTallas(data?.items || []);
-      } catch (error) {
-        console.error("Error al cargar tallas en demanda:", error);
-      }
+  const cargarTallas = async () => {
+    try {
+      const data = await obtenerTallas({ Activo: true, Page: 1, PageSize: 500 });
+      setTallas(data?.items || []);
+    } catch (error) {
+      console.error("Error al cargar tallas:", error);
     }
   };
 
-  const toggleUbicacionesDropdown = async (index) => {
-    const nuevasVariantes = [...variantes];
-    const nuevoEstado = !nuevasVariantes[index].openUbicDropdown;
-    
-    variantes.forEach((_, i) => {
-      nuevasVariantes[i].openPresDropdown = false;
-      nuevasVariantes[i].openTallaDropdown = false;
-      if (i !== index) nuevasVariantes[i].openUbicDropdown = false;
-    });
-
-    nuevasVariantes[index].openUbicDropdown = nuevoEstado;
-    setVariantes(nuevasVariantes);
-
-    if (nuevoEstado) {
-      try {
-        const data = await obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 });
-        setUbicaciones(data?.items || []);
-      } catch (error) {
-        console.error("Error al cargar ubicaciones en demanda:", error);
-      }
+  const cargarUbicaciones = async () => {
+    try {
+      const data = await obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 });
+      setUbicaciones(data?.items || []);
+    } catch (error) {
+      console.error("Error al cargar ubicaciones:", error);
     }
   };
 
@@ -173,8 +312,8 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     if (nombre.trim() || descripcion.trim() || categoriaSeleccionada || marcaSeleccionada) {
       return true;
     }
-    const algunaVarianteModificada = variantes.some((v) => 
-      v.talla || v.presentacion || v.color.trim() || v.precioVenta || v.precioCompra || v.codigoBarras || v.ubicacion
+    const algunaVarianteModificada = variantes.some((v) =>
+      v.talla || v.presentacion || v.color.trim() || v.precioVenta || v.precioCompra || v.stockMinimo || v.codigoBarras || v.ubicacion
     );
     return algunaVarianteModificada || variantes.length > 1;
   };
@@ -189,38 +328,43 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
   const formularioInvalido = () => {
     if (!nombre.trim() || !categoriaSeleccionada || !marcaSeleccionada) {
-      return true; 
+      return true;
     }
 
     const tieneVariantesInvalidas = variantes.some((v) => {
       const tieneEspecificacion = !!v.talla || !!v.presentacion || !!v.color.trim();
       const precioInvalido = v.precioVenta !== "" && Number(v.precioVenta) < 0;
       const costoInvalido = v.precioCompra !== "" && Number(v.precioCompra) < 0;
-      return !tieneEspecificacion || precioInvalido || costoInvalido;
+      const stockMinimoInvalido =
+        v.stockMinimo !== "" &&
+        (!Number.isFinite(Number(v.stockMinimo)) || Number(v.stockMinimo) < 0);
+      return !tieneEspecificacion || precioInvalido || costoInvalido || stockMinimoInvalido;
     });
 
     return tieneVariantesInvalidas;
   };
 
   const handleAgregarVariante = () => {
-    setVariantes([
-      ...variantes,
-      {
-        talla: "",
-        busquedaTalla: "",
-        openTallaDropdown: false,
-        presentacion: "",
-        busquedaPres: "",
-        openPresDropdown: false,
-        color: "",
-        precioVenta: "",
-        precioCompra: "",
-        codigoBarras: "",
-        ubicacion: "",
-        busquedaUbic: "",
-        openUbicDropdown: false,
-      },
-    ]);
+    const primeraVariante = variantes[0];
+    if (primeraVariante) {
+      setVariantes([
+        ...variantes,
+        {
+          ...VARIANTE_VACIA,
+          talla: primeraVariante.talla,
+          presentacion: primeraVariante.presentacion,
+          precioVenta: primeraVariante.precioVenta,
+          precioCompra: primeraVariante.precioCompra,
+          stockMinimo: primeraVariante.stockMinimo,
+          ubicacion: primeraVariante.ubicacion,
+          preciomayoreo: primeraVariante.preciomayoreo,
+          color: "",
+          codigoBarras: "",
+        },
+      ]);
+    } else {
+      setVariantes([...variantes, { ...VARIANTE_VACIA }]);
+    }
   };
 
   const handleEliminarVariante = (index) => {
@@ -241,8 +385,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     setDescripcion("");
     setCategoriaSeleccionada("");
     setMarcaSeleccionada("");
-    setBusquedaCat("");
-    setBusquedaMarca("");
     setCategorias([]);
     setMarcas([]);
     setPresentaciones([]);
@@ -250,23 +392,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     setUbicaciones([]);
     setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
     setOpenConfirmarSalida(false);
-    setVariantes([
-      {
-        talla: "",
-        busquedaTalla: "",
-        openTallaDropdown: false,
-        presentacion: "",
-        busquedaPres: "",
-        openPresDropdown: false,
-        color: "",
-        precioVenta: "",
-        precioCompra: "",
-        codigoBarras: "",
-        ubicacion: "",
-        busquedaUbic: "",
-        openUbicDropdown: false,
-      },
-    ]);
+    setVariantes([{ ...VARIANTE_VACIA }]);
   };
 
   const handleClose = () => {
@@ -291,23 +417,25 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           presentacion: v.presentacion ? Number(v.presentacion) : null,
           color: v.color || null,
           precioVenta: v.precioVenta ? Number(v.precioVenta) : null,
+          preciomayoreo: v.preciomayoreo ? Number(v.preciomayoreo) : null,
           precioCompra: v.precioCompra ? Number(v.precioCompra) : null,
+          stockMinimo: v.stockMinimo !== "" ? Number(v.stockMinimo) : null,
           idUbicacionDefault: v.ubicacion ? Number(v.ubicacion) : null,
           codigosExternos: v.codigoBarras
             ? [
-                {
-                  codigo: v.codigoBarras,
-                  esPrincipal: true,
-                },
-              ]
+              {
+                codigo: v.codigoBarras,
+                esPrincipal: true,
+              },
+            ]
             : [],
         })),
       };
 
       await crearProducto(payload);
-      
+
       mostrarAviso("exito", "¡Producto creado correctamente en el catálogo!");
-      
+
       if (onSuccess) {
         setTimeout(() => onSuccess(), 1500);
       }
@@ -322,29 +450,19 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     }
   };
 
-  const categoriasFiltradas = (categorias || []).filter((c) =>
-    c?.nombre?.toLowerCase().includes((busquedaCat || "").toLowerCase())
-  );
 
-  const marcasFiltradas = (marcas || []).filter((m) =>
-    m?.nombre?.toLowerCase().includes((busquedaMarca || "").toLowerCase())
-  );
-
-  const nombreCategoriaActual = (categorias || []).find((c) => String(c?.idCategoria) === String(categoriaSeleccionada))?.nombre || "Seleccionar categoría";
-  const nombreMarcaActual = (marcas || []).find((m) => String(m?.idMarca) === String(marcaSeleccionada))?.nombre || "Seleccionar marca";
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 transition-all">
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-lg flex flex-col max-h-[90vh] border-t-4 border-(--color-pagina) relative">
-        
+      <div className="bg-(--color-blanco) w-full max-w-4xl rounded-2xl shadow-lg flex flex-col max-h-[90vh] border-t-4 border-(--color-pagina) relative">
+
         {notificacion.mostrar && (
-          <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all max-w-md w-11/12 animate-bounce ${
-            notificacion.tipo === "exito" 
-              ? "bg-green-50 border-green-200 text-green-800" 
-              : "bg-red-50 border-red-200 text-red-800"
-          }`}>
+          <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all max-w-md w-11/12 animate-bounce ${notificacion.tipo === "exito"
+            ? "bg-green-50 border-green-200 text-green-800"
+            : "bg-red-50 border-red-200 text-red-800"
+            }`}>
             {notificacion.tipo === "exito" ? <CheckCircle className="w-5 h-5 text-green-600 shrink-0" /> : <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />}
             <span className="flex-1">{notificacion.mensaje}</span>
             <button onClick={() => setNotificacion({ mostrar: false, tipo: "", mensaje: "" })} className="text-gray-400 hover:text-gray-600 ml-2 p-0.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
@@ -376,7 +494,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          
+
           {step === 1 && (
             <div className="space-y-4 animate-fade-in">
               <h3 className="font-semibold text-gray-700">Información General</h3>
@@ -391,104 +509,34 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                 />
               </div>
 
-              <div className="space-y-1 relative">
-                <label className="text-xs font-semibold text-gray-600 block">Categoría *</label>
-                <div className="flex gap-2">
-                  <div
-                    onClick={toggleCategoriasDropdown}
-                    className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                  >
-                    <span>{nombreCategoriaActual}</span>
-                    <Search className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOpenCategoriaModal(true)}
-                    className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1 relative">
+                  <label className="text-xs font-semibold text-gray-600 block">Categoría *</label>
+                  <BuscadorCombo
+                    placeholder="Seleccionar categoría..."
+                    value={categoriaSeleccionada}
+                    onChange={setCategoriaSeleccionada}
+                    items={categorias}
+                    idField="idCategoria"
+                    nameField="nombre"
+                    onLoadData={cargarCategorias}
+                    onAddNew={() => setOpenCategoriaModal(true)}
+                  />
                 </div>
 
-                {openCatDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Buscar categoría..."
-                      value={busquedaCat}
-                      onChange={(e) => setBusquedaCat(e.target.value)}
-                      className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div className="max-h-40 overflow-y-auto">
-                      {categoriasFiltradas.map((c) => (
-                        <div
-                          key={c?.idCategoria}
-                          onClick={() => {
-                            setCategoriaSeleccionada(c?.idCategoria);
-                            setOpenCatDropdown(false);
-                          }}
-                          className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
-                        >
-                          {c?.nombre}
-                        </div>
-                      ))}
-                      {categoriasFiltradas.length === 0 && (
-                        <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1 relative">
-                <label className="text-xs font-semibold text-gray-600 block">Marca *</label>
-                <div className="flex gap-2">
-                  <div
-                    onClick={toggleMarcasDropdown}
-                    className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                  >
-                    <span>{nombreMarcaActual}</span>
-                    <Search className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOpenMarcaModal(true)}
-                    className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+                <div className="space-y-1 relative">
+                  <label className="text-xs font-semibold text-gray-600 block">Marca *</label>
+                  <BuscadorCombo
+                    placeholder="Seleccionar marca..."
+                    value={marcaSeleccionada}
+                    onChange={setMarcaSeleccionada}
+                    items={marcas}
+                    idField="idMarca"
+                    nameField="nombre"
+                    onLoadData={cargarMarcas}
+                    onAddNew={() => setOpenMarcaModal(true)}
+                  />
                 </div>
-
-                {openMarcaDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Buscar marca..."
-                      value={busquedaMarca}
-                      onChange={(e) => setBusquedaMarca(e.target.value)}
-                      className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div className="max-h-40 overflow-y-auto">
-                      {marcasFiltradas.map((m) => (
-                        <div
-                          key={m?.idMarca}
-                          onClick={() => {
-                            setMarcaSeleccionada(m?.idMarca);
-                            setOpenMarcaDropdown(false);
-                          }}
-                          className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
-                        >
-                          {m?.nombre}
-                        </div>
-                      ))}
-                      {marcasFiltradas.length === 0 && (
-                        <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="space-y-1">
@@ -526,23 +574,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
               <div className="space-y-6">
                 {variantes.map((v, index) => {
-                  const presentacionesFiltradas = (presentaciones || []).filter((p) =>
-                    p?.nombre?.toLowerCase().includes((v.busquedaPres || "").toLowerCase())
-                  );
-                  const tallasFiltradas = (tallas || []).filter((t) =>
-                    t?.nombre?.toLowerCase().includes((v.busquedaTalla || "").toLowerCase())
-                  );
-                  const ubicacionesFiltradas = (ubicaciones || []).filter((u) =>
-                    u?.nombre?.toLowerCase().includes((v.busquedaUbic || "").toLowerCase())
-                  );
-
-                  const nombrePresActual = (presentaciones || []).find((p) => String(p?.idPresentacion) === String(v.presentacion))?.nombre || "Seleccionar presentación";
-                  const nombreTallaActual = (tallas || []).find((t) => String(t?.idTalla) === String(v.talla))?.nombre || "Seleccionar talla";
-                  const nombreUbicActual = (ubicaciones || []).find((u) => String(u?.idUbicacion) === String(v.ubicacion))?.nombre || "Seleccionar ubicación";
-
                   return (
                     <div key={index} className="bg-gray-50 p-5 rounded-xl border border-gray-200 relative space-y-4 shadow-sm hover:shadow-md transition-shadow">
-                      
+
                       {variantes.length > 1 && (
                         <button
                           type="button"
@@ -556,63 +590,13 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                       <div className="text-xs font-bold text-gray-500 uppercase cursor-default flex justify-between">
                         <span>Variante #{index + 1}</span>
                         {(!v.talla && !v.presentacion && !v.color.trim()) && (
-                          <span className="text-red-500 normal-case font-normal text-xs animate-pulse">
+                          <span className="text-(--color-rojo) normal-case font-normal text-xs animate-pulse">
                             * Requiere al menos Talla, Presentación o Color
                           </span>
                         )}
                       </div>
 
-                      <div className="space-y-1 relative">
-                        <label className="text-xs font-semibold text-gray-600 block">Presentación</label>
-                        <div className="flex gap-2">
-                          <div
-                            onClick={() => togglePresentacionesDropdown(index)}
-                            className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                          >
-                            <span>{nombrePresActual}</span>
-                            <Search className="w-4 h-4 text-gray-400" />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setOpenPresentacionModal(true)}
-                            className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                          >
-                            <Plus className="w-5 h-5" />
-                          </button>
-                        </div>
-
-                        {v.openPresDropdown && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
-                            <input
-                              type="text"
-                              placeholder="Buscar presentación..."
-                              value={v.busquedaPres}
-                              onChange={(e) => handleCambioVariante(index, "busquedaPres", e.target.value)}
-                              className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <div className="max-h-40 overflow-y-auto">
-                              {presentacionesFiltradas.map((p) => (
-                                <div
-                                  key={p?.idPresentacion}
-                                  onClick={() => {
-                                    handleCambioVariante(index, "presentacion", p?.idPresentacion);
-                                    handleCambioVariante(index, "openPresDropdown", false);
-                                  }}
-                                  className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
-                                >
-                                  {p?.nombre}
-                                </div>
-                              ))}
-                              {presentacionesFiltradas.length === 0 && (
-                                <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Precio venta</label>
                           <input
@@ -620,9 +604,20 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             value={v.precioVenta}
                             onChange={(e) => handleCambioVariante(index, "precioVenta", e.target.value)}
                             placeholder="Precio venta"
-                            className={`w-full border p-3 rounded-lg bg-white outline-none transition-colors ${
-                              v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
-                            }`}
+                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                              }`}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-600 block">Precio mayoreo</label>
+                          <input
+                            type="number"
+                            value={v.precioMayoreo}
+                            onChange={(e) => handleCambioVariante(index, "precioMayoreo", e.target.value)}
+                            placeholder="Precio mayoreo"
+                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                              }`}
                           />
                         </div>
 
@@ -633,9 +628,26 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             value={v.precioCompra}
                             onChange={(e) => handleCambioVariante(index, "precioCompra", e.target.value)}
                             placeholder="Precio costo"
-                            className={`w-full border p-3 rounded-lg bg-white outline-none transition-colors ${
-                              v.precioCompra !== "" && Number(v.precioCompra) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
-                            }`}
+                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioCompra !== "" && Number(v.precioCompra) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                              }`}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-600 block">Stock mínimo</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={v.stockMinimo}
+                            onChange={(e) => handleCambioVariante(index, "stockMinimo", e.target.value)}
+                            placeholder="Opcional"
+                            title="Unidades mínimas antes de alerta de bajo stock"
+                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.stockMinimo !== "" &&
+                              (!Number.isFinite(Number(v.stockMinimo)) || Number(v.stockMinimo) < 0)
+                              ? "border-red-400 bg-red-50"
+                              : "focus:border-gray-400 hover:border-gray-300"
+                              }`}
                           />
                         </div>
                       </div>
@@ -647,61 +659,47 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             value={v.codigoBarras}
                             onChange={(e) => handleCambioVariante(index, "codigoBarras", e.target.value)}
                             placeholder="Código de barras"
-                            className="w-full border p-3 rounded-lg bg-white outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                          />
+                        </div>
+
+                        <div className="space-y-1 relative">
+                          <label className="text-xs font-semibold text-gray-600 block">Presentación</label>
+                          <BuscadorCombo
+                            placeholder="Seleccionar presentación..."
+                            value={v.presentacion}
+                            onChange={(val) => handleCambioVariante(index, "presentacion", val)}
+                            items={presentaciones}
+                            idField="idPresentacion"
+                            nameField="nombre"
+                            onLoadData={cargarPresentaciones}
+                            onAddNew={() => {
+                              setActiveVariantIndex(index);
+                              setOpenPresentacionModal(true);
+                            }}
+                            limit={3}
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        
+
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Talla</label>
-                          <div className="flex gap-2">
-                            <div
-                              onClick={() => toggleTallasDropdown(index)}
-                              className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 text-sm overflow-hidden whitespace-nowrap text-ellipsis hover:bg-gray-50 hover:border-gray-300 transition-all"
-                            >
-                              <span>{nombreTallaActual}</span>
-                              <Search className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setOpenTallaModal(true)}
-                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                            >
-                              <Plus className="w-5 h-5" />
-                            </button>
-                          </div>
-
-                          {v.openTallaDropdown && (
-                            <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
-                              <input
-                                type="text"
-                                placeholder="Buscar talla..."
-                                value={v.busquedaTalla}
-                                onChange={(e) => handleCambioVariante(index, "busquedaTalla", e.target.value)}
-                                className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <div className="max-h-40 overflow-y-auto">
-                                {tallasFiltradas.map((t) => (
-                                  <div
-                                    key={t?.idTalla}
-                                    onClick={() => {
-                                      handleCambioVariante(index, "talla", t?.idTalla);
-                                      handleCambioVariante(index, "openTallaDropdown", false);
-                                    }}
-                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
-                                  >
-                                    {t?.nombre}
-                                  </div>
-                                ))}
-                                {tallasFiltradas.length === 0 && (
-                                  <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                          <BuscadorCombo
+                            placeholder="Seleccionar talla..."
+                            value={v.talla}
+                            onChange={(val) => handleCambioVariante(index, "talla", val)}
+                            items={tallas}
+                            idField="idTalla"
+                            nameField="nombre"
+                            onLoadData={cargarTallas}
+                            onAddNew={() => {
+                              setActiveVariantIndex(index);
+                              setOpenTallaModal(true);
+                            }}
+                            limit={3}
+                          />
                         </div>
 
                         <div className="space-y-1">
@@ -710,60 +708,27 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             value={v.color}
                             onChange={(e) => handleCambioVariante(index, "color", e.target.value)}
                             placeholder="Color"
-                            className="w-full border p-3 rounded-lg bg-white outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
                           />
                         </div>
 
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Ubicación</label>
-                          <div className="flex gap-2">
-                            <div
-                              onClick={() => toggleUbicacionesDropdown(index)}
-                              className="flex-1 p-3 border rounded-lg bg-white cursor-pointer flex justify-between items-center text-gray-700 text-sm overflow-hidden whitespace-nowrap text-ellipsis hover:bg-gray-50 hover:border-gray-300 transition-all"
-                            >
-                              <span>{nombreUbicActual}</span>
-                              <Search className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setOpenUbicacionModal(true)}
-                              className="px-3 bg-(--color-pagina-2) text-white rounded-lg hover:brightness-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                            >
-                              <Plus className="w-5 h-5" />
-                            </button>
-                          </div>
-
-                          {v.openUbicDropdown && (
-                            <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg p-2 space-y-2">
-                              <input
-                                type="text"
-                                placeholder="Buscar ubicación..."
-                                value={v.busquedaUbic}
-                                onChange={(e) => handleCambioVariante(index, "busquedaUbic", e.target.value)}
-                                className="w-full p-2 border rounded-md text-sm outline-none focus:border-gray-400"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <div className="max-h-40 overflow-y-auto">
-                                {ubicacionesFiltradas.map((u) => (
-                                  <div
-                                    key={u?.idUbicacion}
-                                    onClick={() => {
-                                      handleCambioVariante(index, "ubicacion", u?.idUbicacion);
-                                      handleCambioVariante(index, "openUbicDropdown", false);
-                                    }}
-                                    className="p-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700 transition-colors"
-                                  >
-                                    {u?.nombre}
-                                  </div>
-                                ))}
-                                {ubicacionesFiltradas.length === 0 && (
-                                  <div className="p-2 text-xs text-gray-400 text-center cursor-default">No se encontraron resultados</div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                          <BuscadorCombo
+                            placeholder="Seleccionar ubicación..."
+                            value={v.ubicacion}
+                            onChange={(val) => handleCambioVariante(index, "ubicacion", val)}
+                            items={ubicaciones}
+                            idField="idUbicacion"
+                            nameField="nombre"
+                            onLoadData={cargarUbicaciones}
+                            onAddNew={() => {
+                              setActiveVariantIndex(index);
+                              setOpenUbicacionModal(true);
+                            }}
+                            limit={3}
+                          />
                         </div>
-
                       </div>
                     </div>
                   );
@@ -841,7 +806,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           } catch (error) {
             console.error("Error al guardar marca:", error);
           } finally {
-            setBusquedaMarca("");
             setOpenMarcaModal(false);
           }
         }}
@@ -872,7 +836,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
             setCategorias((prev) => [...prev, categoriaFormateada]);
             setCategoriaSeleccionada(idFinal);
-            setBusquedaCat("");
           } catch (error) {
             console.error("Error al guardar categoría:", error);
           } finally {
@@ -902,12 +865,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
             if (idFinal) {
               const deLista = listaActualizada.find(p => Number(p.idPresentacion) === Number(idFinal));
-              if (deLista) {
+              if (deLista && activeVariantIndex !== null) {
                 const nuevasVariantes = [...variantes];
-                const indexUltimaAbierta = nuevasVariantes.findIndex(v => v.openPresDropdown === true);
-                if (indexUltimaAbierta !== -1) {
-                  nuevasVariantes[indexUltimaAbierta].presentacion = idFinal;
-                }
+                nuevasVariantes[activeVariantIndex].presentacion = idFinal;
                 setVariantes(nuevasVariantes);
               }
             }
@@ -940,12 +900,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
             if (idFinal) {
               const deLista = listaActualizada.find(t => Number(t.idTalla) === Number(idFinal));
-              if (deLista) {
+              if (deLista && activeVariantIndex !== null) {
                 const nuevasVariantes = [...variantes];
-                const indexUltimaAbierta = nuevasVariantes.findIndex(v => v.openTallaDropdown === true);
-                if (indexUltimaAbierta !== -1) {
-                  nuevasVariantes[indexUltimaAbierta].talla = idFinal;
-                }
+                nuevasVariantes[activeVariantIndex].talla = idFinal;
                 setVariantes(nuevasVariantes);
               }
             }
@@ -979,12 +936,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
             if (idFinal) {
               const deLista = listaActualizada.find(u => Number(u.idUbicacion) === Number(idFinal));
-              if (deLista) {
+              if (deLista && activeVariantIndex !== null) {
                 const nuevasVariantes = [...variantes];
-                const indexUltimaAbierta = nuevasVariantes.findIndex(v => v.openUbicDropdown === true);
-                if (indexUltimaAbierta !== -1) {
-                  nuevasVariantes[indexUltimaAbierta].ubicacion = idFinal;
-                }
+                nuevasVariantes[activeVariantIndex].ubicacion = idFinal;
                 setVariantes(nuevasVariantes);
               }
             }

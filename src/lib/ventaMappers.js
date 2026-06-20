@@ -132,7 +132,8 @@ export function roundVenta(n) {
 
 /** Importe bruto de la línea (precio × cantidad), sin descuento. */
 export function brutoLinea(item) {
-  return roundVenta((Number(item?.precio) || 0) * (Number(item?.cantidad) || 0));
+  const precioUnitario = item?.precioNegociado != null ? Number(item.precioNegociado) : Number(item?.precio) || 0;
+  return roundVenta(precioUnitario * (Number(item?.cantidad) || 0));
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Home, Package, PlusCircle, ShoppingCart, Landmark, Users, LayoutDashboard,
-    Settings, LogOut, Store, PanelLeft } from "lucide-react";
+    Settings, LogOut, Store, PanelLeft, Briefcase } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter,
     SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -24,8 +24,8 @@ const menuItems = [
     { icon: Home, label: "Panel de Control", to: "/panel-control" },
     { icon: Package, label: "Inventario", to: "/inventario" },
     { icon: ShoppingCart, label: "Compras", to: "/compras" },
-    //{ icon: PlusCircle, label: "Nuevo Producto", to: "/nuevo-producto" },
     { icon: Store, label: "POS", to: "/pos" },
+    { icon: Briefcase, label: "Mayoreo", to: "/mayoreo" },
     { icon: Landmark, label: "Contabilidad", to: "/contabilidad" },
     { icon: Users, label: "Usuarios", to: "/usuarios" },
     { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard" },
@@ -34,6 +34,7 @@ const menuItems = [
 const isRouteActive = (pathname, to) => {
     if (to === "/compras") return pathname === "/compras" || pathname.startsWith("/compras/");
     if (to === "/pos") return pathname === "/pos" || pathname.startsWith("/pos/");
+    if (to === "/mayoreo") return pathname === "/mayoreo" || pathname.startsWith("/mayoreo/");
     return pathname === to;
 };
 

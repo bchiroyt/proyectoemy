@@ -13,6 +13,12 @@ export const obtenerProductos = async (params = {}) => {
   };
 };
 
+// DETALLE DE UN PRODUCTO
+export const obtenerProductoPorId = async (idProducto) => {
+  const { data } = await apiClient.get(`/api/Productos/${idProducto}`);
+  return data;
+};
+
 // CREAR PRODUCTO
 export const crearProducto = async (data) => {
   const res = await apiClient.post("/api/Productos", data);
@@ -31,4 +37,10 @@ export const buscarVariantesCompra = async (criterio) => {
     params: { criterio: criterio?.trim() || "" },
   });
   return data;
+};
+
+// AGREGAR VARIANTES A PRODUCTO EXISTENTE
+export const agregarVariantesAProducto = async (idProducto, variantes) => {
+  const res = await apiClient.patch(`/api/Productos/${idProducto}/variantes`, { variantes });
+  return res.data;
 };

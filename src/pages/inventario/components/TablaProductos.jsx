@@ -4,6 +4,7 @@ import { Eye, PackageSearch, Clock } from "lucide-react";
 import ModalDetalleProducto from "./ModalDetalleProducto";
 import ModalVariantesProducto from "./ModalVariantesProducto";
 import ModalKardexProducto from "./ModalKardexProducto";
+import { resolverIdProducto } from "@/lib/productoUtils";
 
 const obtenerSkuProducto = (producto) =>
   producto.sku || producto.codigoPrincipal || producto.variantes?.[0]?.sku || "Sin SKU";
@@ -21,8 +22,21 @@ const obtenerStockProducto = (producto) => {
   ) ?? 0;
 };
 
-const obtenerEstadoStock = (stock) => {
-  if (stock <= 10) {
+const obtenerStockMinimoProducto = (producto) => {
+  if (typeof producto.stockMinimo === "number") {
+    return producto.stockMinimo;
+  }
+  return producto.variantes?.reduce(
+    (total, variante) => total + Number(variante.stockMinimo ?? 0),
+    0
+  ) ?? 0;
+};
+
+const obtenerEstadoStock = (stock, stockMinimo) => {
+  // Si no hay stock mínimo definido, usamos 10 por defecto para mantener algo de lógica visual
+  const min = stockMinimo > 0 ? stockMinimo : 10;
+
+  if (stock < min) {
     return {
       barra: "bg-red-500",
       texto: "text-red-700",
@@ -30,7 +44,8 @@ const obtenerEstadoStock = (stock) => {
     };
   }
 
-  if (stock <= 15) {
+  // Naranja si el stock está por encima o igual al mínimo, pero a menos de 10 unidades de distancia
+  if (stock < min + 10) {
     return {
       barra: "bg-orange-500",
       texto: "text-orange-700",
@@ -38,6 +53,7 @@ const obtenerEstadoStock = (stock) => {
     };
   }
 
+  // Verde si el stock tiene al menos 10 unidades por encima del mínimo
   return {
     barra: "bg-green-500",
     texto: "text-green-700",
@@ -52,19 +68,22 @@ const TablaProductos = ({ productos = [], loading = false }) => {
 
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
 
-  const handleDetalle = (producto) => {
-    setProductoSeleccionado(producto);
+  const handleDetalle = (item) => {
+    const idProducto = resolverIdProducto(item);
+    setProductoSeleccionado(idProducto != null ? { ...item, idProducto } : item);
     setOpenDetalle(true);
   };
 
-  const handleVariantes = (producto) => {
-    setProductoSeleccionado(producto);
-    setOpenVariantes(true);
+  const handleKardex = (item) => {
+    const idProducto = resolverIdProducto(item);
+    setProductoSeleccionado(idProducto != null ? { ...item, idProducto } : item);
+    setOpenKardex(true);
   };
 
-  const handleKardex = (producto) => {
-    setProductoSeleccionado(producto);
-    setOpenKardex(true);
+  const handleVariantes = (item) => {
+    const idProducto = resolverIdProducto(item);
+    setProductoSeleccionado(idProducto != null ? { ...item, idProducto } : item);
+    setOpenVariantes(true);
   };
 
   return (
@@ -80,7 +99,8 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                 <th className="p-4 text-left">Estado</th>
                 <th className="p-4 text-left">Variantes</th>
                 <th className="p-4 text-left">Stock</th>
-                <th className="p-4 text-left">Fecha</th>
+                {/* <th className="p-4 text-left">Fecha</th>*/}
+                <th className="p-4 text-left">Precio venta</th>
                 <th className="p-4 text-left">Acciones</th>
               </tr>
             </thead>
@@ -102,9 +122,13 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                 productos.map((item, index) => {
                   const skuProducto = obtenerSkuProducto(item);
                   const stockProducto = obtenerStockProducto(item);
-                  const estadoStock = obtenerEstadoStock(stockProducto);
-                  const progresoStock = Math.min((stockProducto / 15) * 100, 100);
-                  
+                  const stockMinimoProducto = obtenerStockMinimoProducto(item);
+                  const estadoStock = obtenerEstadoStock(stockProducto, stockMinimoProducto);
+
+                  // Para la barra de progreso, asumimos un máximo relativo al stock mínimo (ej. 1.5x del mínimo, o 15 si no hay)
+                  const baseMaximo = stockMinimoProducto > 0 ? stockMinimoProducto * 1.5 : 15;
+                  const progresoStock = Math.min((stockProducto / baseMaximo) * 100, 100);
+
                   const llaveUnica = item.idProducto || item.idVariante || `prod-${index}`;
                   const nombreVisual = item.nombre || item.presentacionNombre || "Producto sin nombre";
                   const cantidadVariantes = typeof item.variantes?.length === "number" ? item.variantes.length : 1;
@@ -137,11 +161,10 @@ const TablaProductos = ({ productos = [], loading = false }) => {
 
                       <td className="p-4">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            item.estado
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${item.estado
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                            }`}
                         >
                           {item.estado ? "Activo" : "Inactivo"}
                         </span>
@@ -159,6 +182,11 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                             <span className={`text-xs font-semibold ${estadoStock.texto}`}>
                               {stockProducto} uds.
                             </span>
+                            {stockMinimoProducto > 0 && (
+                              <span className="text-[10px] text-gray-400 font-medium">
+                                Mín: {stockMinimoProducto}
+                              </span>
+                            )}
                           </div>
                           <div className={`h-2 w-full overflow-hidden rounded-full ${estadoStock.fondo}`}>
                             <div
@@ -168,11 +196,14 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                           </div>
                         </div>
                       </td>
-
+                      {/** 
                       <td className="p-4 text-gray-500 text-xs">
                         {item.fechaCreacion
                           ? new Date(item.fechaCreacion).toLocaleDateString()
                           : "-"}
+                      </td>*/}
+                      <td className="p-4 text-gray-500 text-xs">
+                        {item.precioVenta}
                       </td>
 
                       <td className="p-4">

@@ -25,6 +25,7 @@ export const obtenerUbicaciones = async (params = {}) => {
       : [],
     page: data.page || 1,
     totalPages: data.totalPages || 1,
+    totalRecords: data.totalRecords || 0,
   };
 };
 

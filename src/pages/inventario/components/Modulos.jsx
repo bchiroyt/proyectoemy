@@ -24,7 +24,7 @@ const Modulos = () => {
             <div
               key={i}
               onClick={() => navigate(item.ruta)}
-              className="bg-white px-5 py-4 rounded-xl flex items-center gap-3 shadow-sm hover:shadow-md transition cursor-pointer"
+              className="bg-(--color-blanco) px-5 py-4 rounded-xl flex items-center gap-3 shadow-sm hover:shadow-md transition cursor-pointer"
             >
               <div className="bg-(--color-rosa-hover) p-2 rounded-lg">
                 <Icon className="text-(--color-pagina) w-5 h-5" />

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Package, Calculator, ShoppingCart, BarChart3, Grid2x2,
-         Settings, Store, Users,} from "lucide-react";
+         Settings, Store, Users, Briefcase,} from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,13 @@ const datosPanel = [
         descripcion: "Apertura de caja, control de efectivo y punto de venta.",
         icono: Store,
         to: "/pos",
+    },
+    {
+        id: 3,
+        titulo: "Mayoreo",
+        descripcion: "Cotizaciones mayoristas, edición y finalización de ventas.",
+        icono: Briefcase,
+        to: "/mayoreo",
     },
     {
         id: 4,
