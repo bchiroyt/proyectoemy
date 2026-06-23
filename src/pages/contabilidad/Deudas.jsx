@@ -1,17 +1,39 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, Search, Loader2, X, CheckCircle, AlertCircle, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Search, Loader2, X, CheckCircle, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useNavigationStore } from "@/context/useNavigationStore";
 
 // IMPORTAMOS TU CLIENTE CONFIGURADO
-import { apiClient } from "@/lib/apiClient";
+import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const formatoMoneda = new Intl.NumberFormat("es-GT", {
+  style: "currency",
+  currency: "GTQ",
+  minimumFractionDigits: 2,
+});
+
+const formatearMoneda = (valor) => formatoMoneda.format(Number(valor) || 0);
+
+const formatearFecha = (valor, incluirHora = false) => {
+  if (!valor) return "---";
+  if (!incluirHora) return String(valor).split("T")[0];
+
+  const fecha = new Date(valor);
+  return Number.isNaN(fecha.getTime())
+    ? String(valor)
+    : fecha.toLocaleString("es-GT", { dateStyle: "short", timeStyle: "short" });
+};
 
 const Deudas = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((state) => state.setTitulo);
 
   // ESTADOS PRINCIPALES
   const [deudas, setDeudas] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [errorCarga, setErrorCarga] = useState("");
 
   // SISTEMA DE TOAST
   const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
@@ -45,22 +67,31 @@ const Deudas = () => {
   const cargarDeudas = async () => {
     try {
       setCargando(true);
-      const { data: res } = await apiClient.get("/api/Deudas", {
-        params: { page: 1, pageSize: 200 }
+      setErrorCarga("");
+      const { data: res } = await apiClient.get("/api/deudas", {
+        params: { page: 1, pageSize: 100 }
       });
       
       if (res?.exito) {
         setDeudas(Array.isArray(res.data) ? res.data : res.data?.items || []);
+      } else {
+        throw new Error(res?.mensaje || "No se pudieron cargar las deudas.");
       }
     } catch (error) {
       console.error("Error al cargar deudas:", error);
-      mostrarAviso("error", "No se pudo conectar con el servidor para cargar las deudas.");
+      setDeudas([]);
+      setErrorCarga(getApiErrorMessage(error, "No se pudieron cargar las deudas."));
     } finally {
       setCargando(false);
     }
   };
 
   useEffect(() => {
+    setTitulo("Contabilidad > deudas");
+  }, [setTitulo]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarDeudas();
   }, []);
 
@@ -103,20 +134,6 @@ const Deudas = () => {
     }
   };
 
-  // PREPARAR EDICIÓN
-  const abrirEditar = (deuda) => {
-    setIdDeudaSeleccionada(deuda.idDeuda || deuda.id);
-    setFormDeuda({
-      acreedor: deuda.acreedor || "",
-      descripcion: deuda.descripcion || "",
-      montoTotal: deuda.montoTotal || "",
-      fechaVencimiento: deuda.fechaVencimiento ? deuda.fechaVencimiento.split('T')[0] : "",
-      estado: deuda.estado || "Pendiente",
-    });
-    setModoEditar(true);
-    setModalAbierto(true);
-  };
-
   const cerrarYLimpiarModal = () => {
     setModalAbierto(false);
     setModoEditar(false);
@@ -130,11 +147,13 @@ const Deudas = () => {
     });
   };
 
-  // FILTRADO LOCAL POR ACREEDOR O CONCEPTO
-  const deudasFiltradas = deudas.filter((d) =>
-    d.acreedor?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    d.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  // FILTRADO LOCAL SOBRE LOS CAMPOS DEL DTO DE LISTADO
+  const terminoBusqueda = busqueda.trim().toLowerCase();
+  const deudasFiltradas = deudas.filter((deuda) => {
+    if (!terminoBusqueda) return true;
+    return [deuda.nombreAcreedor, deuda.tipo, deuda.estado, deuda.usuarioRegistro]
+      .some((valor) => String(valor ?? "").toLowerCase().includes(terminoBusqueda));
+  });
 
   const formularioInvalido = () => {
     return !formDeuda.acreedor.trim() || !formDeuda.montoTotal || !formDeuda.fechaVencimiento;
@@ -143,10 +162,8 @@ const Deudas = () => {
   return (
     <div className="p-6 space-y-6 relative bg-(--color-pagina-4) min-h-full w-full">
       
-      {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-semibold text-(--color-pagina)">Deudas y Compromisos</h1>
           <p className="text-(--color-gris-letra) text-sm mt-1">
             Administra los saldos pendientes de cobro, cuentas corrientes y pasivos operativos.
           </p>
@@ -169,7 +186,7 @@ const Deudas = () => {
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por cliente, proveedor o concepto..."
+            placeholder="Buscar por acreedor, tipo, estado o usuario..."
             className="w-full bg-(--color-blanco) border border-(--color-gris-claro-2) rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm text-(--color-negro)"
           />
         </div>
@@ -188,74 +205,103 @@ const Deudas = () => {
       </div>
 
       {/* TABLA DE RESULTADOS */}
-      <div className="bg-(--color-blanco) rounded-2xl shadow-md border border-(--color-gris-claro-2) overflow-hidden">
-        {cargando ? (
-          <div className="flex flex-col items-center justify-center p-20 space-y-3">
-            <Loader2 className="w-7 h-7 animate-spin text-(--color-pagina)" />
-            <p className="text-xs text-(--color-gris-claro) font-medium">Consultando deudas vigentes...</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
+      <div className="bg-(--color-blanco) rounded-2xl shadow-md border border-(--color-gris-claro-2) overflow-x-auto">
+          <table className="w-full min-w-[1400px] text-sm">
             <thead className="bg-(--color-pagina-3) text-(--color-gris-letra) uppercase text-[11px] tracking-wider font-bold border-b border-(--color-gris-claro-2)">
               <tr>
-                <th className="p-4 text-left">Acreedor / Contacto</th>
-                <th className="p-4 text-left">Descripción u Origen</th>
-                <th className="p-4 text-left">Límite / Vencimiento</th>
+                <th className="p-4 text-left">No. deuda</th>
+                <th className="p-4 text-left">Acreedor</th>
+                <th className="p-4 text-left">Tipo</th>
+                <th className="p-4 text-left">Fecha operación</th>
+                <th className="p-4 text-left">Fecha vencimiento</th>
                 <th className="p-4 text-center">Estado</th>
-                <th className="p-4 text-right">Saldo Original</th>
-                <th className="p-4 text-center w-28">Acciones</th>
+                <th className="p-4 text-right">Monto total</th>
+                <th className="p-4 text-right">Total abonos</th>
+                <th className="p-4 text-right">Total restante</th>
+                <th className="p-4 text-left">Usuario registro</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-(--color-gris-claro-2)">
-              {deudasFiltradas.length === 0 ? (
+              {cargando ? (
+                Array.from({ length: 6 }).map((_, fila) => (
+                  <tr key={`deuda-skeleton-${fila}`}>
+                    {Array.from({ length: 10 }).map((__, columna) => (
+                      <td key={`deuda-skeleton-${fila}-${columna}`} className="p-4">
+                        <Skeleton className="h-4 w-full" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : errorCarga ? (
                 <tr>
-                  <td colSpan="6" className="p-12 text-center text-(--color-gris-claro) font-medium">
+                  <td colSpan="10" className="p-10 text-center">
+                    <div className="mx-auto flex max-w-lg flex-col items-center gap-3 text-(--color-rojo-obscuro)">
+                      <AlertCircle className="h-7 w-7 text-(--color-rojo)" />
+                      <p className="text-sm">{errorCarga}</p>
+                      <button
+                        type="button"
+                        onClick={cargarDeudas}
+                        className="rounded-xl border border-(--color-borde-button) bg-(--color-pagina) px-4 py-2 text-sm font-medium text-(--color-blanco) hover:bg-(--color-rosa-hover) hover:text-(--color-negro)"
+                      >
+                        Reintentar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : deudasFiltradas.length === 0 ? (
+                <tr>
+                  <td colSpan="10" className="p-12 text-center text-(--color-gris-claro) font-medium">
                     No se registran obligaciones financieras pendientes.
                   </td>
                 </tr>
               ) : (
                 deudasFiltradas.map((deuda) => (
                   <tr key={deuda.idDeuda || deuda.id} className="hover:bg-(--color-pagina-4) transition-colors text-(--color-negro)">
+                    <td className="p-4 font-semibold">#{deuda.idDeuda}</td>
                     <td className="p-4 font-semibold">
-                      {deuda.acreedor}
+                      {deuda.nombreAcreedor || "---"}
                     </td>
-                    <td className="p-4 max-w-xs truncate text-(--color-gris-letra) font-medium">
-                      {deuda.descripcion || "---"}
+                    <td className="p-4 text-(--color-gris-letra) font-medium">
+                      {deuda.tipo || "---"}
                     </td>
                     <td className="p-4 whitespace-nowrap text-(--color-gris-letra) font-medium">
-                      {deuda.fechaVencimiento ? deuda.fechaVencimiento.split('T')[0] : "---"}
+                      {formatearFecha(deuda.fechaOperacion, true)}
+                    </td>
+                    <td className="p-4 whitespace-nowrap text-(--color-gris-letra) font-medium">
+                      {formatearFecha(deuda.fechaVencimiento)}
                     </td>
                     <td className="p-4 text-center">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                        deuda.estado === "Cancelado" 
+                        deuda.estado === "PAGADA"
                           ? "bg-(--color-pagina-3) border-(--color-pos-scan-ok-borde) text-(--color-verde)" 
                           : "bg-(--color-blanco) border-(--color-rojo) text-(--color-rojo-obscuro)"
                       }`}>
-                        {deuda.estado || "Pendiente"}
+                        {deuda.estado || "PENDIENTE"}
                       </span>
                     </td>
-                    <td className="p-4 text-right font-bold text-(--color-rojo)">
-                      Q {parseFloat(deuda.montoTotal || 0).toFixed(2)}
+                    <td className="p-4 text-right font-semibold">
+                      {formatearMoneda(deuda.montoTotal)}
                     </td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => abrirEditar(deuda)}
-                          className="p-2 text-(--color-celeste) hover:bg-(--color-pagina-3) rounded-lg transition-colors cursor-pointer"
-                          title="Actualizar / Editar"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <td className="p-4 text-right text-(--color-gris-letra)">
+                      {deuda.totalAbonos == null ? "---" : formatearMoneda(deuda.totalAbonos)}
+                    </td>
+                    <td className="p-4 text-right font-bold text-(--color-rojo)">
+                      {formatearMoneda(deuda.totalRestante)}
+                    </td>
+                    <td className="p-4 text-(--color-gris-letra)">
+                      <span className="block font-medium text-(--color-negro)">
+                        {deuda.usuarioRegistro || "---"}
+                      </span>
+                      {deuda.idUsuarioRegistro ? (
+                        <span className="text-xs">ID: {deuda.idUsuarioRegistro}</span>
+                      ) : null}
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
-        )}
       </div>
 
       {/* MODAL: REGISTRAR / EDITAR DEUDA */}
