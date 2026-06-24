@@ -93,6 +93,8 @@ const NuevaCompra = () => {
 
   const [proveedor, setProveedor] = useState("");
   const [fechaPedido, setFechaPedido] = useState(() => new Date().toISOString().slice(0, 10));
+  const [esCredito, setEsCredito] = useState(false);
+  const [fechaVencimientoCredito, setFechaVencimientoCredito] = useState("");
   const [documentoRef, setDocumentoRef] = useState("");
   const [tipoComprobante, setTipoComprobante] = useState("none");
   const [notas, setNotas] = useState("");
@@ -141,6 +143,12 @@ const NuevaCompra = () => {
       }));
     });
   }, [isEdit, compraQ.data]);
+
+  useEffect(() => {
+    if (isDirecta) return;
+    setEsCredito(false);
+    setFechaVencimientoCredito("");
+  }, [isDirecta]);
 
   const proveedores = useMemo(() => {
     const raw = provQ.data ?? [];
@@ -246,6 +254,13 @@ const NuevaCompra = () => {
 
   const quitar = (idVariante) => setLineas((prev) => prev.filter((x) => x.idVariante !== idVariante));
 
+  const cambiarEsCredito = (value) => {
+    setEsCredito(value);
+    if (!value) {
+      setFechaVencimientoCredito("");
+    }
+  };
+
   const buildHeaderBody = () => {
     const idTipo =
       tipoComprobante === "none" || tipoComprobante === "" ? null : Number(tipoComprobante);
@@ -283,6 +298,16 @@ const NuevaCompra = () => {
 
     try {
       if (isDirecta) {
+        if (esCredito) {
+          if (!fechaVencimientoCredito) {
+            setFormError("Seleccione la fecha de vencimiento del credito.");
+            return;
+          }
+          if (fechaVencimientoCredito <= header.fechaCompra) {
+            setFormError("La fecha de vencimiento del credito debe ser posterior a la fecha de compra.");
+            return;
+          }
+        }
         for (const l of lineas) {
           const sync = sincronizarLineaCompraDirecta(l);
           if (!(sync.costoReal > 0)) {
@@ -297,6 +322,8 @@ const NuevaCompra = () => {
         const body = {
           ...header,
           confirmarCantidadMayorSolicitada: false,
+          esCredito,
+          ...(esCredito ? { fechaVencimientoCredito } : {}),
           detalles: lineas.map((l) => {
             const sync = sincronizarLineaCompraDirecta(l);
             return {
@@ -468,6 +495,11 @@ const NuevaCompra = () => {
           onDocumentoRefChange={setDocumentoRef}
           tipoComprobante={tipoComprobante}
           onTipoComprobanteChange={setTipoComprobante}
+          showCreditoControls={isDirecta}
+          esCredito={esCredito}
+          onEsCreditoChange={cambiarEsCredito}
+          fechaVencimientoCredito={fechaVencimientoCredito}
+          onFechaVencimientoCreditoChange={setFechaVencimientoCredito}
           disabled={loadingEdit}
         />
 

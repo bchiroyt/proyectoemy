@@ -1,18 +1,76 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Search, Loader2, X, CheckCircle, AlertCircle, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useNavigationStore } from "@/context/useNavigationStore";
 
 // IMPORTAMOS TU CLIENTE CONFIGURADO
-import { apiClient } from "@/lib/apiClient";
+import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
+import { validateCrearGasto } from "@/lib/gastoValidations";
+
+const obtenerCampo = (objeto, ...campos) => {
+  if (!objeto || typeof objeto !== "object") return undefined;
+  const campo = campos.find((nombre) => Object.prototype.hasOwnProperty.call(objeto, nombre));
+  return campo ? objeto[campo] : undefined;
+};
+
+const normalizarCatalogo = (lista, camposId) => {
+  if (!Array.isArray(lista)) return [];
+
+  return lista
+    .map((item) => ({
+      id: obtenerCampo(item, ...camposId),
+      nombre: obtenerCampo(item, "nombre", "Nombre", "descripcion", "Descripcion") || "",
+    }))
+    .filter((item) => item.id != null);
+};
+
+const CampoSkeleton = () => (
+  <div className="space-y-2">
+    <div className="h-3 w-28 rounded bg-(--color-gris-claro-2)" />
+    <div className="h-11 w-full rounded-lg bg-(--color-pagina-3)" />
+  </div>
+);
+
+const FormularioGastoSkeleton = () => (
+  <div
+    role="status"
+    aria-label="Cargando datos del formulario"
+    className="animate-pulse space-y-4"
+  >
+    <span className="sr-only">Cargando datos del formulario...</span>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <CampoSkeleton />
+      <CampoSkeleton />
+    </div>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <CampoSkeleton />
+      <CampoSkeleton />
+    </div>
+    <div className="space-y-2">
+      <div className="h-3 w-40 rounded bg-(--color-gris-claro-2)" />
+      <div className="h-20 w-full rounded-lg bg-(--color-pagina-3)" />
+    </div>
+    <div className="flex justify-end gap-3 border-t border-(--color-gris-claro-2) pt-4">
+      <div className="h-10 w-24 rounded-xl bg-(--color-pagina-3)" />
+      <div className="h-10 w-32 rounded-xl bg-(--color-gris-claro-2)" />
+    </div>
+  </div>
+);
 
 const Gastos = () => {
   const navigate = useNavigate();
+  const setTitulo = useNavigationStore((state) => state.setTitulo);
 
   // ESTADOS PRINCIPALES
   const [gastos, setGastos] = useState([]);
-  const [categorias, setCategorias] = useState([]); // Para el select del formulario
+  const [tiposGasto, setTiposGasto] = useState([]);
+  const [metodosPago, setMetodosPago] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [cargandoPreparacion, setCargandoPreparacion] = useState(false);
+  const [errorPreparacion, setErrorPreparacion] = useState("");
+  const [erroresCampos, setErroresCampos] = useState({});
+  const [errorRegistro, setErrorRegistro] = useState("");
 
   // SISTEMA DE TOAST
   const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
@@ -26,10 +84,11 @@ const Gastos = () => {
   // FORMULARIO ADAPTADO A TU BASE DE DATOS
   const [formGasto, setFormGasto] = useState({
     fecha: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
-    idCategoriaGasto: "",
+    idTipoGasto: "",
     descripcion: "",
     monto: "",
     idMetodoPago: "",
+    observaciones: "",
   });
 
   // FUNCIÓN PARA DISPARAR AVISOS FLOTANTES
@@ -63,31 +122,104 @@ const Gastos = () => {
     }
   };
 
-  // GET: CARGAR CATEGORÍAS AUXILIARES PARA EL SELECT
-  const cargarCategorias = async () => {
+  // GET: CARGAR DATOS NECESARIOS AL ABRIR EL FORMULARIO
+  const cargarPreparacionGasto = async () => {
     try {
-      const { data: res } = await apiClient.get("/api/Gastos/Categorias");
-      if (res?.exito) setCategorias(res.data || []);
+      setCargandoPreparacion(true);
+      setErrorPreparacion("");
+      setTiposGasto([]);
+      setMetodosPago([]);
+      const { data: respuesta } = await apiClient.get("/api/gastos/preparacion");
+      console.info("[Gastos] Datos de preparacion recibidos:", respuesta);
+      if (obtenerCampo(respuesta, "exito", "Exito") === false) {
+        throw new Error(obtenerCampo(respuesta, "mensaje", "Mensaje") || "No se pudo preparar el formulario.");
+      }
+      const preparacion = obtenerCampo(respuesta, "data", "Data") || respuesta;
+      const tiposRecibidos = obtenerCampo(
+        preparacion,
+        "tiposGasto",
+        "TiposGasto"
+      );
+      const metodosRecibidos = obtenerCampo(
+        preparacion,
+        "metodosPago",
+        "MetodosPago",
+        "metodosDePago",
+        "MetodosDePago",
+        "formasPago",
+        "FormasPago"
+      );
+
+      setTiposGasto(normalizarCatalogo(tiposRecibidos, ["idTipoGasto", "IdTipoGasto", "id", "Id"]));
+      setMetodosPago(normalizarCatalogo(metodosRecibidos, ["idMetodoPago", "IdMetodoPago", "id", "Id"]));
     } catch (error) {
-      console.error("Error al cargar categorías de gastos:", error);
+      console.error("Error al preparar el formulario de gastos:", error);
+      setErrorPreparacion(getApiErrorMessage(error, "No se pudieron cargar los datos del formulario."));
+    } finally {
+      setCargandoPreparacion(false);
     }
   };
 
   useEffect(() => {
+    setTitulo("Contabilidad > gastos");
+  }, [setTitulo]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarGastos();
-    cargarCategorias();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const actualizarCampo = (campo, valor) => {
+    setFormGasto((actual) => ({ ...actual, [campo]: valor }));
+    setErroresCampos((actuales) => {
+      if (!actuales[campo]) return actuales;
+      const siguientes = { ...actuales };
+      delete siguientes[campo];
+      return siguientes;
+    });
+    setErrorRegistro("");
+  };
 
   // POST / PATCH: GUARDAR O ACTUALIZAR GASTO
   const handleGuardar = async (e) => {
     e.preventDefault();
-    if (formularioInvalido()) return;
+    setErroresCampos({});
+    setErrorRegistro("");
+
+    const validacion = validateCrearGasto(formGasto);
+    if (!validacion.success) {
+      setErroresCampos(validacion.error.flatten().fieldErrors);
+      setErrorRegistro("Complete correctamente los campos indicados antes de registrar el gasto.");
+      return;
+    }
+
+    const gastoValidado = validacion.data;
+    const erroresCatalogo = {};
+    if (!tiposGasto.some((tipo) => Number(tipo.id) === gastoValidado.idTipoGasto)) {
+      erroresCatalogo.idTipoGasto = ["Seleccione un tipo de gasto disponible"];
+    }
+    if (
+      gastoValidado.idMetodoPago != null &&
+      !metodosPago.some((metodo) => Number(metodo.id) === gastoValidado.idMetodoPago)
+    ) {
+      erroresCatalogo.idMetodoPago = ["Seleccione un método de pago disponible"];
+    }
+    if (Object.keys(erroresCatalogo).length > 0) {
+      setErroresCampos(erroresCatalogo);
+      setErrorRegistro("Los datos seleccionados no pertenecen a las opciones disponibles.");
+      return;
+    }
 
     try {
       setGuardando(true);
       const payload = {
-        ...formGasto,
-        monto: parseFloat(formGasto.monto)
+        idTipoGasto: gastoValidado.idTipoGasto,
+        idMetodoPago: gastoValidado.idMetodoPago,
+        descripcion: gastoValidado.descripcion,
+        monto: gastoValidado.monto,
+        fecha: gastoValidado.fecha,
+        observaciones: gastoValidado.observaciones || null,
       };
       
       if (modoEditar) {
@@ -100,21 +232,39 @@ const Gastos = () => {
           mostrarAviso("error", data?.mensaje || "Error al actualizar el gasto");
         }
       } else {
-        const { data } = await apiClient.post("/api/Gastos", payload);
+        const { data } = await apiClient.post("/api/gastos", payload);
         if (data?.exito) {
-          mostrarAviso("exito", "¡Gasto registrado exitosamente!");
+          mostrarAviso("exito", data.mensaje || "¡Gasto registrado exitosamente!");
           cerrarYLimpiarModal();
           await cargarGastos();
         } else {
-          mostrarAviso("error", data?.mensaje || "Error al registrar el gasto");
+          setErrorRegistro(data?.mensaje || "No se pudo registrar el gasto.");
         }
       }
     } catch (error) {
       console.error("Error en la operación del gasto:", error);
-      mostrarAviso("error", "Error interno al procesar la solicitud.");
+      setErrorRegistro(getApiErrorMessage(error, "No se pudo registrar el gasto. Verifique los datos e intente nuevamente."));
     } finally {
       setGuardando(false);
     }
+  };
+
+  const abrirNuevo = () => {
+    setModoEditar(false);
+    setIdGastoSeleccionado(null);
+    setErrorPreparacion("");
+    setErroresCampos({});
+    setErrorRegistro("");
+    setFormGasto({
+      fecha: new Date().toISOString().split('T')[0],
+      idTipoGasto: "",
+      descripcion: "",
+      monto: "",
+      idMetodoPago: "",
+      observaciones: "",
+    });
+    setModalAbierto(true);
+    cargarPreparacionGasto();
   };
 
   // PREPARAR EDICIÓN
@@ -122,25 +272,31 @@ const Gastos = () => {
     setIdGastoSeleccionado(gasto.idGasto || gasto.id);
     setFormGasto({
       fecha: gasto.fecha ? gasto.fecha.split('T')[0] : "",
-      idCategoriaGasto: gasto.idCategoriaGasto || "",
+      idTipoGasto: gasto.idTipoGasto || "",
       descripcion: gasto.descripcion || "",
       monto: gasto.monto || "",
       idMetodoPago: gasto.idMetodoPago || "",
+      observaciones: gasto.observaciones || "",
     });
     setModoEditar(true);
     setModalAbierto(true);
+    cargarPreparacionGasto();
   };
 
   const cerrarYLimpiarModal = () => {
     setModalAbierto(false);
     setModoEditar(false);
     setIdGastoSeleccionado(null);
+    setErrorPreparacion("");
+    setErroresCampos({});
+    setErrorRegistro("");
     setFormGasto({
       fecha: new Date().toISOString().split('T')[0],
-      idCategoriaGasto: "",
+      idTipoGasto: "",
       descripcion: "",
       monto: "",
       idMetodoPago: "",
+      observaciones: "",
     });
   };
 
@@ -149,17 +305,11 @@ const Gastos = () => {
     g.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
   );
 
-  const formularioInvalido = () => {
-    return !formGasto.descripcion.trim() || !formGasto.monto || !formGasto.fecha;
-  };
-
   return (
     <div className="p-6 space-y-6 relative bg-(--color-pagina-4) min-h-full w-full">
       
-      {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-semibold text-(--color-pagina)">Gastos de Contabilidad</h1>
           <p className="text-(--color-gris-letra) text-sm mt-1">
             Visualiza, genera y gestiona los egresos operativos y compras de la empresa.
           </p>
@@ -189,10 +339,7 @@ const Gastos = () => {
 
         <button
           type="button"
-          onClick={() => {
-            setModoEditar(false);
-            setModalAbierto(true);
-          }}
+          onClick={abrirNuevo}
           className="flex items-center gap-2 bg-(--color-pagina) border border-(--color-borde-button) text-(--color-blanco) px-5 py-3 rounded-xl hover:bg-(--color-rosa-hover) hover:text-(--color-negro) transition-colors cursor-pointer text-sm font-medium shadow-sm"
         >
           <Plus className="w-4 h-4" />
@@ -212,7 +359,7 @@ const Gastos = () => {
             <thead className="bg-(--color-pagina-3) text-(--color-gris-letra) uppercase text-[11px] tracking-wider font-bold border-b border-(--color-gris-claro-2)">
               <tr>
                 <th className="p-4 text-left">Fecha</th>
-                <th className="p-4 text-left">Categoría</th>
+                <th className="p-4 text-left">Tipo de gasto</th>
                 <th className="p-4 text-left">Descripción</th>
                 <th className="p-4 text-right">Monto</th>
                 <th className="p-4 text-left">Método de Pago</th>
@@ -235,7 +382,7 @@ const Gastos = () => {
                     </td>
                     <td className="p-4">
                       <span className="bg-(--color-pagina-3) text-(--color-pagina) px-2.5 py-1 rounded-full text-xs font-semibold border border-(--color-gris-claro-2)">
-                        {gasto.categoriaGasto?.nombre || gasto.idCategoriaGasto || "General"}
+                        {gasto.tipoGastoNombre || gasto.idTipoGasto || "General"}
                       </span>
                     </td>
                     <td className="p-4 max-w-xs truncate font-medium">
@@ -245,7 +392,7 @@ const Gastos = () => {
                       Q {parseFloat(gasto.monto || 0).toFixed(2)}
                     </td>
                     <td className="p-4 text-(--color-gris-letra)">
-                      {gasto.metodoPago?.nombre || "Efectivo"}
+                      {gasto.metodoPagoNombre || "Sin método de pago"}
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -267,34 +414,33 @@ const Gastos = () => {
         )}
       </div>
 
+      {notificacion.mostrar && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium max-w-md w-11/12 ${
+          notificacion.tipo === "exito"
+            ? "bg-(--color-blanco) border-(--color-pos-scan-ok-borde) text-(--color-verde)"
+            : "bg-(--color-blanco) border-(--color-rojo) text-(--color-rojo-obscuro)"
+        }`}>
+          {notificacion.tipo === "exito" ? (
+            <CheckCircle className="w-5 h-5 text-(--color-verde) shrink-0" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-(--color-rojo) shrink-0" />
+          )}
+          <span className="flex-1">{notificacion.mensaje}</span>
+          <button
+            type="button"
+            onClick={() => setNotificacion((actual) => ({ ...actual, mostrar: false }))}
+            className="text-(--color-gris-claro) hover:text-(--color-gris-letra) ml-2"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* MODAL: REGISTRAR / EDITAR GASTO */}
       {modalAbierto && (
         <div className="fixed inset-0 bg-(--color-negro)/40 flex items-center justify-center z-50 p-4 transition-all fallback-backdrop">
           <div className="bg-(--color-blanco) w-full max-w-xl rounded-2xl shadow-lg flex flex-col max-h-[90vh] border-t-4 border-(--color-pagina) relative">
             
-            {/* TOAST INTERNO DEL MODAL */}
-            {notificacion.mostrar && (
-              <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all max-w-md w-11/12 animate-bounce ${
-                notificacion.tipo === "exito" 
-                  ? "bg-(--color-blanco) border-(--color-pos-scan-ok-borde) text-(--color-verde)" 
-                  : "bg-(--color-blanco) border-(--color-rojo) text-(--color-rojo-obscuro)"
-              }`}>
-                {notificacion.tipo === "exito" ? (
-                  <CheckCircle className="w-5 h-5 text-(--color-verde) shrink-0" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 text-(--color-rojo) shrink-0" />
-                )}
-                <span className="flex-1">{notificacion.mensaje}</span>
-                <button 
-                  type="button" 
-                  onClick={() => setNotificacion({ ...notificacion, mostrar: false })} 
-                  className="text-(--color-gris-claro) hover:text-(--color-gris-letra) ml-2"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
             {/* CABECERA MODAL */}
             <div className="flex justify-between items-center p-6 border-b border-(--color-gris-claro-2)">
               <div className="w-9" />
@@ -312,30 +458,68 @@ const Gastos = () => {
 
             {/* FORMULARIO CONTABLE */}
             <form onSubmit={handleGuardar} className="p-6 overflow-y-auto flex-1 space-y-4">
-              
+              {cargandoPreparacion ? (
+                <FormularioGastoSkeleton />
+              ) : errorPreparacion ? (
+                <div
+                  role="alert"
+                  className="space-y-4 rounded-xl border border-(--color-rojo)/30 bg-(--color-pagina-4) p-5 text-center"
+                >
+                  <AlertCircle className="mx-auto h-8 w-8 text-(--color-rojo)" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-(--color-rojo-obscuro)">
+                      No se pudo cargar el formulario
+                    </p>
+                    <p className="text-sm text-(--color-gris-letra)">{errorPreparacion}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cargarPreparacionGasto}
+                    className="rounded-xl border border-(--color-borde-button) bg-(--color-pagina) px-5 py-2.5 text-sm font-medium text-(--color-blanco) transition-colors hover:bg-(--color-rosa-hover) hover:text-(--color-negro)"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : (
+                <>
+              {errorRegistro ? (
+                <div role="alert" className="flex items-start gap-2 rounded-lg border border-(--color-rojo)/30 bg-(--color-pagina-4) p-3 text-sm text-(--color-rojo-obscuro)">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-(--color-rojo)" />
+                  <span>{errorRegistro}</span>
+                </div>
+              ) : null}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-(--color-gris-letra) block">Fecha de Emisión *</label>
                   <input
                     type="date"
                     value={formGasto.fecha}
-                    onChange={(e) => setFormGasto({ ...formGasto, fecha: e.target.value })}
+                    onChange={(e) => actualizarCampo("fecha", e.target.value)}
+                    aria-invalid={Boolean(erroresCampos.fecha)}
                     className="w-full border border-(--color-gris-claro-2) p-3 rounded-lg outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm bg-(--color-blanco) text-(--color-negro)"
                   />
+                  {erroresCampos.fecha?.[0] ? (
+                    <p className="text-xs text-(--color-rojo)">{erroresCampos.fecha[0]}</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-(--color-gris-letra) block">Categoría de Gasto</label>
+                  <label className="text-xs font-semibold text-(--color-gris-letra) block">Tipo de Gasto *</label>
                   <select
-                    value={formGasto.idCategoriaGasto}
-                    onChange={(e) => setFormGasto({ ...formGasto, idCategoriaGasto: e.target.value })}
+                    value={formGasto.idTipoGasto}
+                    onChange={(e) => actualizarCampo("idTipoGasto", e.target.value)}
+                    aria-invalid={Boolean(erroresCampos.idTipoGasto)}
+                    disabled={cargandoPreparacion}
                     className="w-full border border-(--color-gris-claro-2) p-3 rounded-lg outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm bg-(--color-blanco) text-(--color-negro)"
                   >
-                    <option value="">Seleccione una categoría</option>
-                    {categorias.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                    <option value="">Seleccione un tipo de gasto</option>
+                    {tiposGasto.map((tipo) => (
+                      <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>
                     ))}
                   </select>
+                  {erroresCampos.idTipoGasto?.[0] ? (
+                    <p className="text-xs text-(--color-rojo)">{erroresCampos.idTipoGasto[0]}</p>
+                  ) : null}
                 </div>
               </div>
 
@@ -349,24 +533,34 @@ const Gastos = () => {
                       step="0.01"
                       min="0.01"
                       value={formGasto.monto}
-                      onChange={(e) => setFormGasto({ ...formGasto, monto: e.target.value })}
+                      onChange={(e) => actualizarCampo("monto", e.target.value)}
+                      aria-invalid={Boolean(erroresCampos.monto)}
                       placeholder="0.00"
                       className="w-full border border-(--color-gris-claro-2) pl-8 pr-3 p-3 rounded-lg outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm font-semibold bg-(--color-blanco) text-(--color-negro)"
                     />
                   </div>
+                  {erroresCampos.monto?.[0] ? (
+                    <p className="text-xs text-(--color-rojo)">{erroresCampos.monto[0]}</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-(--color-gris-letra) block">Método de Pago</label>
                   <select
                     value={formGasto.idMetodoPago}
-                    onChange={(e) => setFormGasto({ ...formGasto, idMetodoPago: e.target.value })}
+                    onChange={(e) => actualizarCampo("idMetodoPago", e.target.value)}
+                    aria-invalid={Boolean(erroresCampos.idMetodoPago)}
+                    disabled={cargandoPreparacion}
                     className="w-full border border-(--color-gris-claro-2) p-3 rounded-lg outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm bg-(--color-blanco) text-(--color-negro)"
                   >
-                    <option value="1">Efectivo</option>
-                    <option value="2">Transferencia Bancaria</option>
-                    <option value="3">Tarjeta de Crédito / Débito</option>
+                    <option value="">Seleccione un método de pago</option>
+                    {metodosPago.map((metodo) => (
+                      <option key={metodo.id} value={metodo.id}>{metodo.nombre}</option>
+                    ))}
                   </select>
+                  {erroresCampos.idMetodoPago?.[0] ? (
+                    <p className="text-xs text-(--color-rojo)">{erroresCampos.idMetodoPago[0]}</p>
+                  ) : null}
                 </div>
               </div>
 
@@ -375,8 +569,24 @@ const Gastos = () => {
                 <textarea
                   rows="3"
                   value={formGasto.descripcion}
-                  onChange={(e) => setFormGasto({ ...formGasto, descripcion: e.target.value })}
+                  onChange={(e) => actualizarCampo("descripcion", e.target.value)}
+                  aria-invalid={Boolean(erroresCampos.descripcion)}
+                  maxLength={255}
                   placeholder="Ej. Pago de factura de energía eléctrica correspondiente al mes..."
+                  className="w-full border border-(--color-gris-claro-2) p-3 rounded-lg outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm resize-none bg-(--color-blanco) text-(--color-negro)"
+                />
+                {erroresCampos.descripcion?.[0] ? (
+                  <p className="text-xs text-(--color-rojo)">{erroresCampos.descripcion[0]}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-(--color-gris-letra) block">Observaciones</label>
+                <textarea
+                  rows="2"
+                  value={formGasto.observaciones}
+                  onChange={(e) => actualizarCampo("observaciones", e.target.value)}
+                  placeholder="Información adicional del gasto (opcional)..."
                   className="w-full border border-(--color-gris-claro-2) p-3 rounded-lg outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm resize-none bg-(--color-blanco) text-(--color-negro)"
                 />
               </div>
@@ -392,13 +602,15 @@ const Gastos = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={guardando || formularioInvalido()}
+                  disabled={guardando || cargandoPreparacion || Boolean(errorPreparacion)}
                   className="bg-(--color-pagina) text-(--color-blanco) border border-(--color-borde-button) px-6 py-3 rounded-xl font-medium hover:bg-(--color-rosa-hover) hover:text-(--color-negro) transition-all text-sm disabled:opacity-40 flex items-center gap-2 cursor-pointer shadow-sm"
                 >
                   {guardando && <Loader2 className="w-4 h-4 animate-spin" />}
                   {guardando ? "Guardando..." : modoEditar ? "Actualizar Gasto" : "Aplicar Gasto"}
                 </button>
               </div>
+                </>
+              )}
             </form>
 
           </div>

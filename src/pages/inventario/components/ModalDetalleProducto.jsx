@@ -359,12 +359,12 @@ const ModalDetalleProducto = ({
     <>
       <Dialog open={open} onOpenChange={handleIntentoCierre}>
         <DialogContent
-          className="!flex min-h-0 w-[95vw] !max-w-[1100px] flex-col max-h-[90vh] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl md:w-[90vw] z-50"
+          className="flex min-h-0 w-[95vw] max-w-[1100px] flex-col max-h-[90vh] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl md:w-[90vw] z-50"
           onInteractOutside={solicitarConfirmacionSalida}
           onEscapeKeyDown={solicitarConfirmacionSalida}
         >
           {openConfirmarSalida && (
-            <div className="absolute inset-0 z-[60]">
+            <div className="absolute inset-0 z-index[60]">
               <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
               <div className="absolute left-1/2 top-1/2 z-[61] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2">
                 <div
@@ -461,7 +461,7 @@ const ModalDetalleProducto = ({
                       Categoría
                     </p>
                     <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">
-                      {estadoProducto.categoriaNombre || "---"}
+                      {estadoProducto.categoriaNombre || estadoProducto.categoria || "---"}
                     </p>
                   </div>
 
@@ -470,7 +470,7 @@ const ModalDetalleProducto = ({
                       Marca
                     </p>
                     <p className="text-xs md:text-sm font-semibold text-slate-700 truncate">
-                      {estadoProducto.marcaNombre || "---"}
+                      {estadoProducto.marcaNombre || estadoProducto.marca || "---"}
                     </p>
                   </div>
 
@@ -620,6 +620,7 @@ const ModalDetalleProducto = ({
                       const idActual = v.idVariante || index;
                       const esModoEdicion = editandoId === idActual;
                       const tieneCambios = verificarCambios(v);
+                      const stockActual = v.stockActual ?? v.stock ?? 0;
 
                       return (
                         <Card key={idActual} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
