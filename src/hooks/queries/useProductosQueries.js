@@ -8,7 +8,7 @@ function unwrapProductosPaged(data) {
   return {
     items: inner.items ?? inner.Items ?? [],
     page: Number(inner.page ?? inner.Page ?? 1) || 1,
-    pageSize: Number(inner.pageSize ?? inner.PageSize ?? 50) || 50,
+    pageSize: Number(inner.pageSize ?? inner.PageSize ?? 15) || 15,
     totalRecords:
       Number(
         inner.totalRecords ??
@@ -21,7 +21,7 @@ function unwrapProductosPaged(data) {
   };
 }
 
-export function useProductosListQuery({ page = 1, pageSize = 50 } = {}, options = {}) {
+export function useProductosListQuery({ page = 1, pageSize = 15 } = {}, options = {}) {
   return useQuery({
     queryKey: [QK_PRODUCTOS, "lista", { page, pageSize }],
     queryFn: async () => {
