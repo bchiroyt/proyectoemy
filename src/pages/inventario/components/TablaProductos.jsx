@@ -95,8 +95,8 @@ const TablaProductos = ({ productos = [], loading = false }) => {
               <tr>
                 <th className="p-4 text-left">Producto</th>
                 <th className="p-4 text-left">Categoría</th>
-                <th className="p-4 text-left">Marca</th>
-                <th className="p-4 text-left">Estado</th>
+                {/*<th className="p-4 text-left">Marca</th>
+                <th className="p-4 text-left">Estado</th> */}
                 <th className="p-4 text-left">Variantes</th>
                 <th className="p-4 text-left">Stock</th>
                 {/* <th className="p-4 text-left">Fecha</th>*/}
@@ -155,7 +155,7 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                         </span>
                       </td>
 
-                      <td className="p-4 text-gray-600">
+                      {/*<td className="p-4 text-gray-600">
                         {item.marcaNombre || "Sin marca"}
                       </td>
 
@@ -168,7 +168,7 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                         >
                           {item.estado ? "Activo" : "Inactivo"}
                         </span>
-                      </td>
+                      </td>*/}
 
                       <td className="p-4">
                         <span className="font-semibold text-(--color-pagina)">

@@ -91,7 +91,7 @@ export function CajasAbiertasPanel({ searchQuery = "", page = 1, setPage }) {
               <Table>
                 <TableHeader className="bg-muted/40">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="font-bold">ID</TableHead>
+                    <TableHead className="font-bold">No.</TableHead>
                     <TableHead className="font-bold">Responsable</TableHead>
                     <TableHead className="font-bold">Apertura</TableHead>
                     <TableHead className="font-bold">Monto apertura</TableHead>
@@ -100,10 +100,10 @@ export function CajasAbiertasPanel({ searchQuery = "", page = 1, setPage }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {itemsPaginados.map((c) => (
+                  {itemsPaginados.map((c, index) => (
                     <TableRow key={c.idCaja} className="hover:bg-muted/30">
                       <TableCell className="font-mono font-bold text-(--color-pagina)">
-                        #{c.idCaja}
+                        {index + 1}
                       </TableCell>
                       <TableCell className="font-semibold text-sm">
                         {c.usuarioResponsableNombre || "—"}

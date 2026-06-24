@@ -57,6 +57,8 @@ export function UsuariosListaPanel({
   searchQuery = "",
   nuevoUsuarioOpen = false,
   onNuevoUsuarioOpenChange,
+  page = 1,
+  pageSize = 10,
 }) {
   const [rolDialogUser, setRolDialogUser] = useState(null);
   const [editId, setEditId] = useState(null);
@@ -98,7 +100,7 @@ export function UsuariosListaPanel({
             <Table>
               <TableHeader className="bg-muted/40">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="whitespace-nowrap font-bold">ID</TableHead>
+                  <TableHead className="whitespace-nowrap font-bold">No.</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Usuario</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Correo</TableHead>
                   <TableHead className="whitespace-nowrap font-bold">Nombres</TableHead>
@@ -111,12 +113,12 @@ export function UsuariosListaPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtrados.map((u) => {
+                {filtrados.map((u, index) => {
                   const rolItems = roleBadgeItems(u);
                   const esMiUsuario = sameUserId(miUsuarioId, u.idUsuario);
                   return (
                     <TableRow key={u.idUsuario} className="hover:bg-muted/30">
-                      <TableCell className="whitespace-nowrap font-mono text-xs">{u.idUsuario}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono text-xs">{(page - 1) * pageSize + index + 1}</TableCell>
                       <TableCell className="max-w-[140px] truncate text-sm">{u.username}</TableCell>
                       <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">{u.email}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm">{u.nombres}</TableCell>
