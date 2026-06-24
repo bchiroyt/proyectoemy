@@ -37,6 +37,11 @@ export function mapCatalogoProducto(raw) {
   const stockRaw = pick(raw, "stockActual", "StockActual");
   const stockActual =
     stockRaw === undefined || stockRaw === null ? null : Number(stockRaw);
+  const costoPromedioRaw = pick(raw, "costoPromedioActual", "CostoPromedioActual");
+  const costoPromedioActual =
+    costoPromedioRaw === undefined || costoPromedioRaw === null
+      ? null
+      : Number(costoPromedioRaw);
 
   return {
     id: idVariante,
@@ -52,6 +57,7 @@ export function mapCatalogoProducto(raw) {
     color: pick(raw, "color", "Color") ?? null,
     presentacion: pick(raw, "presentacion", "Presentacion") ?? null,
     precio,
+    costoPromedioActual,
     stockActual,
     codigo: pick(raw, "sku", "Sku") ?? "",
   };

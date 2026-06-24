@@ -40,6 +40,32 @@ const PAGE_SIZE = 30;
 const CATEGORIA_TODO = "todo";
 const CATALOGO_GRID_CLASS =
   "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 w-full";
+const CAMPOS_CATALOGO_LINEA = [
+  "idVariante",
+  "sku",
+  "nombre",
+  "nombreProducto",
+  "descripcion",
+  "marca",
+  "categoria",
+  "categoriaSlug",
+  "talla",
+  "color",
+  "presentacion",
+  "precio",
+  "costoPromedioActual",
+  "stockActual",
+  "codigo",
+];
+
+const mergeCatalogoEnLineaCarrito = (linea, producto, cantidad = linea.cantidad) => ({
+  ...linea,
+  ...producto,
+  cantidad,
+  descuentoTipo: linea.descuentoTipo,
+  descuentoValor: linea.descuentoValor,
+  notaLinea: linea.notaLinea,
+});
 
 const VentasPOS = () => {
   const setTitulo = useNavigationStore((state) => state.setTitulo);
@@ -175,6 +201,32 @@ const VentasPOS = () => {
   const to = Math.min(from + PAGE_SIZE - 1, totalCount);
 
   useEffect(() => {
+    if (productosPagina.length === 0 || carrito.length === 0) return;
+
+    const catalogoPorId = new Map(productosPagina.map((producto) => [producto.id, producto]));
+    let hayCambios = false;
+
+    const carritoActualizado = carrito.map((linea) => {
+      if (linea.esReembolso) return linea;
+
+      const productoCatalogo = catalogoPorId.get(linea.id);
+      if (!productoCatalogo) return linea;
+
+      const requiereActualizar = CAMPOS_CATALOGO_LINEA.some(
+        (campo) => linea[campo] !== productoCatalogo[campo]
+      );
+      if (!requiereActualizar) return linea;
+
+      hayCambios = true;
+      return mergeCatalogoEnLineaCarrito(linea, productoCatalogo);
+    });
+
+    if (hayCambios) {
+      setCarrito(carritoActualizado);
+    }
+  }, [carrito, productosPagina, setCarrito]);
+
+  useEffect(() => {
     if (!miCajaQ.isLoading && !miCajaQ.data?.data) {
       navigate("/pos", { replace: true });
     }
@@ -187,7 +239,9 @@ const VentasPOS = () => {
         const existe = prev.find((p) => p.id === producto.id);
         if (existe) {
           return prev.map((p) =>
-            p.id === producto.id ? { ...p, cantidad: p.cantidad + 1 } : p
+            p.id === producto.id
+              ? mergeCatalogoEnLineaCarrito(p, producto, p.cantidad + 1)
+              : p
           );
         }
         const base = { ...producto, cantidad: 1 };
@@ -289,6 +343,11 @@ const VentasPOS = () => {
   );
 
   const lineaSeleccionada = carrito.find((p) => p.id === lineaSeleccionadaId) ?? null;
+
+  useEffect(() => {
+    if (!infoModalOpen || !lineaSeleccionada) return;
+    console.info("[VentasPOS] Modal de detalle abierto con data:", lineaSeleccionada);
+  }, [infoModalOpen, lineaSeleccionada]);
 
   const aplicarDescuentoLinea = useCallback(
     (tipo, valorRaw) => {
@@ -1103,6 +1162,16 @@ const VentasPOS = () => {
                   </span>
                   <span className="font-bold text-(--color-pagina)">
                     Q {Number(lineaSeleccionada.precio || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-(--color-pos-borde-suave) p-3 bg-(--color-pos-fondo)/50">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--color-pos-texto-muted) block mb-0.5">
+                    Costo promedio
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {lineaSeleccionada.costoPromedioActual == null
+                      ? "null"
+                      : `Q ${Number(lineaSeleccionada.costoPromedioActual).toFixed(2)}`}
                   </span>
                 </div>
                 <div className="rounded-xl border border-(--color-pos-borde-suave) p-3 bg-(--color-pos-fondo)/50">

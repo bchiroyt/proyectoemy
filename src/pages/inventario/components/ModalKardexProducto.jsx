@@ -1,143 +1,455 @@
-import React, { useState, useEffect } from "react";
-import { X, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, RefreshCw, X } from "lucide-react";
 
-// IMPORTACIONES DE TU ARQUITECTURA
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { obtenerKardexPorProducto } from "@/services/kardex";
-import { resolverIdProducto } from "@/lib/productoUtils";
+import { getApiErrorMessage } from "@/lib/apiClient";
+import { pick, throwIfEnvelopeFailed, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
+import { obtenerKardexPorVariante } from "@/services/kardex";
+
+const PERIODO_DEFAULT = "todos";
+const PERIODOS_KARDEX = [
+  { value: "todos", label: "Todos" },
+  { value: "mensual", label: "Mes actual" },
+  { value: "semanal", label: "Semana actual" },
+  { value: "trimestral", label: "Trimestre actual" },
+  { value: "anual", label: "Año actual" },
+];
+
+const formatDateTime = (value) => {
+  if (!value) return "---";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("es-GT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatNumber = (value) => {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number)) return "0";
+  return new Intl.NumberFormat("es-GT", {
+    maximumFractionDigits: 2,
+  }).format(number);
+};
+
+const normalizeText = (value) => String(value ?? "").trim();
+
+const resolverIdVariante = (item) =>
+  toNumberOrNull(pick(item, "idVariante", "IdVariante", "id_variante"));
+
+const getVarianteLabel = (variante, fallbackIndex) => {
+  const partes = [];
+  const sku = normalizeText(
+    pick(variante, "sku", "Sku", "codigoPrincipal", "CodigoPrincipal", "codigoBarras", "CodigoBarras")
+  );
+  const presentacion = normalizeText(
+    pick(variante, "presentacionNombre", "PresentacionNombre", "presentacion", "Presentacion")
+  );
+  const talla = normalizeText(pick(variante, "tallaNombre", "TallaNombre", "talla", "Talla"));
+  const color = normalizeText(pick(variante, "color", "Color", "nombreColor", "NombreColor"));
+
+  if (sku) partes.push(sku);
+  if (presentacion) partes.push(presentacion);
+  if (talla) partes.push(talla);
+  if (color) partes.push(color);
+
+  return partes.length > 0 ? partes.join(" / ") : `Variante ${fallbackIndex + 1}`;
+};
+
+const normalizeTipo = (raw, cantidad) => {
+  const tipo = normalizeText(
+    pick(
+      raw,
+      "tipoMovimiento",
+      "TipoMovimiento",
+      "tipoMovimientoNombre",
+      "TipoMovimientoNombre",
+      "naturaleza",
+      "Naturaleza",
+      "tipo",
+      "Tipo"
+    )
+  );
+  const upper = tipo.toUpperCase();
+
+  if (
+    upper.includes("ENTRADA") ||
+    upper.includes("INGRESO") ||
+    upper.includes("COMPRA") ||
+    upper.includes("DEVOLUCION") ||
+    upper.includes("DEVOLUCIÓN") ||
+    upper.includes("REEMBOLSO")
+  ) {
+    return { tipo: tipo || "Entrada", naturaleza: "ENTRADA" };
+  }
+  if (upper.includes("SALIDA") || upper.includes("EGRESO") || upper.includes("VENTA")) {
+    return { tipo: tipo || "Salida", naturaleza: "SALIDA" };
+  }
+  if (Number(cantidad) < 0) {
+    return { tipo: tipo || "Salida", naturaleza: "SALIDA" };
+  }
+  return { tipo: tipo || "Movimiento", naturaleza: "ENTRADA" };
+};
+
+const normalizeMovimiento = (raw, index) => {
+  if (!raw || typeof raw !== "object") return null;
+
+  const cantidad =
+    toNumberOrNull(
+      pick(
+        raw,
+        "cantidadAfectadaStock",
+        "CantidadAfectadaStock",
+        "cantidad",
+        "Cantidad",
+        "cantidadMovimiento",
+        "CantidadMovimiento"
+      )
+    ) ?? 0;
+  const { tipo, naturaleza } = normalizeTipo(raw, cantidad);
+  const fecha = pick(raw, "fechaMovimiento", "FechaMovimiento", "fecha", "Fecha", "createdAt");
+  const saldo =
+    toNumberOrNull(
+      pick(
+        raw,
+        "stockActualVariante",
+        "StockActualVariante",
+        "saldoHistorico",
+        "SaldoHistorico",
+        "saldo",
+        "Saldo",
+        "existencia",
+        "Existencia"
+      )
+    ) ?? 0;
+  const presentacion = normalizeText(
+    pick(raw, "nombrePresentacion", "NombrePresentacion", "presentacion", "Presentacion")
+  );
+  const talla = normalizeText(pick(raw, "nombreTalla", "NombreTalla", "talla", "Talla"));
+  const especificacion = [presentacion, talla].filter(Boolean).join(" / ") || "General";
+
+  return {
+    id:
+      pick(
+        raw,
+        "idMovimiento",
+        "IdMovimiento",
+        "idMovimientoInventario",
+        "IdMovimientoInventario",
+        "idInventario",
+        "IdInventario",
+        "idKardex",
+        "IdKardex"
+      ) ?? `kardex-${index}`,
+    fecha,
+    especificacion,
+    color: normalizeText(pick(raw, "nombreColor", "NombreColor", "color", "Color")) || "N/A",
+    tipo,
+    naturaleza,
+    cantidad: Math.abs(cantidad),
+    referencia:
+      normalizeText(
+        pick(
+          raw,
+          "referencia",
+          "Referencia",
+          "referenciaExterna",
+          "ReferenciaExterna",
+          "documento",
+          "Documento",
+          "motivo",
+          "Motivo"
+        )
+      ) || "Sin referencia",
+    saldo,
+  };
+};
+
+const unwrapKardex = (raw) => {
+  const items = unwrapList(raw);
+  if (items.length > 0) return items;
+  const data = pick(raw, "data", "Data");
+  const movimientos = pick(
+    data,
+    "movimientos",
+    "Movimientos",
+    "historial",
+    "Historial",
+    "kardex",
+    "Kardex",
+    "registros",
+    "Registros",
+    "detalles",
+    "Detalles"
+  );
+  if (Array.isArray(movimientos)) return movimientos;
+
+  const movimientosRaw = pick(raw, "movimientos", "Movimientos", "historial", "Historial");
+  return Array.isArray(movimientosRaw) ? movimientosRaw : [];
+};
 
 const ModalKardexProducto = ({ open, onClose, producto }) => {
   const [movimientos, setMovimientos] = useState([]);
   const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState("");
+  const [periodoKardex, setPeriodoKardex] = useState(PERIODO_DEFAULT);
+  const [idVarianteManual, setIdVarianteManual] = useState("");
 
-  const idProducto = resolverIdProducto(producto);
+  const productoNombre =
+    producto?.nombre || producto?.productoNombre || producto?.presentacionNombre || "---";
+  const variantes = useMemo(() => {
+    if (!producto) return [];
+
+    const entradas = [];
+    const idFila = resolverIdVariante(producto);
+    if (idFila) {
+      entradas.push(producto);
+    }
+
+    const variantesProducto = pick(producto, "variantes", "Variantes");
+    if (Array.isArray(variantesProducto)) {
+      entradas.push(...variantesProducto);
+    }
+
+    const porId = new Map();
+    for (const variante of entradas) {
+      const idVariante = resolverIdVariante(variante);
+      if (!idVariante || porId.has(idVariante)) continue;
+      porId.set(idVariante, {
+        idVariante,
+        label: getVarianteLabel(variante, porId.size),
+      });
+    }
+
+    return Array.from(porId.values());
+  }, [producto]);
+  const variantesIds = useMemo(
+    () => new Set(variantes.map((variante) => String(variante.idVariante))),
+    [variantes]
+  );
+  const idVarianteSeleccionada = variantesIds.has(String(idVarianteManual))
+    ? Number(idVarianteManual)
+    : variantes[0]?.idVariante ?? null;
+
+  const cargarKardex = async ({ forceRefresh = false } = {}) => {
+    if (!open || !idVarianteSeleccionada) return;
+
+    try {
+      setCargando(true);
+      setError("");
+      const raw = await obtenerKardexPorVariante(idVarianteSeleccionada, {
+        forceRefresh,
+        periodo: periodoKardex,
+      });
+      throwIfEnvelopeFailed(raw, "No se pudo cargar el kardex de la variante.");
+      const normalizados = unwrapKardex(raw).map(normalizeMovimiento).filter(Boolean);
+      setMovimientos(normalizados);
+    } catch (err) {
+      console.error("Error al obtener los movimientos del kardex:", err);
+      setMovimientos([]);
+      setError(getApiErrorMessage(err, "No se pudo cargar el kardex de la variante."));
+    } finally {
+      setCargando(false);
+    }
+  };
 
   useEffect(() => {
-    const cargarKardex = async () => {
-      if (!open || !idProducto) return;
+    let activo = true;
+
+    const cargar = async () => {
+      if (!open || !idVarianteSeleccionada) return;
 
       try {
         setCargando(true);
-        const res = await obtenerKardexPorProducto(idProducto);
-
-        // Estructura estándar RespuestaBase de tu C# (.exito y .data)
-        if (res?.exito && res?.data) {
-          setMovimientos(Array.isArray(res.data) ? res.data : []);
-        } else {
-          setMovimientos(Array.isArray(res) ? res : []);
+        setError("");
+        const raw = await obtenerKardexPorVariante(idVarianteSeleccionada, {
+          periodo: periodoKardex,
+        });
+        throwIfEnvelopeFailed(raw, "No se pudo cargar el kardex de la variante.");
+        const normalizados = unwrapKardex(raw).map(normalizeMovimiento).filter(Boolean);
+        if (activo) {
+          setMovimientos(normalizados);
         }
-      } catch (error) {
-        console.error("Error al obtener los movimientos del kardex:", error);
-        setMovimientos([]);
+      } catch (err) {
+        if (activo) {
+          console.error("Error al obtener los movimientos del kardex:", err);
+          setMovimientos([]);
+          setError(getApiErrorMessage(err, "No se pudo cargar el kardex de la variante."));
+        }
       } finally {
-        setCargando(false);
+        if (activo) {
+          setCargando(false);
+        }
       }
     };
 
-    cargarKardex();
-  }, [open, idProducto]);
+    cargar();
 
-  useEffect(() => {
-    if (!open) {
-      setMovimientos([]);
-    }
-  }, [open]);
+    return () => {
+      activo = false;
+    };
+  }, [open, idVarianteSeleccionada, periodoKardex]);
+
+  const cerrarModal = () => {
+    setMovimientos([]);
+    setPeriodoKardex(PERIODO_DEFAULT);
+    setError("");
+    setIdVarianteManual("");
+    onClose();
+  };
 
   if (!open || !producto) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-(--color-blanco) w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border-t-4 border-pink-600">
-
-        {/* HEADER */}
-        <div className="flex justify-between items-center p-6 border-b shrink-0">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">
-              Kardex de Inventario
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Producto: <span className="font-semibold text-slate-700">{producto.nombre || "---"}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-200">
+      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border-t-4 border-pink-600 bg-(--color-blanco) shadow-2xl">
+        <div className="flex shrink-0 flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between md:p-6">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-gray-800">Kardex de inventario</h2>
+            <p className="mt-1 truncate text-xs text-slate-500">
+              Producto: <span className="font-semibold text-slate-700">{productoNombre}</span>
             </p>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={idVarianteSeleccionada ?? ""}
+              onChange={(event) => setIdVarianteManual(event.target.value)}
+              className="h-9 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+              disabled={cargando || variantes.length <= 1}
+            >
+              {variantes.length === 0 ? (
+                <option value="">Sin variante</option>
+              ) : (
+                variantes.map((variante) => (
+                  <option key={variante.idVariante} value={variante.idVariante}>
+                    {variante.label}
+                  </option>
+                ))
+              )}
+            </select>
+
+            <select
+              value={periodoKardex}
+              onChange={(event) => setPeriodoKardex(event.target.value)}
+              className="h-9 min-w-[160px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+              disabled={cargando || !idVarianteSeleccionada}
+            >
+              {PERIODOS_KARDEX.map((periodo) => (
+                <option key={periodo.value} value={periodo.value}>
+                  {periodo.label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => cargarKardex({ forceRefresh: true })}
+              disabled={cargando || !idVarianteSeleccionada}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              title="Actualizar kardex"
+            >
+              <RefreshCw className={`size-4 ${cargando ? "animate-spin" : ""}`} />
+              Actualizar
+            </button>
+
+            <button
+              type="button"
+              onClick={cerrarModal}
+              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              title="Cerrar"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
 
-        {/* CUERPO - TABLA DEL PROTOTIPO */}
-        <div className="flex-1 flex flex-col min-h-0 bg-slate-50/30">
-          {cargando ? (
-            <div className="flex flex-col items-center justify-center p-20 flex-1 space-y-4">
-              <Loader2 className="w-8 h-8 animate-spin text-pink-600" />
-              <p className="text-xs text-slate-500 font-medium">Consultando movimientos en el servidor...</p>
+        <div className="flex min-h-0 flex-1 flex-col bg-slate-50/30">
+          {!idVarianteSeleccionada ? (
+            <div className="flex flex-1 items-center justify-center p-16 text-center text-sm font-medium text-slate-500">
+              No se encontro una variante valida para consultar el Kardex.
+            </div>
+          ) : cargando ? (
+            <div className="flex flex-1 flex-col items-center justify-center space-y-4 p-20">
+              <Loader2 className="size-8 animate-spin text-pink-600" />
+              <p className="text-xs font-medium text-slate-500">Consultando movimientos...</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-1 items-center justify-center p-8">
+              <div className="max-w-md rounded-xl border border-red-100 bg-red-50 p-4 text-center text-sm font-medium text-red-700">
+                {error}
+              </div>
             </div>
           ) : movimientos.length === 0 ? (
-            <div className="p-16 text-center text-slate-500 font-medium text-sm flex-1 flex items-center justify-center">
-              No se encontraron movimientos registrados para este producto en el kardex.
+            <div className="flex flex-1 items-center justify-center p-16 text-center text-sm font-medium text-slate-500">
+              No se encontraron movimientos para el periodo seleccionado.
             </div>
           ) : (
-            <ScrollArea className="flex-1 p-6">
-              <div className="overflow-x-auto bg-white rounded-xl border border-slate-100 shadow-sm">
+            <ScrollArea className="flex-1 p-4 md:p-6">
+              <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider font-bold border-b border-slate-100">
+                  <thead className="border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                     <tr>
                       <th className="p-4 text-left">No.</th>
                       <th className="p-4 text-left">Fecha</th>
-                      <th className="p-4 text-left">Especificación</th>
+                      <th className="p-4 text-left">Especificacion</th>
                       <th className="p-4 text-left">Color</th>
                       <th className="p-4 text-left">Tipo</th>
-                      <th className="p-4 text-right">Cant.</th>
-                      <th className="p-4 text-left">Referencia / Documento</th>
-                      <th className="p-4 text-right">Saldo Histórico</th>
+                      <th className="p-4 text-right">Cantidad</th>
+                      <th className="p-4 text-left">Referencia</th>
+                      <th className="p-4 text-right">Saldo</th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {movimientos.map((m, index) => {
-                      // Leer el tipo de movimiento ("ENTRADA" o "SALIDA")
-                      const tipo = m.tipoMovimiento || m.tipo || "";
-                      const esEntrada = tipo.toUpperCase() === "ENTRADA" || tipo.toUpperCase().includes("INGRESO");
+                    {movimientos.map((movimiento, index) => {
+                      const esEntrada = movimiento.naturaleza === "ENTRADA";
 
                       return (
-                        <tr key={m.idInventario || index} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="p-4 font-mono text-xs text-slate-400">
-                            #{index + 1}
-                          </td>
-                          <td className="p-4 whitespace-nowrap text-xs">
-                            {m.fechaMovimiento || m.fecha ? new Date(m.fechaMovimiento || m.fecha).toLocaleString() : "---"}
+                        <tr
+                          key={`${movimiento.id}-${movimiento.fecha ?? "sin-fecha"}-${index}`}
+                          className="transition-colors hover:bg-slate-50/60"
+                        >
+                          <td className="p-4 font-mono text-xs text-slate-400">#{index + 1}</td>
+                          <td className="whitespace-nowrap p-4 text-xs">
+                            {formatDateTime(movimiento.fecha)}
                           </td>
                           <td className="p-4">
                             <span className="font-semibold text-slate-800">
-                              {m.nombrePresentacion || m.presentacion || "General"}
+                              {movimiento.especificacion}
                             </span>
-                            {(m.nombreTalla || m.talla) ? ` • ${m.nombreTalla || m.talla}` : ""}
                           </td>
-                          <td className="p-4 uppercase text-xs font-medium text-slate-500">
-                            {m.nombreColor || m.color || "N/A"}
+                          <td className="p-4 text-xs font-medium uppercase text-slate-500">
+                            {movimiento.color}
                           </td>
                           <td className="p-4">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${esEntrada
-                                  ? "bg-green-50 text-green-700 border border-green-100"
-                                  : "bg-pink-50 text-pink-600 border border-pink-100"
-                                }`}
+                              className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                                esEntrada
+                                  ? "border-green-100 bg-green-50 text-green-700"
+                                  : "border-pink-100 bg-pink-50 text-pink-600"
+                              }`}
                             >
-                              {tipo || "SALIDA"}
+                              {movimiento.tipo}
                             </span>
                           </td>
-                          <td className={`p-4 text-right font-bold text-sm ${esEntrada ? "text-green-700" : "text-red-600"}`}>
+                          <td
+                            className={`p-4 text-right text-sm font-bold ${
+                              esEntrada ? "text-green-700" : "text-red-600"
+                            }`}
+                          >
                             {esEntrada ? "+" : "-"}
-                            {m.cantidad}
+                            {formatNumber(movimiento.cantidad)}
                           </td>
-                          <td className="p-4 text-slate-500 text-xs max-w-xs truncate">
-                            {m.motivo || m.referencia || "Sin especificar"}
+                          <td className="max-w-xs truncate p-4 text-xs text-slate-500">
+                            {movimiento.referencia}
                           </td>
-                          <td className="p-4 text-right font-bold text-slate-900 bg-slate-50/30">
-                            {m.saldoHistorico ?? m.saldo ?? 0}
+                          <td className="bg-slate-50/30 p-4 text-right font-bold text-slate-900">
+                            {formatNumber(movimiento.saldo)}
                           </td>
                         </tr>
                       );
@@ -149,16 +461,18 @@ const ModalKardexProducto = ({ open, onClose, producto }) => {
           )}
         </div>
 
-        {/* FOOTER */}
-        <div className="p-4 border-t flex justify-end shrink-0 bg-white">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-white p-4">
+          <p className="text-xs font-medium text-slate-500">
+            {movimientos.length} movimientos
+          </p>
           <button
-            onClick={onClose}
-            className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2 rounded-xl text-xs font-medium transition-colors shadow-sm cursor-pointer"
+            type="button"
+            onClick={cerrarModal}
+            className="rounded-xl bg-pink-600 px-6 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-pink-700"
           >
             Cerrar Kardex
           </button>
         </div>
-
       </div>
     </div>
   );

@@ -16,20 +16,33 @@ const tipos = {
   },
 };
 
-const Toast = ({ open, message, type = "success", onClose }) => {
+const posiciones = {
+  "top-right": "top-5 right-5 animate-in slide-in-from-right duration-300",
+  "bottom-right": "bottom-5 right-5 animate-in slide-in-from-bottom duration-300",
+  "bottom-center": "bottom-5 left-1/2 -translate-x-1/2 animate-in slide-in-from-bottom duration-300",
+};
+
+const Toast = ({
+  open,
+  message,
+  type = "success",
+  onClose,
+  duration = 3000,
+  position = "top-right",
+}) => {
   useEffect(() => {
     if (!open) return;
 
     const timer = setTimeout(() => {
       onClose();
-    }, 3000);
+    }, duration);
 
     return () => clearTimeout(timer);
-  }, [open, onClose]);
+  }, [duration, open, onClose]);
 
   if (!open) return null;
   return (
-    <div className="fixed top-5 right-5 z-[9999] animate-in slide-in-from-right duration-300">
+    <div className={`fixed z-[9999] ${posiciones[position] || posiciones["top-right"]}`}>
       <div
         className={`
           ${tipos[type]?.clases}

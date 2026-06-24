@@ -359,7 +359,7 @@ const ModalDetalleProducto = ({
     <>
       <Dialog open={open} onOpenChange={handleIntentoCierre}>
         <DialogContent
-          className="flex min-h-0 w-[95vw] max-w-[1100px] flex-col max-h-[90vh] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl md:w-[90vw] z-50"
+          className="z-50 flex max-h-[94vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl sm:max-w-6xl lg:max-w-7xl"
           onInteractOutside={solicitarConfirmacionSalida}
           onEscapeKeyDown={solicitarConfirmacionSalida}
         >
@@ -452,7 +452,7 @@ const ModalDetalleProducto = ({
               No se pudo cargar la información del producto.
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex flex-col overflow-hidden">
               {/* INFORMACIÓN PRINCIPAL DEL PRODUCTO */}
               <div className="shrink-0 border-y border-slate-100 bg-slate-50/50">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 px-6 md:px-8 py-3.5 text-left">
@@ -498,7 +498,7 @@ const ModalDetalleProducto = ({
               </div>
 
               {/* CONTENEDOR DE VARIANTES */}
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 md:p-8">
+              <div className="flex flex-col overflow-hidden p-6 md:p-8">
                 <div className="mb-4 shrink-0 flex items-center justify-between">
                   <span className="text-pink-600 font-bold text-sm border-b-2 border-pink-500 pb-2 inline-block">
                     Variantes ({estadoProducto.variantes?.length || 0})
@@ -513,7 +513,7 @@ const ModalDetalleProducto = ({
                   </Button>
                 </div>
 
-                <div className="h-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
+                <div className="max-h-[52vh] overflow-y-auto overscroll-contain pr-2 lg:max-h-[56vh]">
                   <div className="space-y-3 pb-2">
                     {mostrandoNuevaVariante && (
                       <Card className="border-2 border-pink-200 shadow-md bg-pink-50/30 overflow-hidden mb-4">
