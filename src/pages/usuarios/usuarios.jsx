@@ -118,6 +118,8 @@ const Usuarios = () => {
           searchQuery={searchQuery}
           nuevoUsuarioOpen={openNuevoUsuario}
           onNuevoUsuarioOpenChange={setOpenNuevoUsuario}
+          page={page}
+          pageSize={PAGE_SIZE}
         />
       ) : (
         <RolesYPermisosPanel />

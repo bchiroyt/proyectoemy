@@ -65,7 +65,8 @@ const ModalDetalleProducto = ({
   const [errorNuevaVariante, setErrorNuevaVariante] = useState("");
   const [accionSalidaPendiente, setAccionSalidaPendiente] = useState(null);
 
-  const idProducto = resolverIdProducto(producto);
+  // Obtener el ID del producto de forma segura
+  const idProducto = resolverIdProducto(producto) || producto?.idProducto || producto?.id_producto || (typeof producto === "number" || typeof producto === "string" ? producto : null);
 
   // EFECTO: Consulta al servidor al abrirse el modal
   useEffect(() => {
@@ -359,7 +360,7 @@ const ModalDetalleProducto = ({
     <>
       <Dialog open={open} onOpenChange={handleIntentoCierre}>
         <DialogContent
-          className="flex min-h-0 w-[95vw] max-w-[1100px] flex-col max-h-[90vh] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl md:w-[90vw] z-50"
+          className="flex min-h-0 w-[95vw] sm:max-w-[90vw] md:max-w-[1100px] flex-col max-h-[90vh] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl z-50"
           onInteractOutside={solicitarConfirmacionSalida}
           onEscapeKeyDown={solicitarConfirmacionSalida}
         >
@@ -694,8 +695,8 @@ const ModalDetalleProducto = ({
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                   Stock
                                 </p>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${(v.stockActual ?? v.stock ?? 0) > 0 ? 'bg-slate-100 text-slate-800' : 'bg-red-50 text-red-600'}`}>
-                                  {v.stockActual ?? v.stock ?? 0}
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${Number(stockActual) > 0 ? 'bg-slate-100 text-slate-800' : 'bg-red-50 text-red-600'}`}>
+                                  {stockActual}
                                 </span>
                                 {v.stockMinimo != null && v.stockMinimo !== "" && (
                                   <p className="text-[10px] text-slate-400 mt-1">

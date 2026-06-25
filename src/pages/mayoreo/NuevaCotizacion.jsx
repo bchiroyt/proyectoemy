@@ -107,7 +107,6 @@ export default function NuevaCotizacion() {
   const handleAgregarProducto = (producto) => {
     agregarProducto(producto);
     setCriterio("");
-    setToast({ open: true, message: "Producto agregado", type: "success" });
   };
 
   const total = useMemo(

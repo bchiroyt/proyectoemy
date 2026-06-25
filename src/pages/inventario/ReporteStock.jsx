@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { AlertTriangle, ArrowLeft, FileDown } from "lucide-react";
-import logoImg from "@/assets/tran1.png";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { useNivelesStockQuery } from "@/hooks/queries/useNivelesStockQueries";
 import { fetchNivelesStockExportar } from "@/services/nivelesStockService";
@@ -13,142 +12,14 @@ import {
   normalizarEstadoStock,
 } from "@/lib/nivelesStockMappers";
 import { Skeleton } from "@/components/ui/skeleton";
+import { generarInformeNivelStockPdf } from "@/lib/pdfExport";
 
 const PRODUCT_IMAGE_PLACEHOLDER =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
-const SIDEBAR_COLOR = [232, 48, 126];
 const SIDEBAR_COLOR_HEX = "#E8307E";
-const GRAY_LIGHT = [156, 163, 175];
-const GRAY_TEXT = [107, 114, 128];
 
-const cargarImagenComoDataUrl = async (src) => {
-  const response = await fetch(src);
-  if (!response.ok) throw new Error("No se pudo cargar el logo del reporte.");
-  const blob = await response.blob();
 
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
-
-const formatearFechaReporte = (valor) => {
-  if (!valor) return "Fecha no disponible";
-  const fecha = new Date(valor);
-  if (Number.isNaN(fecha.getTime())) return String(valor);
-
-  return fecha.toLocaleString("es-GT", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-};
-
-const buildVarianteReporte = (item) => {
-  const talla = String(item?.talla ?? "").trim();
-  const color = String(item?.color ?? "").trim();
-  const presentacion = String(item?.presentacion ?? "").trim();
-  return [talla || presentacion, color].filter(Boolean).join(" / ") || "Sin variante";
-};
-
-const generarInformeNivelStockPdf = async ({ fecha, items }) => {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const marginX = 14;
-  const fechaTexto = formatearFechaReporte(fecha);
-
-  try {
-    const logoDataUrl = await cargarImagenComoDataUrl(logoImg);
-    doc.addImage(logoDataUrl, "PNG", marginX, 10, 28, 20);
-  } catch (error) {
-    console.warn("[ReporteStock] No se pudo insertar el logo en el PDF:", error);
-  }
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(17, 24, 39);
-  doc.text("MODA Y VARIEDADES EMY", 47, 17);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...GRAY_TEXT);
-  doc.text("Sistema de Gestion de inventario", 47, 24);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(17, 24, 39);
-  doc.text("INFORME DE NIVEL DE STOCK", pageWidth - marginX, 17, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRAY_LIGHT);
-  doc.text(fechaTexto, pageWidth - marginX, 24, { align: "right" });
-
-  doc.setDrawColor(...SIDEBAR_COLOR);
-  doc.setLineWidth(1);
-  doc.line(marginX, 35, pageWidth - marginX, 35);
-
-  autoTable(doc, {
-    startY: 43,
-    margin: { left: marginX, right: marginX },
-    head: [[
-      "PRODUCTO",
-      "VARIANTE",
-      "SKU",
-      "CANTIDAD EXISTENTE",
-      "STOCK ACTUAL",
-      "STOCK MIN",
-    ]],
-    body: items.map((item) => [
-      item.producto || "Producto",
-      buildVarianteReporte(item),
-      item.sku || "Sin registrar",
-      item.cantidadExistente ?? item.stockActual ?? 0,
-      item.stockActual ?? 0,
-      item.stockMin ?? "-",
-    ]),
-    styles: {
-      font: "helvetica",
-      fontSize: 8,
-      cellPadding: 2.4,
-      overflow: "linebreak",
-      textColor: [31, 41, 55],
-      lineColor: [229, 231, 235],
-      lineWidth: 0.1,
-    },
-    headStyles: {
-      fillColor: SIDEBAR_COLOR,
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      halign: "center",
-    },
-    alternateRowStyles: {
-      fillColor: [249, 250, 251],
-    },
-    columnStyles: {
-      0: { cellWidth: 62 },
-      1: { cellWidth: 45 },
-      2: { cellWidth: 38 },
-      3: { cellWidth: 34, halign: "right" },
-      4: { cellWidth: 30, halign: "right" },
-      5: { cellWidth: 28, halign: "right" },
-    },
-    didDrawPage: () => {
-      doc.setFontSize(7);
-      doc.setTextColor(...GRAY_LIGHT);
-      doc.text(
-        `Pagina ${doc.internal.getNumberOfPages()}`,
-        pageWidth - marginX,
-        doc.internal.pageSize.getHeight() - 8,
-        { align: "right" }
-      );
-    },
-  });
-
-  doc.save("informe_nivel_stock.pdf");
-};
 
 const ReporteStock = () => {
   const navigate = useNavigate();
@@ -184,9 +55,14 @@ const ReporteStock = () => {
 
     try {
       const reporte = await fetchNivelesStockExportar();
-      const itemsFiltrados = reporte.items.filter((item) =>
-        ["critico", "advertencia"].includes(normalizarEstadoStock(item.nivelStock))
-      );
+      const itemsFiltrados = reporte.items.filter((item) => {
+        const coincideProveedor =
+          proveedorFiltro === "todos" || item.proveedor === proveedorFiltro;
+        const coincideEstado =
+          estadoFiltro === "todos" ||
+          normalizarEstadoStock(item.nivelStock) === estadoFiltro;
+        return coincideProveedor && coincideEstado;
+      });
 
       await generarInformeNivelStockPdf({
         fecha: reporte.fecha,
