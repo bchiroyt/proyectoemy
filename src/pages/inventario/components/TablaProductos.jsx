@@ -10,27 +10,64 @@ import { resolverIdProducto } from "@/lib/productoUtils";
 const obtenerSkuProducto = (producto) =>
   producto.sku || producto.codigoPrincipal || producto.variantes?.[0]?.sku || "Sin SKU";
 
+const toNumero = (valor) => {
+  if (valor === undefined || valor === null || valor === "") return null;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : null;
+};
+
 const obtenerStockProducto = (producto) => {
-  if (typeof producto.stock === "number") {
-    return producto.stock;
-  }
-  if (typeof producto.stockActual === "number") {
-    return producto.stockActual;
-  }
+  const stockDirecto = toNumero(
+    producto.stockActual ??
+      producto.existenciaActual ??
+      producto.existencia ??
+      producto.cantidadExistente ??
+      producto.stock
+  );
+  if (stockDirecto != null) return stockDirecto;
+
   return producto.variantes?.reduce(
-    (total, variante) => total + Number(variante.stockActual ?? variante.stock ?? 0),
+    (total, variante) =>
+      total +
+      Number(
+        variante.stockActual ??
+          variante.existenciaActual ??
+          variante.existencia ??
+          variante.cantidadExistente ??
+          variante.stock ??
+          0
+      ),
     0
   ) ?? 0;
 };
 
 const obtenerStockMinimoProducto = (producto) => {
-  if (typeof producto.stockMinimo === "number") {
-    return producto.stockMinimo;
-  }
+  const stockMinimoDirecto = toNumero(producto.stockMinimo ?? producto.stockMin ?? producto.minimo);
+  if (stockMinimoDirecto != null) return stockMinimoDirecto;
+
   return producto.variantes?.reduce(
-    (total, variante) => total + Number(variante.stockMinimo ?? 0),
+    (total, variante) =>
+      total + Number(variante.stockMinimo ?? variante.stockMin ?? variante.minimo ?? 0),
     0
   ) ?? 0;
+};
+
+const obtenerPrecioVentaProducto = (producto) => {
+  const precio =
+    toNumero(producto.precioVentaActual ?? producto.precioVenta ?? producto.precio) ??
+    toNumero(
+      producto.variantes?.[0]?.precioVentaActual ??
+        producto.variantes?.[0]?.precioVenta ??
+        producto.variantes?.[0]?.precio
+    );
+
+  return precio != null
+    ? new Intl.NumberFormat("es-GT", {
+        style: "currency",
+        currency: "GTQ",
+        minimumFractionDigits: 2,
+      }).format(precio)
+    : "-";
 };
 
 const obtenerEstadoStock = (stock, stockMinimo) => {
@@ -62,7 +99,7 @@ const obtenerEstadoStock = (stock, stockMinimo) => {
   };
 };
 
-const TablaProductos = ({ productos = [], loading = false }) => {
+const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
   const [openDetalle, setOpenDetalle] = useState(false);
   const [openVariantes, setOpenVariantes] = useState(false);
   const [openKardex, setOpenKardex] = useState(false);
@@ -132,7 +169,9 @@ const TablaProductos = ({ productos = [], loading = false }) => {
 
                   const llaveUnica = item.idProducto || item.idVariante || `prod-${index}`;
                   const nombreVisual = item.nombre || item.presentacionNombre || "Producto sin nombre";
+                  const categoriaVisual = item.categoriaNombre || item.nombreCategoria || item.categoria || "Sin categoria";
                   const cantidadVariantes = typeof item.variantes?.length === "number" ? item.variantes.length : 1;
+                  const precioVentaVisual = obtenerPrecioVentaProducto(item);
 
                   return (
                     <tr
@@ -166,7 +205,7 @@ const TablaProductos = ({ productos = [], loading = false }) => {
 
                       <td className="p-4">
                         <span className="bg-gray-100 px-2 py-1 rounded-md text-xs">
-                          {item.categoriaNombre || "Sin categoría"}
+                          {categoriaVisual}
                         </span>
                       </td>
 
@@ -218,7 +257,7 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                           : "-"}
                       </td>*/}
                       <td className="p-4 text-gray-500 text-xs">
-                        {item.precioVenta}
+                        {precioVentaVisual}
                       </td>
 
                       <td className="p-4">
@@ -261,6 +300,7 @@ const TablaProductos = ({ productos = [], loading = false }) => {
         open={openDetalle}
         onClose={() => setOpenDetalle(false)}
         producto={productoSeleccionado}
+        onRefresh={onRefresh}
       />
 
       <ModalVariantesProducto

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Trash2, ArrowLeft, Pencil } from "lucide-react";
+import { Check, Trash2, ArrowLeft, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 
@@ -29,6 +29,8 @@ const GestionMarcas = () => {
   const [openConfirm, setOpenConfirm] = useState(false);
   const [marcaAEliminar, setMarcaAEliminar] = useState(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
+  const [accionEstado, setAccionEstado] = useState("eliminar");
+  const [estadoFiltro, setEstadoFiltro] = useState("activos");
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -45,6 +47,7 @@ const GestionMarcas = () => {
       const data = await obtenerMarcas({
         Page: page,
         PageSize: PAGE_SIZE,
+        Activo: estadoFiltro === "activos",
       });
 
       setMarcas(data.items || []);
@@ -55,7 +58,7 @@ const GestionMarcas = () => {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, estadoFiltro]);
 
   useEffect(() => {
     setTitulo("Marcas");
@@ -90,17 +93,30 @@ const GestionMarcas = () => {
   // ELIMINAR CLICK
   const handleEliminarClick = (marca) => {
     setMarcaAEliminar(marca);
+    setAccionEstado("eliminar");
     setOpenConfirm(true);
   };
 
-  // ELIMINAR CONFIRMADO
-  const handleEliminarConfirmado = async () => {
+  const handleActivarClick = (marca) => {
+    setMarcaAEliminar(marca);
+    setAccionEstado("activar");
+    setOpenConfirm(true);
+  };
+
+  const handleCambiarEstadoConfirmado = async () => {
     if (!marcaAEliminar) return;
 
     try {
       setLoadingDelete(true);
 
-      await eliminarMarca(marcaAEliminar.idMarca);
+      if (accionEstado === "activar") {
+        await actualizarMarca(marcaAEliminar.idMarca, {
+          ...marcaAEliminar,
+          activo: true,
+        });
+      } else {
+        await eliminarMarca(marcaAEliminar.idMarca);
+      }
 
       await fetchMarcas();
 
@@ -111,6 +127,11 @@ const GestionMarcas = () => {
     } finally {
       setLoadingDelete(false);
     }
+  };
+
+  const handleEstadoFiltroChange = (event) => {
+    setEstadoFiltro(event.target.value);
+    setPage(1);
   };
 
   return (
@@ -129,6 +150,14 @@ const GestionMarcas = () => {
         </div>
 
         <div className="flex flex-1 justify-end items-center gap-3">
+          <select
+            value={estadoFiltro}
+            onChange={handleEstadoFiltroChange}
+            className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors focus:border-(--color-pagina)"
+          >
+            <option value="activos">Activos</option>
+            <option value="eliminados">Eliminados</option>
+          </select>
           <Paginacion
             from={from}
             to={to}
@@ -178,15 +207,17 @@ const GestionMarcas = () => {
               ) : marcas.length > 0 ? (
                 marcas.map((m, index) => (
                   <tr
-                    key={index + 1}
-                    className="hover:bg-gray-50 transition-colors"
+                    key={m.idMarca || index}
+                    className={`transition-colors ${
+                      m.activo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
+                    }`}
                   >
                     <td className="p-4 font-medium">
                       {m.idMarca}
                     </td>
 
                     <td className="p-4">
-                      {m.nombre}
+                      <span className={m.activo ? "" : "text-gray-400 line-through"}>{m.nombre}</span>
                     </td>
 
                     <td className="p-4 text-gray-500">
@@ -213,12 +244,23 @@ const GestionMarcas = () => {
                         <Pencil className="w-4 h-4" />
                       </button>
 
-                      <button
-                        onClick={() => handleEliminarClick(m)}
-                        className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {m.activo ? (
+                        <button
+                          onClick={() => handleEliminarClick(m)}
+                          className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors cursor-pointer"
+                          title="Eliminar marca"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivarClick(m)}
+                          className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors cursor-pointer"
+                          title="Reactivar marca"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      )}
 
                     </td>
                   </tr>
@@ -256,10 +298,17 @@ const GestionMarcas = () => {
       <ModalConfirmacion
         open={openConfirm}
         onClose={() => setOpenConfirm(false)}
-        onConfirm={handleEliminarConfirmado}
+        onConfirm={handleCambiarEstadoConfirmado}
         loading={loadingDelete}
-        titulo="Eliminar marca"
-        mensaje={`¿Seguro que quieres eliminar "${marcaAEliminar?.nombre}"?`}
+        titulo={accionEstado === "activar" ? "Reactivar marca" : "Eliminar marca"}
+        confirmLabel={accionEstado === "activar" ? "Reactivar" : "Eliminar"}
+        loadingLabel={accionEstado === "activar" ? "Reactivando..." : "Eliminando..."}
+        confirmClassName={accionEstado === "activar" ? "bg-green-600 hover:bg-green-700" : undefined}
+        mensaje={
+          accionEstado === "activar"
+            ? `¿Seguro que quieres reactivar "${marcaAEliminar?.nombre}"?`
+            : `¿Seguro que quieres eliminar "${marcaAEliminar?.nombre}"?`
+        }
       />
 
     </div>

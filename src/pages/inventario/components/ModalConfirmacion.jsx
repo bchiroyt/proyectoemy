@@ -8,6 +8,7 @@ const ModalConfirmacion = ({
   mensaje = "¿Estás seguro?",
   confirmLabel = "Eliminar",
   loadingLabel = "Eliminando...",
+  confirmClassName = "bg-red-500 hover:bg-red-600",
   loading = false,
 }) => {
   if (!open) return null;
@@ -35,7 +36,7 @@ const ModalConfirmacion = ({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className="w-full rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600"
+            className={`w-full rounded-xl py-2.5 text-sm font-medium text-white ${confirmClassName}`}
           >
             {loading ? loadingLabel : confirmLabel}
           </Button>

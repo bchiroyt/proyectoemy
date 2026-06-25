@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { Check, Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
@@ -26,10 +26,12 @@ const GestionPresentacion = () => {
 
   const [deleteModal, setDeleteModal] = useState(false);
   const [presentacionAEliminar, setPresentacionAEliminar] = useState(null);
+  const [accionEstado, setAccionEstado] = useState("eliminar");
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [estadoFiltro, setEstadoFiltro] = useState("activos");
 
   const from = totalRecords === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
@@ -41,6 +43,7 @@ const GestionPresentacion = () => {
       const data = await obtenerPresentaciones({
         Page: page,
         PageSize: PAGE_SIZE,
+        Activo: estadoFiltro === "activos",
       });
 
       setPresentaciones(data.items || []);
@@ -51,7 +54,7 @@ const GestionPresentacion = () => {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, estadoFiltro]);
 
   useEffect(() => {
     setTitulo("Presentación");
@@ -92,6 +95,13 @@ const GestionPresentacion = () => {
 
   const handleEliminarClick = (p) => {
     setPresentacionAEliminar(p);
+    setAccionEstado("eliminar");
+    setDeleteModal(true);
+  };
+
+  const handleActivarClick = (p) => {
+    setPresentacionAEliminar(p);
+    setAccionEstado("activar");
     setDeleteModal(true);
   };
 
@@ -99,7 +109,15 @@ const GestionPresentacion = () => {
     if (!presentacionAEliminar) return;
 
     try {
-      await eliminarPresentacion(presentacionAEliminar.idPresentacion);
+      if (accionEstado === "activar") {
+        await actualizarPresentacion(presentacionAEliminar.idPresentacion, {
+          nombre: presentacionAEliminar.nombre,
+          descripcion: presentacionAEliminar.descripcion,
+          estado: true,
+        });
+      } else {
+        await eliminarPresentacion(presentacionAEliminar.idPresentacion);
+      }
 
       await fetchPresentaciones();
     } catch (error) {
@@ -109,6 +127,11 @@ const GestionPresentacion = () => {
       setDeleteModal(false);
       setPresentacionAEliminar(null);
     }
+  };
+
+  const handleEstadoFiltroChange = (event) => {
+    setEstadoFiltro(event.target.value);
+    setPage(1);
   };
 
   return (
@@ -127,6 +150,14 @@ const GestionPresentacion = () => {
         </div>
 
         <div className="flex flex-1 justify-end items-center gap-3">
+          <select
+            value={estadoFiltro}
+            onChange={handleEstadoFiltroChange}
+            className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors focus:border-(--color-pagina)"
+          >
+            <option value="activos">Activos</option>
+            <option value="eliminados">Eliminados</option>
+          </select>
           <Paginacion
             from={from}
             to={to}
@@ -168,17 +199,22 @@ const GestionPresentacion = () => {
                   </td>
                 </tr>
               ) : presentaciones.length > 0 ? (
-                presentaciones.map((p, index) => (
+                presentaciones.map((p, index) => {
+                  const esActivo = (p.estado ?? p.activo ?? true) !== false;
+
+                  return (
                   <tr
                     key={p.idPresentacion}
-                    className="hover:bg-gray-50 transition-colors"
+                    className={`transition-colors ${
+                      esActivo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
+                    }`}
                   >
                     <td className="p-4 font-medium">
                       {index + 1}
                     </td>
 
                     <td className="p-4">
-                      {p.nombre}
+                      <span className={esActivo ? "" : "text-gray-400 line-through"}>{p.nombre}</span>
                     </td>
 
                     <td className="p-4 text-gray-500">
@@ -188,12 +224,12 @@ const GestionPresentacion = () => {
                     <td className="p-4">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          p.estado
+                          esActivo
                             ? "bg-green-100 text-green-700"
                             : "bg-red-100 text-red-700"
                         }`}
                       >
-                        {p.estado ? "Activo" : "Inactivo"}
+                        {esActivo ? "Activo" : "Inactivo"}
                       </span>
                     </td>
 
@@ -207,17 +243,28 @@ const GestionPresentacion = () => {
                           <Pencil className="w-4 h-4" />
                         </button>
 
-                        <button
-                          onClick={() => handleEliminarClick(p)}
-                          className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors cursor-pointer"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {esActivo ? (
+                          <button
+                            onClick={() => handleEliminarClick(p)}
+                            className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors cursor-pointer"
+                            title="Eliminar presentación"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleActivarClick(p)}
+                            className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors cursor-pointer"
+                            title="Reactivar presentación"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="5" className="p-10 text-center text-gray-400">
@@ -246,11 +293,11 @@ const GestionPresentacion = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl">
             <h2 className="text-lg font-bold text-gray-900 mb-2">
-              Confirmar eliminación
+              {accionEstado === "activar" ? "Reactivar Presentación" : "Confirmar eliminación"}
             </h2>
 
             <p className="text-gray-500">
-              Estás a punto de eliminar la presentación{" "}
+              {accionEstado === "activar" ? "Estás a punto de reactivar la presentación " : "Estás a punto de eliminar la presentación "}
               <span className="font-semibold text-gray-700">
                 "{presentacionAEliminar?.nombre}"
               </span>
@@ -267,9 +314,11 @@ const GestionPresentacion = () => {
 
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors cursor-pointer"
+                className={`px-4 py-2 text-white rounded-2xl transition-colors cursor-pointer ${
+                  accionEstado === "activar" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                }`}
               >
-                Eliminar
+                {accionEstado === "activar" ? "Reactivar" : "Eliminar"}
               </button>
             </div>
           </div>

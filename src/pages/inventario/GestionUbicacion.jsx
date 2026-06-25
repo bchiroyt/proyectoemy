@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { Check, Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 
@@ -27,10 +27,12 @@ const GestionUbicaciones = () => {
 
   const [deleteModal, setDeleteModal] = useState(false);
   const [ubicacionAEliminar, setUbicacionAEliminar] = useState(null);
+  const [accionEstado, setAccionEstado] = useState("eliminar");
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [estadoFiltro, setEstadoFiltro] = useState("activos");
 
   const from = totalRecords === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
@@ -43,6 +45,7 @@ const GestionUbicaciones = () => {
       const data = await obtenerUbicaciones({
         Page: page,
         PageSize: PAGE_SIZE,
+        Activo: estadoFiltro === "activos",
       });
 
       setUbicaciones(data.items || []);
@@ -53,7 +56,7 @@ const GestionUbicaciones = () => {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, estadoFiltro]);
 
   useEffect(() => {
     setTitulo("Ubicaciones");
@@ -94,14 +97,28 @@ const GestionUbicaciones = () => {
   // ELIMINAR
   const handleEliminarClick = (u) => {
     setUbicacionAEliminar(u);
+    setAccionEstado("eliminar");
+    setDeleteModal(true);
+  };
+
+  const handleActivarClick = (u) => {
+    setUbicacionAEliminar(u);
+    setAccionEstado("activar");
     setDeleteModal(true);
   };
 
   const handleConfirmDelete = async () => {
     try {
-      await eliminarUbicacion(
-        ubicacionAEliminar.idUbicacion
-      );
+      if (accionEstado === "activar") {
+        await actualizarUbicacion(ubicacionAEliminar.idUbicacion, {
+          ...ubicacionAEliminar,
+          activo: true,
+        });
+      } else {
+        await eliminarUbicacion(
+          ubicacionAEliminar.idUbicacion
+        );
+      }
 
       await fetchUbicaciones();
 
@@ -111,6 +128,11 @@ const GestionUbicaciones = () => {
       setDeleteModal(false);
       setUbicacionAEliminar(null);
     }
+  };
+
+  const handleEstadoFiltroChange = (event) => {
+    setEstadoFiltro(event.target.value);
+    setPage(1);
   };
 
   return (
@@ -129,6 +151,14 @@ const GestionUbicaciones = () => {
         </div>
 
         <div className="flex flex-1 justify-end items-center gap-3">
+          <select
+            value={estadoFiltro}
+            onChange={handleEstadoFiltroChange}
+            className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors focus:border-(--color-pagina)"
+          >
+            <option value="activos">Activos</option>
+            <option value="eliminados">Eliminados</option>
+          </select>
           <Paginacion
             from={from}
             to={to}
@@ -179,14 +209,16 @@ const GestionUbicaciones = () => {
                 ubicaciones.map((u, index) => (
                   <tr
                     key={u.idUbicacion}
-                    className="hover:bg-gray-50 transition-colors"
+                    className={`transition-colors ${
+                      u.activo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
+                    }`}
                   >
                     <td className="p-4 font-medium text-gray-700">
                       { index + 1}
                     </td>
 
                     <td className="p-4 font-medium">
-                      {u.nombre}
+                      <span className={u.activo ? "" : "text-gray-400 line-through"}>{u.nombre}</span>
                     </td>
 
                     <td className="p-4 text-gray-500">
@@ -214,12 +246,23 @@ const GestionUbicaciones = () => {
                         <Pencil className="w-4 h-4" />
                       </button>
 
-                      <button
-                        onClick={() => handleEliminarClick(u)}
-                        className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {u.activo ? (
+                        <button
+                          onClick={() => handleEliminarClick(u)}
+                          className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors cursor-pointer"
+                          title="Eliminar ubicación"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivarClick(u)}
+                          className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors cursor-pointer"
+                          title="Reactivar ubicación"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      )}
 
                     </td>
                   </tr>
@@ -260,11 +303,11 @@ const GestionUbicaciones = () => {
           <div className="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl">
 
             <h2 className="text-lg font-bold mb-2 text-gray-900">
-              Eliminar Ubicación
+              {accionEstado === "activar" ? "Reactivar Ubicación" : "Eliminar Ubicación"}
             </h2>
 
             <p className="text-gray-500">
-              ¿Estás seguro que deseas eliminar{" "}
+              {accionEstado === "activar" ? "¿Estás seguro que deseas reactivar " : "¿Estás seguro que deseas eliminar "}
               <span className="font-semibold text-gray-700">
                 "{ubicacionAEliminar?.nombre}"
               </span>
@@ -282,9 +325,11 @@ const GestionUbicaciones = () => {
 
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded-2xl hover:bg-red-600 transition-colors font-medium cursor-pointer"
+                className={`px-4 py-2 text-white rounded-2xl transition-colors font-medium cursor-pointer ${
+                  accionEstado === "activar" ? "bg-green-600 hover:bg-green-700" : "bg-red-500 hover:bg-red-600"
+                }`}
               >
-                Eliminar
+                {accionEstado === "activar" ? "Reactivar" : "Eliminar"}
               </button>
 
             </div>

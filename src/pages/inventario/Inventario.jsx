@@ -6,8 +6,9 @@ import ModalNuevoProducto from "./components/ModalNuevoProducto";
 import { obtenerProductos, buscarVariantesCompra } from "@/services/productos";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { unwrapVariantesBuscar } from "@/lib/productoUtils";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 15;
 
 const Inventario = () => {
   const setTitulo = useNavigationStore((s) => s.setTitulo);
@@ -36,10 +37,10 @@ const Inventario = () => {
 
       if (debouncedQuery.trim() !== "") {
         const res = await buscarVariantesCompra(debouncedQuery);
-        const listaFiltrada = res?.data || res || [];
+        const listaFiltrada = unwrapVariantesBuscar(res);
 
-        setProductos(Array.isArray(listaFiltrada) ? listaFiltrada : []);
-        setTotalRecords(Array.isArray(listaFiltrada) ? listaFiltrada.length : 0);
+        setProductos(listaFiltrada);
+        setTotalRecords(listaFiltrada.length);
         setTotalPages(1);
       } else {
         const data = await obtenerProductos({
@@ -167,7 +168,11 @@ const Inventario = () => {
             <div className="shrink-0">
               <Modulos />
             </div>
-            <TablaProductos productos={productos} loading={loadingProductos} />
+            <TablaProductos
+              productos={productos}
+              loading={loadingProductos}
+              onRefresh={fetchProductos}
+            />
           </>
         )}
       </div>

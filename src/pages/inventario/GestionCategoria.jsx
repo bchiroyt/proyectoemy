@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { Check, Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
@@ -26,6 +26,7 @@ const GestionCategorias = () => {
 
   const [deleteModal, setDeleteModal] = useState(false);
   const [categoriaAEliminar, setCategoriaAEliminar] = useState(null);
+  const [accionEstado, setAccionEstado] = useState("eliminar");
 
   const [errorModal, setErrorModal] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
@@ -33,6 +34,7 @@ const GestionCategorias = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [estadoFiltro, setEstadoFiltro] = useState("activos");
 
   const from = totalRecords === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
@@ -44,6 +46,7 @@ const GestionCategorias = () => {
       const data = await obtenerCategorias({
         Page: page,
         PageSize: PAGE_SIZE,
+        Activo: estadoFiltro === "activos",
       });
 
       setCategorias(data.items || []);
@@ -57,7 +60,7 @@ const GestionCategorias = () => {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, estadoFiltro]);
 
   useEffect(() => {
     setTitulo("Categorías");
@@ -100,12 +103,27 @@ const GestionCategorias = () => {
 
   const handleEliminarClick = (cat) => {
     setCategoriaAEliminar(cat);
+    setAccionEstado("eliminar");
+    setDeleteModal(true);
+  };
+
+  const handleActivarClick = (cat) => {
+    setCategoriaAEliminar(cat);
+    setAccionEstado("activar");
     setDeleteModal(true);
   };
 
   const handleConfirmDelete = async () => {
     try {
-      await eliminarCategoria(categoriaAEliminar.idCategoria);
+      if (accionEstado === "activar") {
+        await actualizarCategoria(categoriaAEliminar.idCategoria, {
+          nombre: categoriaAEliminar.nombre,
+          descripcion: categoriaAEliminar.descripcion,
+          estado: true,
+        });
+      } else {
+        await eliminarCategoria(categoriaAEliminar.idCategoria);
+      }
 
       await fetchCategorias();
     } catch (error) {
@@ -117,6 +135,11 @@ const GestionCategorias = () => {
       setDeleteModal(false);
       setCategoriaAEliminar(null);
     }
+  };
+
+  const handleEstadoFiltroChange = (event) => {
+    setEstadoFiltro(event.target.value);
+    setPage(1);
   };
 
   return (
@@ -135,6 +158,14 @@ const GestionCategorias = () => {
           </button>
         </div>
         <div className="flex flex-1 justify-end items-center gap-3">
+          <select
+            value={estadoFiltro}
+            onChange={handleEstadoFiltroChange}
+            className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors focus:border-(--color-pagina)"
+          >
+            <option value="activos">Activos</option>
+            <option value="eliminados">Eliminados</option>
+          </select>
           <Paginacion
             from={from}
             to={to}
@@ -178,10 +209,15 @@ const GestionCategorias = () => {
                   </td>
                 </tr>
               ) : categorias.length > 0 ? (
-                categorias.map((cat, index) => (
+                categorias.map((cat, index) => {
+                  const esActivo = (cat.estado ?? cat.activo ?? true) !== false;
+
+                  return (
                   <tr
-                    key={index + 1}
-                    className="border-t hover:bg-gray-50"
+                    key={cat.idCategoria || index}
+                    className={`border-t ${
+                      esActivo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
+                    }`}
                   >
 
                     <td className="p-4">
@@ -189,7 +225,7 @@ const GestionCategorias = () => {
                     </td>
 
                     <td className="p-4">
-                      {cat.nombre}
+                      <span className={esActivo ? "" : "text-gray-400 line-through"}>{cat.nombre}</span>
                     </td>
 
                     <td className="p-4">
@@ -198,12 +234,12 @@ const GestionCategorias = () => {
 
                     <td className="p-4">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs ${cat.estado
+                        className={`px-2 py-1 rounded-full text-xs ${esActivo
                           ? "bg-green-100 text-green-700"
                           : "bg-red-100 text-red-700"
                           }`}
                       >
-                        {cat.estado ? "Activo" : "Inactivo"}
+                        {esActivo ? "Activo" : "Inactivo"}
                       </span>
                     </td>
 
@@ -216,17 +252,29 @@ const GestionCategorias = () => {
                         <Pencil className="w-4 h-4" />
                       </button>
 
-                      <button
-                        onClick={() => handleEliminarClick(cat)}
-                        className="p-2 bg-red-50 rounded-lg hover:bg-red-100"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </button>
+                      {esActivo ? (
+                        <button
+                          onClick={() => handleEliminarClick(cat)}
+                          className="p-2 bg-red-50 rounded-lg hover:bg-red-100"
+                          title="Eliminar categoría"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivarClick(cat)}
+                          className="p-2 bg-green-50 rounded-lg hover:bg-green-100"
+                          title="Reactivar categoría"
+                        >
+                          <Check className="w-4 h-4 text-green-600" />
+                        </button>
+                      )}
 
                     </td>
 
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td
@@ -263,12 +311,12 @@ const GestionCategorias = () => {
           <div className="bg-white p-6 rounded-2xl w-full max-w-sm">
 
             <h2 className="text-lg font-bold mb-3">
-              Eliminar Categoría
+              {accionEstado === "activar" ? "Reactivar Categoría" : "Eliminar Categoría"}
             </h2>
 
             <p>
-              ¿Seguro que deseas eliminar "
-              {categoriaAEliminar?.nombre}"?
+              {accionEstado === "activar" ? "¿Seguro que deseas reactivar " : "¿Seguro que deseas eliminar "}
+              "{categoriaAEliminar?.nombre}"?
             </p>
 
             <div className="flex justify-end gap-3 mt-6">
@@ -282,9 +330,11 @@ const GestionCategorias = () => {
 
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg"
+                className={`px-4 py-2 text-white rounded-lg ${
+                  accionEstado === "activar" ? "bg-green-600" : "bg-red-500"
+                }`}
               >
-                Eliminar
+                {accionEstado === "activar" ? "Reactivar" : "Eliminar"}
               </button>
 
             </div>

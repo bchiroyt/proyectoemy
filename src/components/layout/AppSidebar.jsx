@@ -68,7 +68,7 @@ const AppSidebar = () => {
                 <PanelLeft aria-hidden="true" />
             </button>
 
-            <Sidebar collapsible="icon" className="z-30 bg-(--color-blanco) border-r">
+            <Sidebar collapsible="icon" className="z-40 bg-(--color-blanco) border-r">
 
                 <button
                     type="button"

@@ -18,6 +18,7 @@ import { getApiErrorMessage, API_BASE_URL } from "@/lib/apiClient";
 import {
   resolverIdProducto,
   unwrapProductoDetalleBody,
+  normalizarProductoDetalleDesdeBusqueda,
   FORM_NUEVA_VARIANTE_VACIO,
   crearFormNuevaVarianteDesdeReferencia,
   formatearEspecificacionVariante,
@@ -47,6 +48,8 @@ const ModalDetalleProducto = ({
   const [codigoBarrasInput, setCodigoBarrasInput] = useState("");
   const [cargando, setCargando] = useState(false);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [errorDetalle, setErrorDetalle] = useState("");
+  const [errorEdicion, setErrorEdicion] = useState("");
   
   // ESTADO LOCAL sincronizado con la data real del backend
   const [estadoProducto, setEstadoProducto] = useState(null);
@@ -71,10 +74,24 @@ const ModalDetalleProducto = ({
   // EFECTO: Consulta al servidor al abrirse el modal
   useEffect(() => {
     const cargarDetalleProducto = async () => {
-      if (!open || !idProducto) return;
+      if (!open) return;
+
+      if (!idProducto) {
+        const detalleDesdeBusqueda = normalizarProductoDetalleDesdeBusqueda(producto);
+        setEstadoProducto(detalleDesdeBusqueda);
+        setCargandoDetalle(false);
+        setErrorDetalle(
+          detalleDesdeBusqueda
+            ? ""
+            : "El resultado seleccionado no incluye el ID del producto. Revisa la respuesta del buscador de variantes."
+        );
+        console.warn("[ModalDetalleProducto] Producto sin idProducto:", producto);
+        return;
+      }
 
       try {
         setCargandoDetalle(true);
+        setErrorDetalle("");
         const raw = await obtenerProductoPorId(idProducto);
         throwIfEnvelopeFailed(raw, "No se pudo cargar el detalle del producto");
         const detalle = unwrapProductoDetalleBody(raw);
@@ -83,9 +100,19 @@ const ModalDetalleProducto = ({
             ...detalle,
             idProducto: resolverIdProducto(detalle) ?? idProducto,
           });
+        } else {
+          setEstadoProducto(null);
+          setErrorDetalle("El servidor no devolvió datos del producto seleccionado.");
         }
       } catch (error) {
         console.error("Error al obtener el detalle del producto:", error);
+        const detalleDesdeBusqueda = normalizarProductoDetalleDesdeBusqueda(producto);
+        setEstadoProducto(detalleDesdeBusqueda);
+        setErrorDetalle(
+          detalleDesdeBusqueda
+            ? ""
+            : getApiErrorMessage(error, "No se pudo cargar la información del producto.")
+        );
       } finally {
         setCargandoDetalle(false);
       }
@@ -98,6 +125,8 @@ const ModalDetalleProducto = ({
   useEffect(() => {
     if (!open) {
       setEstadoProducto(null);
+      setErrorDetalle("");
+      setErrorEdicion("");
       setEditandoId(null);
       setOpenConfirmarSalida(false);
       setMostrandoNuevaVariante(false);
@@ -215,6 +244,7 @@ const ModalDetalleProducto = ({
   };
 
   const iniciarEdicion = (v, idActual) => {
+    setErrorEdicion("");
     setEditandoId(idActual);
     setColorInput(v.color || "");
     setPrecioVentaInput(v.precioVentaActual !== undefined ? v.precioVentaActual : "");
@@ -223,6 +253,7 @@ const ModalDetalleProducto = ({
 
   const cancelarEdicion = () => {
     setEditandoId(null);
+    setErrorEdicion("");
     setColorInput("");
     setPrecioVentaInput("");
     setCodigoBarrasInput("");
@@ -240,42 +271,77 @@ const ModalDetalleProducto = ({
     );
   };
 
+  const resolverBooleano = (valor, fallback) => {
+    if (typeof valor === "boolean") return valor;
+    if (typeof valor === "string") {
+      const normalizado = valor.trim().toLowerCase();
+      if (["activo", "activa", "true", "1", "habilitado", "habilitada"].includes(normalizado)) {
+        return true;
+      }
+      if (["inactivo", "inactiva", "false", "0", "deshabilitado", "deshabilitada"].includes(normalizado)) {
+        return false;
+      }
+    }
+    return fallback;
+  };
+
   const handleUpdateVariante = async (v, idVariante) => {
+    const idNumerico = Number(idVariante);
+    if (!Number.isFinite(idNumerico) || idNumerico <= 0) {
+      const message = "No se puede actualizar esta variante porque no trae un ID valido.";
+      setErrorEdicion(message);
+      return;
+    }
+
+    const precioVenta = Number(precioVentaInput);
+    if (!Number.isFinite(precioVenta) || precioVenta <= 0) {
+      const message = "El precio de venta debe ser mayor que 0.";
+      setErrorEdicion(message);
+      return;
+    }
+
     try {
       setCargando(true);
+      setErrorEdicion("");
+
+      const codigo = codigoBarrasInput.trim();
 
       const payload = {
-        color: colorInput,
-        precioVenta: Number(precioVentaInput),
-        estado: v.estado !== undefined ? v.estado : true,
-        permiteNegativoDefault: v.permiteNegativoDefault !== undefined ? v.permiteNegativoDefault : true,
-        codigosExternos: [
-          {
-            codigo: codigoBarrasInput,
-            esPrincipal: true,
-          },
-        ],
+        color: colorInput.trim() || null, 
+        precioVenta,
+        codigosExternos: codigo ? [{ codigo, esPrincipal: true }] : [],
+        estado: resolverBooleano(v.estado, true),
+        permiteNegativoDefault: resolverBooleano(v.permiteNegativoDefault, true),
       };
 
-      await actualizarVariante(idVariante, payload);
+      const respuesta = await actualizarVariante(idNumerico, payload);
+      throwIfEnvelopeFailed(respuesta, "No se pudo actualizar la variante.");
 
-      setEstadoProducto((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          variantes: prev.variantes.map((variante) => {
-            if (variante.idVariante === idVariante) {
-              return {
-                ...variante,
-                color: colorInput,
-                precioVentaActual: Number(precioVentaInput),
-                codigoPrincipal: codigoBarrasInput,
-              };
-            }
-            return variante;
-          }),
-        };
-      });
+      if (idProducto) {
+        const raw = await obtenerProductoPorId(idProducto);
+        const detalle = unwrapProductoDetalleBody(raw);
+        if (detalle) {
+          setEstadoProducto({ ...detalle, idProducto: resolverIdProducto(detalle) ?? idProducto });
+        }
+      } else {
+        setEstadoProducto((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            variantes: prev.variantes.map((variante) => {
+              if (Number(variante.idVariante) === idNumerico) {
+                return {
+                  ...variante,
+                  color: colorInput.trim(),
+                  precioVentaActual: precioVenta,
+                  codigoPrincipal: codigo,
+                };
+              }
+              return variante;
+            }),
+          };
+        });
+      }
 
       if (onRefresh) {
         await onRefresh();
@@ -284,6 +350,8 @@ const ModalDetalleProducto = ({
       setEditandoId(null);
     } catch (error) {
       console.error("Error al actualizar la variante:", error);
+      const message = getApiErrorMessage(error, "No se pudo actualizar la variante.");
+      setErrorEdicion(message);
     } finally {
       setCargando(false);
     }
@@ -450,7 +518,7 @@ const ModalDetalleProducto = ({
             </div>
           ) : !estadoProducto ? (
             <div className="p-12 text-center text-slate-500 flex-1">
-              No se pudo cargar la información del producto.
+              {errorDetalle || "No se pudo cargar la información del producto."}
             </div>
           ) : (
             <div className="flex flex-col overflow-hidden">
@@ -618,13 +686,15 @@ const ModalDetalleProducto = ({
                     )}
 
                     {estadoProducto.variantes?.map((v, index) => {
-                      const idActual = v.idVariante || index;
-                      const esModoEdicion = editandoId === idActual;
+                      const idActual = Number(v.idVariante);
+                      const idVarianteValido = Number.isFinite(idActual) && idActual > 0;
+                      const keyVariante = idVarianteValido ? idActual : `variante-${index}`;
+                      const esModoEdicion = idVarianteValido && editandoId === idActual;
                       const tieneCambios = verificarCambios(v);
                       const stockActual = v.stockActual ?? v.stock ?? 0;
 
                       return (
-                        <Card key={idActual} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
+                        <Card key={keyVariante} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
                           <CardContent className="p-4">
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
                               
@@ -739,7 +809,7 @@ const ModalDetalleProducto = ({
 
                                     <Button
                                       size="sm"
-                                      disabled={!tieneCambios || cargando}
+                                      disabled={!idVarianteValido || !tieneCambios || cargando}
                                       onClick={() => handleUpdateVariante(v, idActual)}
                                       className="h-8 px-3 text-xs bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-lg"
                                     >
@@ -756,7 +826,7 @@ const ModalDetalleProducto = ({
                                     variant="outline"
                                     className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
                                     onClick={() => iniciarEdicion(v, idActual)}
-                                    disabled={editandoId !== null}
+                                    disabled={editandoId !== null || !idVarianteValido}
                                   >
                                     <Edit2 className="w-3 h-3 mr-1" />
                                     Editar
@@ -765,6 +835,11 @@ const ModalDetalleProducto = ({
                               </div>
 
                             </div>
+                            {esModoEdicion && errorEdicion && (
+                              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                                {errorEdicion}
+                              </p>
+                            )}
                           </CardContent>
                         </Card>
                       );
@@ -776,6 +851,7 @@ const ModalDetalleProducto = ({
           )}
         </DialogContent>
       </Dialog>
+
     </>
   );
 };
