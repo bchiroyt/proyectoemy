@@ -291,6 +291,27 @@ export function normalizarVarianteDetalle(raw) {
     "tallaNombre",
     "TallaNombre",
   ]);
+  const ubicacion = normalizarCampoCatalogoVariante(
+    varianteBase,
+    [
+      "ubicacion",
+      "Ubicacion",
+      "idUbicacion",
+      "IdUbicacion",
+      "idUbicacionDefault",
+      "IdUbicacionDefault",
+      "ubicacionDefault",
+      "UbicacionDefault",
+    ],
+    [
+      "ubicacionNombre",
+      "UbicacionNombre",
+      "nombreUbicacion",
+      "NombreUbicacion",
+      "ubicacionDefaultNombre",
+      "UbicacionDefaultNombre",
+    ]
+  );
   const stockActual =
     toNumberOrNull(
       pickFrom(
@@ -320,6 +341,9 @@ export function normalizarVarianteDetalle(raw) {
     presentacionNombre: presentacion.nombre,
     talla: talla.id,
     tallaNombre: talla.nombre,
+    ubicacion: ubicacion.id,
+    idUbicacionDefault: ubicacion.id,
+    ubicacionNombre: ubicacion.nombre,
     codigoPrincipal: resolverCodigoPrincipal(...sources),
     precioVentaActual: pickFrom(
       sources,

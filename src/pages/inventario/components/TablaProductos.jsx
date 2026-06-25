@@ -189,14 +189,16 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           {item.urlImagen ? (
-                            <img
-                              src={`${API_BASE_URL}${item.urlImagen}`}
-                              alt={nombreVisual}
-                              className="h-10 w-10 shrink-0 rounded-md border border-gray-200 object-cover"
-                              onError={(event) => {
-                                event.currentTarget.style.display = "none";
-                              }}
-                            />
+                            <div className="relative z-0 h-10 w-10 shrink-0 rounded-md border border-gray-200 bg-gray-50 transition-transform duration-300 ease-out hover:z-20 hover:scale-150 hover:shadow-xl">
+                              <img
+                                src={`${API_BASE_URL}${item.urlImagen}`}
+                                alt={nombreVisual}
+                                className="h-full w-full rounded-md object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </div>
                           ) : (
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-100 bg-gray-100">
                               <Package className="h-5 w-5 text-gray-400 stroke-[1.5]" />

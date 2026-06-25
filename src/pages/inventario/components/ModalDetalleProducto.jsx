@@ -16,6 +16,7 @@ import {
 import { actualizarVariante, obtenerProductoPorId, agregarVariantesAProducto, actualizarImagenProducto, actualizarProducto } from "@/services/productos";
 import { obtenerTallas } from "@/services/tallas";
 import { obtenerPresentaciones } from "@/services/presentaciones";
+import { obtenerUbicaciones } from "@/services/ubicaciones";
 import { obtenerCategorias } from "@/services/categorias";
 import { obtenerMarcas } from "@/services/marcas";
 import BuscadorCombo from "./BuscadorCombo";
@@ -28,6 +29,7 @@ import {
   FORM_NUEVA_VARIANTE_VACIO,
   crearFormNuevaVarianteDesdeReferencia,
   formatearEspecificacionVariante,
+  resolverIdCatalogoPorNombre,
 } from "@/lib/productoUtils";
 
 import {
@@ -88,6 +90,7 @@ const ModalDetalleProducto = ({
   const [codigosSecundariosInput, setCodigosSecundariosInput] = useState([]);
   const [tallaInput, setTallaInput] = useState("");
   const [presentacionInput, setPresentacionInput] = useState("");
+  const [ubicacionInput, setUbicacionInput] = useState("");
   const [stockMinimoInput, setStockMinimoInput] = useState("");
   const [cargando, setCargando] = useState(false);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
@@ -105,6 +108,7 @@ const ModalDetalleProducto = ({
   const [guardandoNuevaVariante, setGuardandoNuevaVariante] = useState(false);
   const [tallas, setTallas] = useState([]);
   const [presentaciones, setPresentaciones] = useState([]);
+  const [ubicaciones, setUbicaciones] = useState([]);
   const [cargandoCatalogos, setCargandoCatalogos] = useState(false);
   const fileInputRef = useRef(null);
   const [cargandoImagen, setCargandoImagen] = useState(false);
@@ -135,6 +139,14 @@ const ModalDetalleProducto = ({
 
   // Obtener el ID del producto de forma segura
   const idProducto = resolverIdProducto(producto) || producto?.idProducto || producto?.id_producto || (typeof producto === "number" || typeof producto === "string" ? producto : null);
+  const estadoCatalogoNormalizado = String(
+    estadoProducto?.estadoCatalogo ?? estadoProducto?.EstadoCatalogo ?? ""
+  ).trim().toUpperCase();
+  const productoTieneStock = (estadoProducto?.variantes || []).some(
+    (variante) => Number(variante.stockActual ?? variante.stock ?? 0) > 0
+  );
+  const nombreBloqueadoPorActivo =
+    estadoCatalogoNormalizado === "ACTIVO" || (!estadoCatalogoNormalizado && productoTieneStock);
 
   // EFECTO: Consulta al servidor al abrirse el modal
   useEffect(() => {
@@ -238,6 +250,7 @@ const ModalDetalleProducto = ({
       setMarcaCabecera("");
       setTallaInput("");
       setPresentacionInput("");
+      setUbicacionInput("");
       setStockMinimoInput("");
       setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
     }
@@ -245,16 +258,21 @@ const ModalDetalleProducto = ({
 
   // Cargar catálogos al mostrar el formulario de nueva variante o editar variante
   useEffect(() => {
-    if ((mostrandoNuevaVariante || editandoId !== null) && tallas.length === 0 && presentaciones.length === 0) {
+    if (
+      (mostrandoNuevaVariante || editandoId !== null) &&
+      (tallas.length === 0 || presentaciones.length === 0 || ubicaciones.length === 0)
+    ) {
       const cargarCatalogos = async () => {
         setCargandoCatalogos(true);
         try {
-          const [resTallas, resPres] = await Promise.all([
+          const [resTallas, resPres, resUbicaciones] = await Promise.all([
             obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
-            obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 })
+            obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
+            obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }),
           ]);
           setTallas(resTallas.items || []);
           setPresentaciones(resPres.items || []);
+          setUbicaciones(resUbicaciones.items || []);
         } catch (error) {
           console.error("Error al cargar catálogos:", error);
         } finally {
@@ -263,23 +281,26 @@ const ModalDetalleProducto = ({
       };
       cargarCatalogos();
     }
-  }, [mostrandoNuevaVariante, editandoId, tallas.length, presentaciones.length]);
+  }, [mostrandoNuevaVariante, editandoId, tallas.length, presentaciones.length, ubicaciones.length]);
 
   const cargarCatalogosVariante = async () => {
     setCargandoCatalogos(true);
     try {
-      const [resTallas, resPres] = await Promise.all([
+      const [resTallas, resPres, resUbicaciones] = await Promise.all([
         obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
         obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
+        obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }),
       ]);
       const itemsTallas = resTallas.items || [];
       const itemsPresentaciones = resPres.items || [];
+      const itemsUbicaciones = resUbicaciones.items || [];
       setTallas(itemsTallas);
       setPresentaciones(itemsPresentaciones);
-      return { tallas: itemsTallas, presentaciones: itemsPresentaciones };
+      setUbicaciones(itemsUbicaciones);
+      return { tallas: itemsTallas, presentaciones: itemsPresentaciones, ubicaciones: itemsUbicaciones };
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
-      return { tallas: [], presentaciones: [] };
+      return { tallas: [], presentaciones: [], ubicaciones: [] };
     } finally {
       setCargandoCatalogos(false);
     }
@@ -370,21 +391,125 @@ const ModalDetalleProducto = ({
     setOpenConfirmarSalida(true);
   };
 
-  const iniciarEdicion = (v, idActual) => {
+  const resolverValorCatalogoVariante = (variante, catalogo, idField, idKeys, nombreKeys) => {
+    const valorDirecto = idKeys
+      .map((key) => variante?.[key])
+      .find((valor) => valor !== undefined && valor !== null && valor !== "");
+
+    if (valorDirecto !== undefined) {
+      const idNumerico = Number(valorDirecto);
+      if (Number.isFinite(idNumerico) && idNumerico > 0) {
+        return String(idNumerico);
+      }
+
+      const idPorNombre = resolverIdCatalogoPorNombre(catalogo, idField, valorDirecto);
+      if (idPorNombre) return idPorNombre;
+    }
+
+    const nombre = nombreKeys
+      .map((key) => variante?.[key])
+      .find((valor) => typeof valor === "string" && valor.trim());
+
+    return resolverIdCatalogoPorNombre(catalogo, idField, nombre);
+  };
+
+  const obtenerCodigosSecundarios = (variante) =>
+    (variante.codigosExternos || [])
+      .filter((c) => !c.esPrincipal && c.codigo !== variante.codigoPrincipal)
+      .map((c) => c.codigo);
+
+  const obtenerCodigosDesdeInputs = () => {
+    const codigoPrincipal = codigoBarrasInput.trim();
+    const codigos = [];
+
+    if (codigoPrincipal) {
+      codigos.push({ codigo: codigoPrincipal, esPrincipal: true });
+    }
+
+    codigosSecundariosInput.forEach((code) => {
+      const codigoSecundario = code.trim();
+      if (codigoSecundario && codigoSecundario !== codigoPrincipal) {
+        codigos.push({ codigo: codigoSecundario, esPrincipal: false });
+      }
+    });
+
+    return codigos;
+  };
+
+  const obtenerValoresOriginalesVariante = (variante, catalogos = {}) => {
+    const catalogoTallas = catalogos.tallas ?? tallas;
+    const catalogoPresentaciones = catalogos.presentaciones ?? presentaciones;
+    const catalogoUbicaciones = catalogos.ubicaciones ?? ubicaciones;
+
+    return {
+      color: variante.color || "",
+      precioVenta: String(variante.precioVentaActual !== undefined ? variante.precioVentaActual : ""),
+      codigoPrincipal: variante.codigoPrincipal || "",
+      talla: resolverValorCatalogoVariante(
+        variante,
+        catalogoTallas,
+        "idTalla",
+        ["talla", "idTalla", "id_talla", "Talla", "IdTalla"],
+        ["tallaNombre", "nombreTalla", "TallaNombre", "NombreTalla"]
+      ),
+      presentacion: resolverValorCatalogoVariante(
+        variante,
+        catalogoPresentaciones,
+        "idPresentacion",
+        ["presentacion", "idPresentacion", "id_presentacion", "Presentacion", "IdPresentacion"],
+        ["presentacionNombre", "nombrePresentacion", "PresentacionNombre", "NombrePresentacion"]
+      ),
+      ubicacion: resolverValorCatalogoVariante(
+        variante,
+        catalogoUbicaciones,
+        "idUbicacion",
+        [
+          "ubicacion",
+          "idUbicacion",
+          "idUbicacionDefault",
+          "ubicacionDefault",
+          "id_ubicacion",
+          "Ubicacion",
+          "IdUbicacion",
+          "IdUbicacionDefault",
+        ],
+        [
+          "ubicacionNombre",
+          "nombreUbicacion",
+          "ubicacionDefaultNombre",
+          "UbicacionNombre",
+          "NombreUbicacion",
+          "UbicacionDefaultNombre",
+        ]
+      ),
+      stockMinimo:
+        variante.stockMinimo !== undefined && variante.stockMinimo !== null
+          ? String(variante.stockMinimo)
+          : "",
+      codigosSecundarios: obtenerCodigosSecundarios(variante),
+    };
+  };
+
+  const iniciarEdicion = async (v, idActual) => {
     setErrorEdicion("");
-    setEditandoId(idActual);
-    setColorInput(v.color || "");
-    setPrecioVentaInput(v.precioVentaActual !== undefined ? v.precioVentaActual : "");
-    setCodigoBarrasInput(v.codigoPrincipal || "");
-    setTallaInput(v.talla || "");
-    setPresentacionInput(v.presentacion || "");
-    setStockMinimoInput(v.stockMinimo !== undefined && v.stockMinimo !== null ? String(v.stockMinimo) : "");
+    let catalogos = { tallas, presentaciones, ubicaciones };
+    if (tallas.length === 0 || presentaciones.length === 0 || ubicaciones.length === 0) {
+      catalogos = await cargarCatalogosVariante();
+    }
+
+    const valores = obtenerValoresOriginalesVariante(v, catalogos);
+    setColorInput(valores.color);
+    setPrecioVentaInput(valores.precioVenta);
+    setCodigoBarrasInput(valores.codigoPrincipal);
+    setTallaInput(valores.talla);
+    setPresentacionInput(valores.presentacion);
+    setUbicacionInput(valores.ubicacion);
+    setStockMinimoInput(valores.stockMinimo);
     
     // Cargar códigos secundarios antiguos
-    const secundarios = (v.codigosExternos || [])
-      .filter((c) => !c.esPrincipal && c.codigo !== v.codigoPrincipal)
-      .map((c) => c.codigo);
+    const secundarios = valores.codigosSecundarios;
     setCodigosSecundariosInput(secundarios);
+    setEditandoId(idActual);
   };
 
   const cancelarEdicion = () => {
@@ -395,49 +520,28 @@ const ModalDetalleProducto = ({
     setCodigoBarrasInput("");
     setTallaInput("");
     setPresentacionInput("");
+    setUbicacionInput("");
     setStockMinimoInput("");
     setCodigosSecundariosInput([]);
   };
 
   const verificarCambios = (v) => {
-    const colorOriginal = v.color || "";
-    const precioOriginal = String(v.precioVentaActual !== undefined ? v.precioVentaActual : "");
-    const codigoOriginal = v.codigoPrincipal || "";
-    const tallaOriginal = v.talla !== undefined && v.talla !== null ? String(v.talla) : "";
-    const presentacionOriginal = v.presentacion !== undefined && v.presentacion !== null ? String(v.presentacion) : "";
-    const stockMinimoOriginal = v.stockMinimo !== undefined && v.stockMinimo !== null ? String(v.stockMinimo) : "";
-    
-    const secundariosOriginales = (v.codigosExternos || [])
-      .filter((c) => !c.esPrincipal && c.codigo !== v.codigoPrincipal)
-      .map((c) => c.codigo);
+    const valoresOriginales = obtenerValoresOriginalesVariante(v);
 
     const mismosSecundarios =
-      secundariosOriginales.length === codigosSecundariosInput.length &&
-      secundariosOriginales.every((val, idx) => val === codigosSecundariosInput[idx]);
+      valoresOriginales.codigosSecundarios.length === codigosSecundariosInput.length &&
+      valoresOriginales.codigosSecundarios.every((val, idx) => val === codigosSecundariosInput[idx]);
 
     return (
-      colorInput !== colorOriginal ||
-      String(precioVentaInput) !== precioOriginal ||
-      codigoBarrasInput !== codigoOriginal ||
-      tallaInput !== tallaOriginal ||
-      presentacionInput !== presentacionOriginal ||
-      stockMinimoInput !== stockMinimoOriginal ||
+      colorInput !== valoresOriginales.color ||
+      String(precioVentaInput) !== valoresOriginales.precioVenta ||
+      codigoBarrasInput !== valoresOriginales.codigoPrincipal ||
+      tallaInput !== valoresOriginales.talla ||
+      presentacionInput !== valoresOriginales.presentacion ||
+      ubicacionInput !== valoresOriginales.ubicacion ||
+      stockMinimoInput !== valoresOriginales.stockMinimo ||
       !mismosSecundarios
     );
-  };
-
-  const resolverBooleano = (valor, fallback) => {
-    if (typeof valor === "boolean") return valor;
-    if (typeof valor === "string") {
-      const normalizado = valor.trim().toLowerCase();
-      if (["activo", "activa", "true", "1", "habilitado", "habilitada"].includes(normalizado)) {
-        return true;
-      }
-      if (["inactivo", "inactiva", "false", "0", "deshabilitado", "deshabilitada"].includes(normalizado)) {
-        return false;
-      }
-    }
-    return fallback;
   };
 
   const handleUpdateVariante = async (v, idVariante) => {
@@ -448,9 +552,22 @@ const ModalDetalleProducto = ({
       return;
     }
 
+    const valoresOriginales = obtenerValoresOriginalesVariante(v);
+    const cambioPrecioVenta = String(precioVentaInput) !== valoresOriginales.precioVenta;
     const precioVenta = Number(precioVentaInput);
-    if (!Number.isFinite(precioVenta) || precioVenta <= 0) {
+    if (cambioPrecioVenta && (!Number.isFinite(precioVenta) || precioVenta <= 0)) {
       const message = "El precio de venta debe ser mayor que 0.";
+      setErrorEdicion(message);
+      return;
+    }
+
+    const cambioStockMinimo = stockMinimoInput !== valoresOriginales.stockMinimo;
+    if (
+      cambioStockMinimo &&
+      stockMinimoInput !== "" &&
+      (!Number.isFinite(Number(stockMinimoInput)) || Number(stockMinimoInput) < 0)
+    ) {
+      const message = "El stock minimo debe ser un numero mayor o igual que 0.";
       setErrorEdicion(message);
       return;
     }
@@ -459,39 +576,61 @@ const ModalDetalleProducto = ({
       setCargando(true);
       setErrorEdicion("");
 
-      const codigo = codigoBarrasInput.trim();
-
       // Filtrar códigos externos antiguos para excluir el código principal anterior
       // Combinar los códigos no principales con el nuevo código principal
-      const nuevosCodigos = [];
-      if (codigoBarrasInput.trim()) {
-        nuevosCodigos.push({
-          codigo: codigoBarrasInput.trim(),
-          esPrincipal: true,
-        });
-      }
-      
-      codigosSecundariosInput.forEach((code) => {
-        if (code.trim() && code.trim() !== codigoBarrasInput.trim()) {
-          nuevosCodigos.push({
-            codigo: code.trim(),
-            esPrincipal: false,
-          });
-        }
-      });
+      const nuevosCodigos = obtenerCodigosDesdeInputs();
+      const mismosSecundarios =
+        valoresOriginales.codigosSecundarios.length === codigosSecundariosInput.length &&
+        valoresOriginales.codigosSecundarios.every((val, idx) => val === codigosSecundariosInput[idx]);
+      const cambioCodigos =
+        codigoBarrasInput !== valoresOriginales.codigoPrincipal || !mismosSecundarios;
 
-      const payload = {
-        color: colorInput.trim() || null,
-        precioVenta,
-        talla: tallaInput ? Number(tallaInput) : null,
-        limpiarTalla: !tallaInput,
-        presentacion: presentacionInput ? Number(presentacionInput) : null,
-        limpiarPresentacion: !presentacionInput,
-        stockMinimo: stockMinimoInput !== "" ? Number(stockMinimoInput) : null,
-        estado: resolverBooleano(v.estado, true),
-        permiteNegativoDefault: resolverBooleano(v.permiteNegativoDefault, true),
-        codigosExternos: nuevosCodigos,
-      };
+      const payload = {};
+
+      if (colorInput !== valoresOriginales.color) {
+        payload.color = colorInput.trim() || null;
+      }
+
+      if (cambioPrecioVenta) {
+        payload.precioVenta = precioVenta;
+      }
+
+      if (tallaInput !== valoresOriginales.talla) {
+        if (tallaInput) {
+          payload.talla = Number(tallaInput);
+        } else {
+          payload.limpiarTalla = true;
+        }
+      }
+
+      if (presentacionInput !== valoresOriginales.presentacion) {
+        if (presentacionInput) {
+          payload.presentacion = Number(presentacionInput);
+        } else {
+          payload.limpiarPresentacion = true;
+        }
+      }
+
+      if (ubicacionInput !== valoresOriginales.ubicacion) {
+        if (ubicacionInput) {
+          payload.idUbicacionDefault = Number(ubicacionInput);
+        } else {
+          payload.limpiarUbicacionDefault = true;
+        }
+      }
+
+      if (cambioStockMinimo) {
+        payload.stockMinimo = stockMinimoInput !== "" ? Number(stockMinimoInput) : null;
+      }
+
+      if (cambioCodigos) {
+        payload.codigosExternos = nuevosCodigos;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setEditandoId(null);
+        return;
+      }
 
       const respuesta = await actualizarVariante(idNumerico, payload);
       throwIfEnvelopeFailed(respuesta, "No se pudo actualizar la variante.");
@@ -502,11 +641,12 @@ const ModalDetalleProducto = ({
         // Buscar nombres correspondientes para talla y presentación actualizadas
         const tNombre = tallas.find(t => String(t.idTalla) === String(tallaInput))?.nombre || null;
         const pNombre = presentaciones.find(p => String(p.idPresentacion) === String(presentacionInput))?.nombre || null;
+        const uNombre = ubicaciones.find(u => String(u.idUbicacion) === String(ubicacionInput))?.nombre || null;
 
         return {
           ...prev,
           variantes: prev.variantes.map((variante) => {
-            if (variante.idVariante === idVariante) {
+            if (Number(variante.idVariante) === idNumerico) {
               return {
                 ...variante,
                 color: colorInput,
@@ -516,6 +656,9 @@ const ModalDetalleProducto = ({
                 tallaNombre: tNombre,
                 presentacion: presentacionInput ? Number(presentacionInput) : null,
                 presentacionNombre: pNombre,
+                ubicacion: ubicacionInput ? Number(ubicacionInput) : null,
+                idUbicacionDefault: ubicacionInput ? Number(ubicacionInput) : null,
+                ubicacionNombre: uNombre,
                 stockMinimo: stockMinimoInput !== "" ? Number(stockMinimoInput) : null,
                 codigosExternos: nuevosCodigos,
               };
@@ -651,7 +794,11 @@ const ModalDetalleProducto = ({
   };
 
   const handleGuardarCabecera = async () => {
-    if (!nombreCabecera.trim()) {
+    const nombreSeguro = nombreBloqueadoPorActivo
+      ? estadoProducto?.nombre || nombreCabecera
+      : nombreCabecera.trim();
+
+    if (!nombreSeguro?.trim()) {
       mostrarAviso("error", "El nombre del producto es requerido.");
       return;
     }
@@ -659,7 +806,7 @@ const ModalDetalleProducto = ({
     try {
       setCargandoCabecera(true);
       const payload = {
-        nombre: nombreCabecera.trim(),
+        nombre: nombreSeguro.trim(),
         descripcion: descripcionCabecera.trim() || null,
         categoria: categoriaCabecera ? Number(categoriaCabecera) : null,
         marca: marcaCabecera ? Number(marcaCabecera) : null
@@ -818,8 +965,13 @@ const ModalDetalleProducto = ({
                       value={nombreCabecera}
                       onChange={(e) => setNombreCabecera(e.target.value)}
                       placeholder="Nombre del producto"
-                      disabled={cargandoCabecera}
+                      disabled={cargandoCabecera || nombreBloqueadoPorActivo}
                     />
+                    {nombreBloqueadoPorActivo && (
+                      <p className="mt-1 text-[11px] font-medium text-amber-600">
+                        El nombre no se puede editar cuando el producto ya está activo.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Descripción</label>
@@ -1096,12 +1248,12 @@ const ModalDetalleProducto = ({
                               {/* ESPECIFICACIONES */}
                               <div className="lg:col-span-2">
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  Presentación / Talla
+                                  Presentación / Talla / Ubicación
                                 </p>
                                 {esModoEdicion ? (
-                                  <div className="space-y-1">
+                                  <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5">
                                     <select
-                                      className="w-full h-8 text-[11px] rounded-md border-slate-200 focus:ring-pink-500 p-1 outline-none"
+                                      className="w-full h-8 text-[11px] rounded-md border border-slate-300 bg-white p-1 shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                       value={presentacionInput}
                                       onChange={(e) => setPresentacionInput(e.target.value)}
                                       disabled={cargandoCatalogos}
@@ -1112,7 +1264,7 @@ const ModalDetalleProducto = ({
                                       ))}
                                     </select>
                                     <select
-                                      className="w-full h-8 text-[11px] rounded-md border-slate-200 focus:ring-pink-500 p-1 outline-none"
+                                      className="w-full h-8 text-[11px] rounded-md border border-slate-300 bg-white p-1 shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                       value={tallaInput}
                                       onChange={(e) => setTallaInput(e.target.value)}
                                       disabled={cargandoCatalogos}
@@ -1122,11 +1274,29 @@ const ModalDetalleProducto = ({
                                         <option key={`talla-${t.idTalla ?? "sin-id"}-${index}`} value={t.idTalla}>{t.nombre}</option>
                                       ))}
                                     </select>
+                                    <select
+                                      className="w-full h-8 text-[11px] rounded-md border border-slate-300 bg-white p-1 shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                      value={ubicacionInput}
+                                      onChange={(e) => setUbicacionInput(e.target.value)}
+                                      disabled={cargandoCatalogos}
+                                    >
+                                      <option value="">Ubic. N/A</option>
+                                      {ubicaciones.map((u, index) => (
+                                        <option key={`ubicacion-${u.idUbicacion ?? "sin-id"}-${index}`} value={u.idUbicacion}>{u.nombre}</option>
+                                      ))}
+                                    </select>
                                   </div>
                                 ) : (
-                                  <p className="text-xs text-slate-600 truncate" title={formatearEspecificacionVariante(v)}>
-                                    {formatearEspecificacionVariante(v)}
-                                  </p>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-slate-600 truncate" title={formatearEspecificacionVariante(v)}>
+                                      {formatearEspecificacionVariante(v)}
+                                    </p>
+                                    {(v.ubicacionNombre || v.nombreUbicacion || v.ubicacionDefaultNombre) && (
+                                      <p className="text-[10px] text-slate-400 truncate">
+                                        {v.ubicacionNombre || v.nombreUbicacion || v.ubicacionDefaultNombre}
+                                      </p>
+                                    )}
+                                  </div>
                                 )}
                               </div>
 
