@@ -245,7 +245,9 @@ export function enriquecerTicketEncabezado(ticket, { cajeroFallback = "" } = {})
   const direccion =
     String(ticket.direccion ?? "").trim() || TICKET_NEGOCIO_DIRECCION;
   const cajero =
-    String(ticket.cajero ?? cajeroFallback ?? "").trim() || "Cajero";
+    String(ticket.cajero || "").trim() ||
+    String(cajeroFallback || "").trim() ||
+    "Cajero";
 
   return {
     ...ticket,
@@ -261,7 +263,10 @@ export function mapVentaTicket(raw) {
   const detallesRaw = pick(data, "detalles", "Detalles") ?? [];
   const pagosRaw = pick(data, "pagos", "Pagos") ?? [];
 
-  return enriquecerTicketEncabezado({
+  // No enriquecer aquí: el consumidor (VentaTicketPanel) vuelve a enriquecer
+  // pasando el cajeroFallback. Si pre-enriqueciéramos, un cajero vacío del
+  // backend quedaría como "Cajero" y el fallback nunca se aplicaría.
+  return {
     nombreNegocio: pick(data, "nombreNegocio", "NombreNegocio") ?? "",
     cajero: pick(data, "cajero", "Cajero") ?? "",
     direccion: pick(data, "direccion", "Direccion") ?? "",
@@ -271,7 +276,7 @@ export function mapVentaTicket(raw) {
     total: Number(pick(data, "total", "Total") ?? 0),
     pagos: unwrapList(pagosRaw).map(mapTicketPago).filter(Boolean),
     cambio: Number(pick(data, "cambio", "Cambio") ?? 0),
-  });
+  };
 }
 
 /** Construye ticket desde datos locales tras el cobro (si GET ticket no está disponible). */

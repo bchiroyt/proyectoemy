@@ -1,13 +1,167 @@
+import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
+import { obtenerProductoPorId } from "@/services/productos";
+import { buscarVariantesCompra } from "@/services/productosService";
+import { unwrapProductoDetalleBody } from "@/lib/productoUtils";
+
+const CAMPOS_COSTO_COMPRA = [
+  "precioCompraActual",
+  "PrecioCompraActual",
+  "costoPromedioActual",
+  "CostoPromedioActual",
+  "precioCompra",
+  "PrecioCompra",
+  "ultimoPrecioCompra",
+  "UltimoPrecioCompra",
+  "ultimoCostoCompra",
+  "UltimoCostoCompra",
+];
+
 /** Costo de compra de una variante (nunca el precio de venta). */
 export function resolverCostoCompraVariante(v) {
-  const costo =
-    v?.precioCompraActual ??
-    v?.PrecioCompraActual ??
-    v?.costoPromedioActual ??
-    v?.CostoPromedioActual;
-  if (costo == null || costo === "") return 0;
-  const n = Number(costo);
-  return Number.isFinite(n) ? n : 0;
+  if (!v || typeof v !== "object") return 0;
+
+  for (const campo of CAMPOS_COSTO_COMPRA) {
+    const n = toNumberOrNull(v[campo]);
+    if (n != null && n > 0) return n;
+  }
+
+  return 0;
+}
+
+/** Normaliza variante de GET /api/Productos/variantes/buscar para compras. */
+export function normalizarVarianteCompraBusqueda(raw) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const costo = resolverCostoCompraVariante(raw);
+  const stockActual =
+    toNumberOrNull(pick(raw, "stockActual", "StockActual", "stock", "Stock")) ?? 0;
+
+  return {
+    ...raw,
+    idVariante: toNumberOrNull(pick(raw, "idVariante", "IdVariante")),
+    idProducto: toNumberOrNull(pick(raw, "idProducto", "IdProducto")),
+    productoNombre:
+      pick(raw, "productoNombre", "ProductoNombre", "nombre", "Nombre") ?? "",
+    sku: pick(raw, "sku", "Sku", "codigoPrincipal", "CodigoPrincipal") ?? "",
+    stockActual,
+    stock: stockActual,
+    precioCompraActual:
+      toNumberOrNull(pick(raw, "precioCompraActual", "PrecioCompraActual")) ??
+      (costo > 0 ? costo : null),
+    costoPromedioActual:
+      toNumberOrNull(pick(raw, "costoPromedioActual", "CostoPromedioActual")) ??
+      (costo > 0 ? costo : null),
+  };
+}
+
+export function unwrapVariantesCompraBuscar(raw) {
+  return unwrapList(raw).map(normalizarVarianteCompraBusqueda).filter(Boolean);
+}
+
+const cacheVariantesPorProducto = new Map();
+
+export function invalidarCacheDetalleProductoVariantes() {
+  cacheVariantesPorProducto.clear();
+}
+
+export function resolverUbicacionDefaultAjuste(catalogos, variante) {
+  const ubicaciones = catalogos?.ubicaciones ?? [];
+  const idVarianteUbicacion = toNumberOrNull(
+    pick(
+      variante,
+      "idUbicacionDefault",
+      "IdUbicacionDefault",
+      "ubicacion",
+      "Ubicacion",
+      "idUbicacion",
+      "IdUbicacion"
+    )
+  );
+
+  if (
+    idVarianteUbicacion &&
+    ubicaciones.some((u) => Number(u.idUbicacion) === idVarianteUbicacion)
+  ) {
+    return idVarianteUbicacion;
+  }
+
+  return ubicaciones[0]?.idUbicacion ?? null;
+}
+
+/** Stock de la variante en una ubicación (si el backend lo soporta en buscar). */
+export async function consultarStockVarianteUbicacion(
+  idVariante,
+  idUbicacion,
+  sku,
+  buscar = buscarVariantesCompra
+) {
+  const idVar = toNumberOrNull(idVariante);
+  const idUbi = toNumberOrNull(idUbicacion);
+  const codigo = String(sku ?? "").trim();
+  if (!idVar || !idUbi || !codigo) return null;
+
+  try {
+    const raw = await buscar(codigo, { idUbicacion: idUbi });
+    const items = unwrapVariantesCompraBuscar(raw);
+    const match = items.find(
+      (v) => toNumberOrNull(pick(v, "idVariante", "IdVariante")) === idVar
+    );
+    if (!match) return null;
+    return toNumberOrNull(pick(match, "stockActual", "StockActual", "stock", "Stock"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Alinea stock/costo de la variante con GET /api/Productos/{idProducto}.
+ * La búsqueda puede traer stock desactualizado o incompleto.
+ */
+export async function enriquecerVarianteDesdeDetalleProducto(
+  variante,
+  obtenerDetalle = obtenerProductoPorId
+) {
+  const base = normalizarVarianteCompraBusqueda(variante);
+  if (!base) return variante;
+
+  const idProducto = toNumberOrNull(pick(base, "idProducto", "IdProducto"));
+  const idVariante = toNumberOrNull(pick(base, "idVariante", "IdVariante"));
+  if (!idProducto || !idVariante) return base;
+
+  try {
+    let variantesDetalle = cacheVariantesPorProducto.get(idProducto);
+    if (!variantesDetalle) {
+      const raw = await obtenerDetalle(idProducto);
+      const detalle = unwrapProductoDetalleBody(raw);
+      variantesDetalle = Array.isArray(detalle?.variantes) ? detalle.variantes : [];
+      cacheVariantesPorProducto.set(idProducto, variantesDetalle);
+    }
+
+    const match = variantesDetalle.find(
+      (vv) => toNumberOrNull(pick(vv, "idVariante", "IdVariante")) === idVariante
+    );
+    if (!match) return base;
+
+    const stockDetalle =
+      toNumberOrNull(pick(match, "stockActual", "StockActual", "stock", "Stock")) ?? 0;
+
+    return normalizarVarianteCompraBusqueda({
+      ...base,
+      ...match,
+      stockActual: stockDetalle,
+      stock: stockDetalle,
+    });
+  } catch {
+    return base;
+  }
+}
+
+/** @deprecated Alias: usar enriquecerVarianteDesdeDetalleProducto */
+export async function enriquecerVarianteCompraConCosto(
+  variante,
+  obtenerDetalle = obtenerProductoPorId
+) {
+  return enriquecerVarianteDesdeDetalleProducto(variante, obtenerDetalle);
 }
 
 /** Valor mostrado en input de cantidad (vacío si es 0 para poder escribir sin un 0 fijo). */

@@ -505,8 +505,7 @@ const ModalDetalleProducto = ({
     setPresentacionInput(valores.presentacion);
     setUbicacionInput(valores.ubicacion);
     setStockMinimoInput(valores.stockMinimo);
-    
-    // Cargar códigos secundarios antiguos
+
     const secundarios = valores.codigosSecundarios;
     setCodigosSecundariosInput(secundarios);
     setEditandoId(idActual);

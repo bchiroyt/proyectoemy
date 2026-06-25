@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   aplicarInputCantidad,
   aplicarInputCosto,
+  enriquecerVarianteCompraConCosto,
   resolverCostoCompraVariante,
   sincronizarLineaCompraDirecta,
 } from "@/lib/compraVarianteUtils";
@@ -170,8 +171,9 @@ const NuevaCompra = () => {
     0
   );
 
-  const agregar = (v) => {
-    const nueva = mapVarianteToLinea(v);
+  const agregar = async (v) => {
+    const variante = await enriquecerVarianteCompraConCosto(v);
+    const nueva = mapVarianteToLinea(variante);
     setLineas((prev) => {
       const ex = prev.find((x) => x.idVariante === nueva.idVariante);
       if (ex) {

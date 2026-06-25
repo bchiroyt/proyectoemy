@@ -1,5 +1,5 @@
 import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
-import { roundVenta } from "@/lib/ventaMappers";
+import { enriquecerTicketEncabezado, roundVenta } from "@/lib/ventaMappers";
 
 /** Ubicación por defecto al reintegrar inventario en reembolso (no se pide al cajero). */
 export const ID_UBICACION_REEMBOLSO = 1;
@@ -106,6 +106,73 @@ export function montoBaseLineaReembolso(item) {
     return roundVenta(neto * qty);
   }
   return roundVenta(Math.abs(Number(item?.precio) || 0) * qty);
+}
+
+/**
+ * Construye el ticket de reembolso a partir del snapshot local del cobro.
+ * No depende de un endpoint GET de ticket: usa las líneas y pagos ya conocidos
+ * y, si la respuesta del POST trae número de documento, lo aprovecha.
+ */
+export function buildTicketReembolso({
+  reembolsoAplicado,
+  lineas,
+  pagos,
+  cajeroNombre,
+  motivo,
+  observacion,
+  idVentaOriginal,
+} = {}) {
+  const data = reembolsoAplicado ?? {};
+
+  const detalles = (lineas ?? []).map((l) => {
+    const base = montoBaseLineaReembolso(l);
+    const penalizacion = roundVenta(Number(l.montoPenalizacion) || 0);
+    const montoReembolsado = roundVenta(Math.max(0, base - penalizacion));
+    return {
+      nombre: l.nombre ?? "Producto",
+      cantidad: Number(l.cantidad) || 0,
+      montoBase: base,
+      penalizacion,
+      montoReembolsado,
+    };
+  });
+
+  const pagosTicket = (pagos ?? []).map((p) => ({
+    metodoPago: p.nombre,
+    montoAplicado: roundVenta(Number(p.montoAplicado) || 0),
+  }));
+
+  const totalReembolsado = roundVenta(
+    pagosTicket.reduce((acc, p) => acc + p.montoAplicado, 0) ||
+      detalles.reduce((acc, d) => acc + d.montoReembolsado, 0)
+  );
+
+  return enriquecerTicketEncabezado(
+    {
+      tipo: "reembolso",
+      nombreNegocio: pick(data, "nombreNegocio", "NombreNegocio") ?? "",
+      direccion: pick(data, "direccion", "Direccion") ?? "",
+      cajero: pick(data, "cajero", "Cajero") ?? "",
+      numeroDocumento:
+        pick(
+          data,
+          "numeroDocumento",
+          "NumeroDocumento",
+          "numeroReembolso",
+          "NumeroReembolso"
+        ) ?? "",
+      numeroVenta:
+        pick(data, "numeroTicket", "NumeroTicket", "numeroVenta", "NumeroVenta") ??
+        (idVentaOriginal != null ? `V-${idVentaOriginal}` : ""),
+      fechaHora: pick(data, "fechaHora", "FechaHora") ?? new Date().toISOString(),
+      motivo: motivo ?? "",
+      observacion: observacion ?? "",
+      detalles,
+      totalReembolsado,
+      pagos: pagosTicket,
+    },
+    { cajeroFallback: cajeroNombre }
+  );
 }
 
 export function mapReembolsoPrevisualizacion(raw) {

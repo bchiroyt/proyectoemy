@@ -354,6 +354,14 @@ export function normalizarVarianteDetalle(raw) {
       "precio",
       "Precio"
     ),
+    precioCompraActual: pickFrom(
+      sources,
+      "precioCompraActual",
+      "PrecioCompraActual",
+      "precioCompra",
+      "PrecioCompra"
+    ),
+    costoPromedioActual: pickFrom(sources, "costoPromedioActual", "CostoPromedioActual"),
     stockMinimo: pickFrom(sources, "stockMinimo", "StockMinimo", "stockMin", "StockMin", "minimo", "Minimo"),
     stockActual,
     stock: stockActual,

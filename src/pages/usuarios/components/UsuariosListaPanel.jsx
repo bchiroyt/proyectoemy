@@ -8,6 +8,7 @@ import { Edit2, Shield, UserX } from "lucide-react";
 import { useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
 import { useAuthStore } from "@/context/useAuthStore";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { filtrarUsuariosVisibles } from "@/lib/usuarioUtils";
 import { AsignarRolesUsuarioDialog } from "./AsignarRolesUsuarioDialog";
 import { EditarUsuarioDialog } from "./EditarUsuarioDialog";
 import { PermisosUsuarioDialog } from "./PermisosUsuarioDialog";
@@ -67,7 +68,7 @@ export function UsuariosListaPanel({
   const miUsuarioId = useAuthStore((s) => s.user?.idUsuario);
   const rolesQ = useRolesQuery();
 
-  const lista = usuarios ?? [];
+  const lista = filtrarUsuariosVisibles(usuarios ?? []);
   const filtrados = useMemo(() => lista.filter((u) => matchesQuery(u, searchQuery)), [lista, searchQuery]);
 
   //const filteredHint = useMemo(
