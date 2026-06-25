@@ -5,6 +5,7 @@ import { API_BASE_URL } from "@/lib/apiClient";
 import ModalDetalleProducto from "./ModalDetalleProducto";
 import ModalVariantesProducto from "./ModalVariantesProducto";
 import ModalKardexProducto from "./ModalKardexProducto";
+import { pick, toNumberOrNull } from "@/lib/apiNormalizer";
 import { resolverIdProducto } from "@/lib/productoUtils";
 
 const obtenerSkuProducto = (producto) =>
@@ -15,6 +16,15 @@ const toNumero = (valor) => {
   const numero = Number(valor);
   return Number.isFinite(numero) ? numero : null;
 };
+
+const formatearMoneda = (valor) =>
+  valor != null
+    ? new Intl.NumberFormat("es-GT", {
+        style: "currency",
+        currency: "GTQ",
+        minimumFractionDigits: 2,
+      }).format(valor)
+    : "-";
 
 const obtenerStockProducto = (producto) => {
   const stockDirecto = toNumero(
@@ -53,25 +63,29 @@ const obtenerStockMinimoProducto = (producto) => {
 };
 
 const obtenerPrecioVentaProducto = (producto) => {
-  const precio =
-    toNumero(producto.precioVentaActual ?? producto.precioVenta ?? producto.precio) ??
-    toNumero(
-      producto.variantes?.[0]?.precioVentaActual ??
-        producto.variantes?.[0]?.precioVenta ??
-        producto.variantes?.[0]?.precio
-    );
+  const directo = toNumberOrNull(
+    pick(producto, "precioVentaActual", "PrecioVentaActual", "precioVenta", "PrecioVenta", "precio", "Precio")
+  );
+  if (directo != null) return directo;
 
-  return precio != null
-    ? new Intl.NumberFormat("es-GT", {
-        style: "currency",
-        currency: "GTQ",
-        minimumFractionDigits: 2,
-      }).format(precio)
-    : "-";
+  if (!Array.isArray(producto.variantes) || producto.variantes.length === 0) {
+    return null;
+  }
+
+  let minimo = null;
+  for (const variante of producto.variantes) {
+    const precio = toNumberOrNull(
+      pick(variante, "precioVentaActual", "PrecioVentaActual", "precioVenta", "PrecioVenta", "precio", "Precio")
+    );
+    if (precio != null && (minimo === null || precio < minimo)) {
+      minimo = precio;
+    }
+  }
+
+  return minimo;
 };
 
 const obtenerEstadoStock = (stock, stockMinimo) => {
-  // Si no hay stock mínimo definido, usamos 10 por defecto para mantener algo de lógica visual
   const min = stockMinimo > 0 ? stockMinimo : 10;
 
   if (stock < min) {
@@ -82,7 +96,6 @@ const obtenerEstadoStock = (stock, stockMinimo) => {
     };
   }
 
-  // Naranja si el stock está por encima o igual al mínimo, pero a menos de 10 unidades de distancia
   if (stock < min + 10) {
     return {
       barra: "bg-orange-500",
@@ -91,7 +104,6 @@ const obtenerEstadoStock = (stock, stockMinimo) => {
     };
   }
 
-  // Verde si el stock tiene al menos 10 unidades por encima del mínimo
   return {
     barra: "bg-green-500",
     texto: "text-green-700",
@@ -106,21 +118,23 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
 
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
 
-  const handleDetalle = (item) => {
+  const prepararProductoSeleccionado = (item) => {
     const idProducto = resolverIdProducto(item);
-    setProductoSeleccionado(idProducto != null ? { ...item, idProducto } : item);
+    return idProducto != null ? { ...item, idProducto } : item;
+  };
+
+  const handleDetalle = (item) => {
+    setProductoSeleccionado(prepararProductoSeleccionado(item));
     setOpenDetalle(true);
   };
 
   const handleKardex = (item) => {
-    const idProducto = resolverIdProducto(item);
-    setProductoSeleccionado(idProducto != null ? { ...item, idProducto } : item);
+    setProductoSeleccionado(prepararProductoSeleccionado(item));
     setOpenKardex(true);
   };
 
   const handleVariantes = (item) => {
-    const idProducto = resolverIdProducto(item);
-    setProductoSeleccionado(idProducto != null ? { ...item, idProducto } : item);
+    setProductoSeleccionado(prepararProductoSeleccionado(item));
     setOpenVariantes(true);
   };
 
@@ -132,12 +146,9 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
             <thead className="sticky top-0 z-10 bg-gray-50 text-xs uppercase text-gray-500 shadow-[0_1px_0_0_#f3f4f6]">
               <tr>
                 <th className="p-4 text-left">Producto</th>
-                <th className="p-4 text-left">Categoría</th>
-                {/*<th className="p-4 text-left">Marca</th>
-                <th className="p-4 text-left">Estado</th> */}
+                <th className="p-4 text-left">Categoria</th>
                 <th className="p-4 text-left">Variantes</th>
                 <th className="p-4 text-left">Stock</th>
-                {/* <th className="p-4 text-left">Fecha</th>*/}
                 <th className="p-4 text-left">Precio venta</th>
                 <th className="p-4 text-left">Acciones</th>
               </tr>
@@ -146,13 +157,13 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="9" className="p-10 text-center text-gray-400">
+                  <td colSpan="6" className="p-10 text-center text-gray-400">
                     Cargando productos...
                   </td>
                 </tr>
               ) : productos.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="p-10 text-center text-gray-400">
+                  <td colSpan="6" className="p-10 text-center text-gray-400">
                     No hay productos registrados.
                   </td>
                 </tr>
@@ -162,40 +173,37 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                   const stockProducto = obtenerStockProducto(item);
                   const stockMinimoProducto = obtenerStockMinimoProducto(item);
                   const estadoStock = obtenerEstadoStock(stockProducto, stockMinimoProducto);
-
-                  // Para la barra de progreso, asumimos un máximo relativo al stock mínimo (ej. 1.5x del mínimo, o 15 si no hay)
                   const baseMaximo = stockMinimoProducto > 0 ? stockMinimoProducto * 1.5 : 15;
                   const progresoStock = Math.min((stockProducto / baseMaximo) * 100, 100);
-
                   const llaveUnica = `producto-${item.idProducto ?? "sin-producto"}-variante-${
                     item.idVariante ?? "sin-variante"
                   }-${index}`;
                   const nombreVisual = item.nombre || item.presentacionNombre || "Producto sin nombre";
-                  const categoriaVisual = item.categoriaNombre || item.nombreCategoria || item.categoria || "Sin categoria";
+                  const categoriaVisual =
+                    item.categoriaNombre || item.nombreCategoria || item.categoria || "Sin categoria";
                   const cantidadVariantes = typeof item.variantes?.length === "number" ? item.variantes.length : 1;
-                  const precioVentaVisual = obtenerPrecioVentaProducto(item);
+                  const precioVentaVisual = formatearMoneda(obtenerPrecioVentaProducto(item));
 
                   return (
-                    <tr
-                      key={llaveUnica}
-                      className="border-t hover:bg-gray-50 transition"
-                    >
+                    <tr key={llaveUnica} className="border-t transition hover:bg-gray-50">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           {item.urlImagen ? (
                             <img
                               src={`${API_BASE_URL}${item.urlImagen}`}
                               alt={nombreVisual}
-                              className="w-10 h-10 rounded-md object-cover border border-gray-200 shrink-0"
-                              onError={(e) => { e.target.style.display = 'none'; }}
+                              className="h-10 w-10 shrink-0 rounded-md border border-gray-200 object-cover"
+                              onError={(event) => {
+                                event.currentTarget.style.display = "none";
+                              }}
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center shrink-0 border border-gray-100">
-                              <Package className="w-5 h-5 text-gray-400 stroke-[1.5]" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-100 bg-gray-100">
+                              <Package className="h-5 w-5 text-gray-400 stroke-[1.5]" />
                             </div>
                           )}
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-gray-800 line-clamp-1">
+                          <div className="flex min-w-0 flex-col">
+                            <span className="line-clamp-1 font-semibold text-gray-800">
                               {nombreVisual}
                             </span>
                             <span className="font-mono text-xs text-gray-400">
@@ -206,25 +214,10 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                       </td>
 
                       <td className="p-4">
-                        <span className="bg-gray-100 px-2 py-1 rounded-md text-xs">
+                        <span className="rounded-md bg-gray-100 px-2 py-1 text-xs">
                           {categoriaVisual}
                         </span>
                       </td>
-
-                      {/*<td className="p-4 text-gray-600">
-                        {item.marcaNombre || "Sin marca"}
-                      </td>
-
-                      <td className="p-4">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${item.estado
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                            }`}
-                        >
-                          {item.estado ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>*/}
 
                       <td className="p-4">
                         <span className="font-semibold text-(--color-pagina)">
@@ -239,8 +232,8 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                               {stockProducto} uds.
                             </span>
                             {stockMinimoProducto > 0 && (
-                              <span className="text-[10px] text-gray-400 font-medium">
-                                Mín: {stockMinimoProducto}
+                              <span className="text-[10px] font-medium text-gray-400">
+                                Min: {stockMinimoProducto}
                               </span>
                             )}
                           </div>
@@ -252,13 +245,8 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                           </div>
                         </div>
                       </td>
-                      {/** 
-                      <td className="p-4 text-gray-500 text-xs">
-                        {item.fechaCreacion
-                          ? new Date(item.fechaCreacion).toLocaleDateString()
-                          : "-"}
-                      </td>*/}
-                      <td className="p-4 text-gray-500 text-xs">
+
+                      <td className="p-4 text-xs text-gray-500">
                         {precioVentaVisual}
                       </td>
 
@@ -266,26 +254,26 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => handleDetalle(item)}
-                            className="text-gray-500 hover:text-(--color-pagina) transition"
+                            className="text-gray-500 transition hover:text-(--color-pagina)"
                             title="Ver detalle"
                           >
-                            <Eye className="w-5 h-5" />
+                            <Eye className="h-5 w-5" />
                           </button>
 
                           <button
                             onClick={() => handleKardex(item)}
-                            className="text-gray-500 hover:text-blue-500 transition"
+                            className="text-gray-500 transition hover:text-blue-500"
                             title="Kardex"
                           >
-                            <PackageSearch className="w-5 h-5" />
+                            <PackageSearch className="h-5 w-5" />
                           </button>
 
                           <button
                             onClick={() => handleVariantes(item)}
-                            className="text-gray-500 hover:text-yellow-500 transition"
+                            className="text-gray-500 transition hover:text-yellow-500"
                             title="Variantes"
                           >
-                            <Clock className="w-5 h-5" />
+                            <Clock className="h-5 w-5" />
                           </button>
                         </div>
                       </td>

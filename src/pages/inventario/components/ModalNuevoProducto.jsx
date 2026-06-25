@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { X, ArrowLeft, Plus, Trash2, Search, CheckCircle, AlertCircle, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { X, ArrowLeft, Plus, Trash2, CheckCircle, AlertCircle } from "lucide-react";
 
 import ModalCatalogoInventario from "./ModalCatalogoInventario";
+import BuscadorCombo from "./BuscadorCombo";
 
 import { obtenerMarcas, crearMarca } from "@/services/marcas";
 import { obtenerCategorias, crearCategoria } from "@/services/categorias";
@@ -12,7 +12,7 @@ import { obtenerUbicaciones, crearUbicacion } from "@/services/ubicaciones";
 
 import { crearProducto } from "@/services/productos";
 
-function BuscadorCombo({
+function BuscadorComboLocal({
   placeholder,
   value,
   onChange,
