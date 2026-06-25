@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { normalizarEstadoStock } from "@/lib/nivelesStockMappers";
 import { generarInformeNivelStockPdf } from "@/lib/pdfExport";
 import { fetchNivelesStockExportar } from "@/services/nivelesStockService";
+import { API_BASE_URL } from "@/lib/apiClient";
 
 const PAGE_SIZE = 20;
 
@@ -182,7 +183,26 @@ const ReporteInventarioPanel = () => {
               ) : (
                 items.map((row) => (
                   <TableRow key={row.idVariante} className="hover:bg-(--color-pagina-4)/40">
-                    <TableCell className="font-medium">{row.producto || "—"}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {row.urlImagen ? (
+                          <img
+                            src={`${API_BASE_URL}${row.urlImagen}`}
+                            alt={row.producto}
+                            className="w-8 h-8 rounded object-cover border border-slate-200 bg-white shrink-0"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              // Podríamos mostrar el Package aquí, pero para simplicidad ocultamos la img rota
+                            }}
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-(--color-pagina-3) flex items-center justify-center shrink-0">
+                            <Package className="w-4 h-4 text-(--color-pagina)/40" />
+                          </div>
+                        )}
+                        <span>{row.producto || "—"}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{row.sku || "—"}</TableCell>
                     <TableCell className="text-sm text-(--color-gris-letra)">
                       {[row.color, row.talla].filter(Boolean).join(" / ") || "—"}

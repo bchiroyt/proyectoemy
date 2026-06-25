@@ -14,7 +14,7 @@ import { actualizarVariante, obtenerProductoPorId, agregarVariantesAProducto } f
 import { obtenerTallas } from "@/services/tallas";
 import { obtenerPresentaciones } from "@/services/presentaciones";
 import { throwIfEnvelopeFailed } from "@/lib/apiNormalizer";
-import { getApiErrorMessage } from "@/lib/apiClient";
+import { getApiErrorMessage, API_BASE_URL } from "@/lib/apiClient";
 import {
   resolverIdProducto,
   unwrapProductoDetalleBody,
@@ -412,7 +412,7 @@ const ModalDetalleProducto = ({
                 <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
               ) : (estadoProducto?.urlImagen || estadoProducto?.imagenUrl || estadoProducto?.imagen) ? (
                 <img
-                  src={estadoProducto.urlImagen || estadoProducto.imagenUrl || estadoProducto.imagen}
+                  src={`${API_BASE_URL}${estadoProducto.urlImagen || estadoProducto.imagenUrl || estadoProducto.imagen}`}
                   alt={estadoProducto.nombre || "Producto"}
                   className="w-full h-full object-contain rounded-lg"
                 />

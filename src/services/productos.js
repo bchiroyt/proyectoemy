@@ -21,7 +21,9 @@ export const obtenerProductoPorId = async (idProducto) => {
 
 // CREAR PRODUCTO
 export const crearProducto = async (data) => {
-  const res = await apiClient.post("/api/Productos", data);
+  const isFormData = data instanceof FormData;
+  const config = isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
+  const res = await apiClient.post("/api/Productos", data, config);
   return res.data?.data;
 };
 

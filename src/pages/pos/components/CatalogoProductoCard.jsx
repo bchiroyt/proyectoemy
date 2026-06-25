@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Package } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/apiClient";
 
 /**
  * Tarjeta cuadrada del catálogo POS.
  */
 export function CatalogoProductoCard({ producto, onAgregar, className }) {
   const sinStock = producto.stockActual != null && producto.stockActual <= 0;
+  const [imgError, setImgError] = useState(false);
 
   return (
     <button
@@ -19,11 +22,20 @@ export function CatalogoProductoCard({ producto, onAgregar, className }) {
       )}
     >
       <div className="aspect-square max-h-24 w-full bg-(--color-pagina-3) rounded-lg mb-2 overflow-hidden flex items-center justify-center">
-        <Package
-          className="size-8 text-(--color-pagina)/40 shrink-0"
-          strokeWidth={1.25}
-          aria-hidden
-        />
+        {producto.urlImagen && !imgError ? (
+          <img
+            src={`${API_BASE_URL}${producto.urlImagen}`}
+            alt={producto.nombre}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <Package
+            className="size-8 text-(--color-pagina)/40 shrink-0"
+            strokeWidth={1.25}
+            aria-hidden
+          />
+        )}
       </div>
       <p className="text-sm font-semibold leading-snug line-clamp-2 flex-1">{producto.nombre}</p>
       <p className="text-sm text-(--color-pos-texto-muted) mt-1 tabular-nums">
