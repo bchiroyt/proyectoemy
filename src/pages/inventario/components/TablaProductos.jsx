@@ -167,7 +167,9 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                   const baseMaximo = stockMinimoProducto > 0 ? stockMinimoProducto * 1.5 : 15;
                   const progresoStock = Math.min((stockProducto / baseMaximo) * 100, 100);
 
-                  const llaveUnica = item.idProducto || item.idVariante || `prod-${index}`;
+                  const llaveUnica = `producto-${item.idProducto ?? "sin-producto"}-variante-${
+                    item.idVariante ?? "sin-variante"
+                  }-${index}`;
                   const nombreVisual = item.nombre || item.presentacionNombre || "Producto sin nombre";
                   const categoriaVisual = item.categoriaNombre || item.nombreCategoria || item.categoria || "Sin categoria";
                   const cantidadVariantes = typeof item.variantes?.length === "number" ? item.variantes.length : 1;

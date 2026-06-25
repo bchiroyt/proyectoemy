@@ -208,7 +208,7 @@ const GestionUbicaciones = () => {
               ) : ubicaciones.length > 0 ? (
                 ubicaciones.map((u, index) => (
                   <tr
-                    key={u.idUbicacion}
+                    key={`ubicacion-${u.idUbicacion ?? "sin-id"}-${index}`}
                     className={`transition-colors ${
                       u.activo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
                     }`}

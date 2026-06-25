@@ -182,7 +182,7 @@ function BuscadorCombo({
                 const isSelected = selectedItem && String(item[idField]) === String(selectedItem[idField]);
                 return (
                   <div
-                    key={item[idField]}
+                    key={`${idField}-${item[idField] ?? "sin-id"}-${idx}`}
                     onClick={() => handleSelect(item)}
                     className={cn(
                       "flex items-center justify-between px-3 py-2 text-sm cursor-pointer select-none transition-colors",

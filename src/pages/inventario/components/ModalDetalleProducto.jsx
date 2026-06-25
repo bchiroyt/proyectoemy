@@ -597,8 +597,8 @@ const ModalDetalleProducto = ({
                                 disabled={cargandoCatalogos}
                               >
                                 <option value="">N/A</option>
-                                {tallas.map((t) => (
-                                  <option key={t.idTalla} value={t.idTalla}>{t.nombre}</option>
+                                {tallas.map((t, index) => (
+                                  <option key={`talla-${t.idTalla ?? "sin-id"}-${index}`} value={t.idTalla}>{t.nombre}</option>
                                 ))}
                               </select>
                             </div>
@@ -611,8 +611,8 @@ const ModalDetalleProducto = ({
                                 disabled={cargandoCatalogos}
                               >
                                 <option value="">N/A</option>
-                                {presentaciones.map((p) => (
-                                  <option key={p.idPresentacion} value={p.idPresentacion}>{p.nombre}</option>
+                                {presentaciones.map((p, index) => (
+                                  <option key={`presentacion-${p.idPresentacion ?? "sin-id"}-${index}`} value={p.idPresentacion}>{p.nombre}</option>
                                 ))}
                               </select>
                             </div>

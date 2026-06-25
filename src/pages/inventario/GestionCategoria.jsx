@@ -214,7 +214,7 @@ const GestionCategorias = () => {
 
                   return (
                   <tr
-                    key={cat.idCategoria || index}
+                    key={`categoria-${cat.idCategoria ?? "sin-id"}-${index}`}
                     className={`border-t ${
                       esActivo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
                     }`}

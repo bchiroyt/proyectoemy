@@ -207,7 +207,7 @@ const GestionMarcas = () => {
               ) : marcas.length > 0 ? (
                 marcas.map((m, index) => (
                   <tr
-                    key={m.idMarca || index}
+                    key={`marca-${m.idMarca ?? "sin-id"}-${index}`}
                     className={`transition-colors ${
                       m.activo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
                     }`}

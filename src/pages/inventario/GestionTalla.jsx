@@ -195,7 +195,7 @@ const GestionTallas = () => {
               ) : tallas.length > 0 ? (
                 tallas.map((t, index) => (
                   <tr
-                    key={t.idTalla}
+                    key={`talla-${t.idTalla ?? "sin-id"}-${index}`}
                     className={`transition-colors ${
                       t.activo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
                     }`}

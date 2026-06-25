@@ -204,7 +204,7 @@ const GestionPresentacion = () => {
 
                   return (
                   <tr
-                    key={p.idPresentacion}
+                    key={`presentacion-${p.idPresentacion ?? "sin-id"}-${index}`}
                     className={`transition-colors ${
                       esActivo ? "hover:bg-gray-50" : "bg-gray-100/60 opacity-75 hover:bg-gray-100"
                     }`}
