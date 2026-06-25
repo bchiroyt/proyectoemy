@@ -5,6 +5,7 @@ import { API_BASE_URL } from "@/lib/apiClient";
 import ModalDetalleProducto from "./ModalDetalleProducto";
 import ModalVariantesProducto from "./ModalVariantesProducto";
 import ModalKardexProducto from "./ModalKardexProducto";
+import { pick, toNumberOrNull } from "@/lib/apiNormalizer";
 import { resolverIdProducto } from "@/lib/productoUtils";
 
 const obtenerSkuProducto = (producto) =>
@@ -31,6 +32,29 @@ const obtenerStockMinimoProducto = (producto) => {
     (total, variante) => total + Number(variante.stockMinimo ?? 0),
     0
   ) ?? 0;
+};
+
+const obtenerPrecioVentaProducto = (producto) => {
+  const directo = toNumberOrNull(
+    pick(producto, "precioVentaActual", "PrecioVentaActual", "precioVenta", "PrecioVenta")
+  );
+  if (directo != null) return directo;
+
+  if (!Array.isArray(producto.variantes) || producto.variantes.length === 0) {
+    return null;
+  }
+
+  let minimo = null;
+  for (const variante of producto.variantes) {
+    const precio = toNumberOrNull(
+      pick(variante, "precioVentaActual", "PrecioVentaActual", "precioVenta", "PrecioVenta")
+    );
+    if (precio != null && (minimo === null || precio < minimo)) {
+      minimo = precio;
+    }
+  }
+
+  return minimo;
 };
 
 const obtenerEstadoStock = (stock, stockMinimo) => {
@@ -133,6 +157,7 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                   const llaveUnica = item.idProducto || item.idVariante || `prod-${index}`;
                   const nombreVisual = item.nombre || item.presentacionNombre || "Producto sin nombre";
                   const cantidadVariantes = typeof item.variantes?.length === "number" ? item.variantes.length : 1;
+                  const precioVentaProducto = obtenerPrecioVentaProducto(item);
 
                   return (
                     <tr
@@ -217,8 +242,10 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                           ? new Date(item.fechaCreacion).toLocaleDateString()
                           : "-"}
                       </td>*/}
-                      <td className="p-4 text-gray-500 text-xs">
-                        {item.precioVenta}
+                      <td className="p-4 text-sm text-gray-600 tabular-nums">
+                        {precioVentaProducto != null
+                          ? `Q ${precioVentaProducto.toFixed(2)}`
+                          : "—"}
                       </td>
 
                       <td className="p-4">

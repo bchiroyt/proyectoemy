@@ -45,6 +45,7 @@ const ModalVariantesProducto = ({ open, onClose, producto }) => {
                 <th className="p-4 text-left">Código</th>
                 <th className="p-4 text-left">Color</th>
                 <th className="p-4 text-left">Talla</th>
+                <th className="p-4 text-left">Costo Prom.</th>
                 <th className="p-4 text-left">Precio</th>
                 <th className="p-4 text-left">Estado</th>
               </tr>
@@ -66,6 +67,12 @@ const ModalVariantesProducto = ({ open, onClose, producto }) => {
 
                     <td className="p-4 font-semibold">
                       {v.tallaNombre || "-"}
+                    </td>
+
+                    <td className="p-4 font-semibold text-slate-500">
+                      {v.costoPromedioActual || v.CostoPromedioActual
+                        ? `Q${Number(v.costoPromedioActual || v.CostoPromedioActual).toFixed(2)}`
+                        : "Q0.00"}
                     </td>
 
                     <td className="p-4 font-semibold text-(--color-pagina)">

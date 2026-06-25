@@ -27,6 +27,14 @@ export const crearProducto = async (data) => {
   return res.data?.data;
 };
 
+// ACTUALIZAR IMAGEN DE PRODUCTO
+export const actualizarImagenProducto = async (idProducto, formData) => {
+  const res = await apiClient.patch(`/api/Productos/${idProducto}/imagen`, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return res.data;
+};
+
 // ACTUALIZAR VARIANTE DE PRODUCTO
 export const actualizarVariante = async (idVariante, data) => {
   const res = await apiClient.patch(`/api/Productos/variantes/${idVariante}`, data);
@@ -44,5 +52,11 @@ export const buscarVariantesCompra = async (criterio) => {
 // AGREGAR VARIANTES A PRODUCTO EXISTENTE
 export const agregarVariantesAProducto = async (idProducto, variantes) => {
   const res = await apiClient.patch(`/api/Productos/${idProducto}/variantes`, { variantes });
+  return res.data;
+};
+
+// ACTUALIZAR PRODUCTO (CABECERA)
+export const actualizarProducto = async (idProducto, data) => {
+  const res = await apiClient.patch(`/api/Productos/${idProducto}`, data);
   return res.data;
 };
