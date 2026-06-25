@@ -234,6 +234,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   // Datos del formulario
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [imagen, setImagen] = useState(null);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
   const [marcaSeleccionada, setMarcaSeleccionada] = useState("");
 
@@ -383,6 +384,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     setStep(1);
     setNombre("");
     setDescripcion("");
+    setImagen(null);
     setCategoriaSeleccionada("");
     setMarcaSeleccionada("");
     setCategorias([]);
@@ -406,33 +408,34 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     try {
       setLoading(true);
 
-      const payload = {
-        nombre,
-        descripcion,
-        categoria: Number(categoriaSeleccionada),
-        marca: Number(marcaSeleccionada),
-        estadoCatalogo: "BORRADOR",
-        variantes: variantes.map((v) => ({
-          talla: v.talla ? Number(v.talla) : null,
-          presentacion: v.presentacion ? Number(v.presentacion) : null,
-          color: v.color || null,
-          precioVenta: v.precioVenta ? Number(v.precioVenta) : null,
-          preciomayoreo: v.preciomayoreo ? Number(v.preciomayoreo) : null,
-          precioCompra: v.precioCompra ? Number(v.precioCompra) : null,
-          stockMinimo: v.stockMinimo !== "" ? Number(v.stockMinimo) : null,
-          idUbicacionDefault: v.ubicacion ? Number(v.ubicacion) : null,
-          codigosExternos: v.codigoBarras
-            ? [
-              {
-                codigo: v.codigoBarras,
-                esPrincipal: true,
-              },
-            ]
-            : [],
-        })),
-      };
+      const formData = new FormData();
+      formData.append("Nombre", nombre);
+      formData.append("Descripcion", descripcion || "");
+      formData.append("Categoria", Number(categoriaSeleccionada));
+      formData.append("Marca", Number(marcaSeleccionada));
+      formData.append("EstadoCatalogo", "BORRADOR");
+      
+      if (imagen) {
+        formData.append("Imagen", imagen);
+      }
 
-      await crearProducto(payload);
+      variantes.forEach((v, index) => {
+        if (v.talla) formData.append(`Variantes[${index}].talla`, Number(v.talla));
+        if (v.presentacion) formData.append(`Variantes[${index}].presentacion`, Number(v.presentacion));
+        if (v.color) formData.append(`Variantes[${index}].color`, v.color);
+        if (v.precioVenta) formData.append(`Variantes[${index}].precioVenta`, Number(v.precioVenta));
+        if (v.preciomayoreo) formData.append(`Variantes[${index}].preciomayoreo`, Number(v.preciomayoreo));
+        if (v.precioCompra) formData.append(`Variantes[${index}].precioCompra`, Number(v.precioCompra));
+        if (v.stockMinimo !== "") formData.append(`Variantes[${index}].stockMinimo`, Number(v.stockMinimo));
+        if (v.ubicacion) formData.append(`Variantes[${index}].idUbicacionDefault`, Number(v.ubicacion));
+        
+        if (v.codigoBarras) {
+          formData.append(`Variantes[${index}].codigosExternos[0].codigo`, v.codigoBarras);
+          formData.append(`Variantes[${index}].codigosExternos[0].esPrincipal`, "true");
+        }
+      });
+
+      await crearProducto(formData);
 
       mostrarAviso("exito", "¡Producto creado correctamente en el catálogo!");
 
@@ -506,6 +509,16 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Escribe el nombre del producto"
                   className="w-full border p-3 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-600 block">Imagen del Producto</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImagen(e.target.files[0])}
+                  className="w-full border p-2 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors text-sm"
                 />
               </div>
 

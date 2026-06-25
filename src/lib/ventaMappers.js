@@ -56,6 +56,7 @@ export function mapCatalogoProducto(raw) {
     talla: pick(raw, "talla", "Talla") ?? null,
     color: pick(raw, "color", "Color") ?? null,
     presentacion: pick(raw, "presentacion", "Presentacion") ?? null,
+    urlImagen: pick(raw, "urlImagen", "UrlImagen", "imagen", "Imagen") ?? null,
     precio,
     costoPromedioActual,
     stockActual,

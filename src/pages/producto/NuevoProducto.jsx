@@ -1,17 +1,41 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
+import { crearProducto } from "@/services/productos";
 
 const NuevoProducto = () => {
   const setTitulo = useNavigationStore((s) => s.setTitulo);
+  const [nombre, setNombre] = useState("");
+  const [sku, setSku] = useState("");
+  const [precio, setPrecio] = useState("");
+  const [imagen, setImagen] = useState(null);
 
   useEffect(() => {
     setTitulo("Nuevo producto");
   }, [setTitulo]);
+
+  const handleGuardar = async () => {
+    const formData = new FormData();
+    formData.append("Nombre", nombre);
+    formData.append("Sku", sku);
+    formData.append("PrecioVenta", precio);
+    if (imagen) {
+      formData.append("Imagen", imagen);
+    }
+
+    try {
+      await crearProducto(formData);
+      alert("Producto guardado correctamente");
+      // Opcional: Redirigir a inventario o limpiar formulario
+    } catch (e) {
+      console.error(e);
+      alert("Error al guardar el producto");
+    }
+  };
 
   return (
     <div className="h-full min-h-0 overflow-y-auto">
@@ -26,19 +50,23 @@ const NuevoProducto = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="nombre">Nombre</Label>
-              <Input id="nombre" placeholder="Nombre del producto" className="bg-slate-50" />
+              <Input id="nombre" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre del producto" className="bg-slate-50" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sku">SKU</Label>
-              <Input id="sku" placeholder="VF-000-XX-X" className="bg-slate-50 font-mono text-sm" />
+              <Input id="sku" value={sku} onChange={e => setSku(e.target.value)} placeholder="VF-000-XX-X" className="bg-slate-50 font-mono text-sm" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="precio">Precio venta</Label>
-              <Input id="precio" type="number" placeholder="0.00" className="bg-slate-50" />
+              <Input id="precio" type="number" value={precio} onChange={e => setPrecio(e.target.value)} placeholder="0.00" className="bg-slate-50" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="imagen">Imagen del producto</Label>
+              <Input id="imagen" type="file" accept="image/*" onChange={e => setImagen(e.target.files[0])} className="bg-slate-50" />
             </div>
           </div>
           <div className="flex flex-wrap gap-2 pt-2">
-            <Button type="button" className="bg-(--color-pagina) hover:bg-(--color-borde-button) text-white">
+            <Button type="button" onClick={handleGuardar} className="bg-(--color-pagina) hover:bg-(--color-borde-button) text-white">
               Guardar
             </Button>
             <Button variant="outline" asChild>

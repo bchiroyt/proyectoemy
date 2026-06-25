@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Eye, PackageSearch, Clock } from "lucide-react";
+import { Eye, PackageSearch, Clock, Package } from "lucide-react";
+import { API_BASE_URL } from "@/lib/apiClient";
 
 import ModalDetalleProducto from "./ModalDetalleProducto";
 import ModalVariantesProducto from "./ModalVariantesProducto";
@@ -139,13 +140,27 @@ const TablaProductos = ({ productos = [], loading = false }) => {
                       className="border-t hover:bg-gray-50 transition"
                     >
                       <td className="p-4">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-gray-800">
-                            {nombreVisual}
-                          </span>
-                          <span className="font-mono text-xs text-gray-400">
-                            SKU: {skuProducto}
-                          </span>
+                        <div className="flex items-center gap-3">
+                          {item.urlImagen ? (
+                            <img
+                              src={`${API_BASE_URL}${item.urlImagen}`}
+                              alt={nombreVisual}
+                              className="w-10 h-10 rounded-md object-cover border border-gray-200 shrink-0"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center shrink-0 border border-gray-100">
+                              <Package className="w-5 h-5 text-gray-400 stroke-[1.5]" />
+                            </div>
+                          )}
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-800 line-clamp-1">
+                              {nombreVisual}
+                            </span>
+                            <span className="font-mono text-xs text-gray-400">
+                              SKU: {skuProducto}
+                            </span>
+                          </div>
                         </div>
                       </td>
 

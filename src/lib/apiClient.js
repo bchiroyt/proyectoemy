@@ -15,6 +15,8 @@ if (import.meta.env.DEV && !fromEnv) {
   );
 }
 
+export const API_BASE_URL = baseURL;
+
 export const apiClient = axios.create({
   baseURL,
   headers: { "Content-Type": "application/json" },
