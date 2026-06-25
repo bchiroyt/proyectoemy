@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { AlertTriangle, ArrowLeft, FileDown } from "lucide-react";
-import logoImg from "@/assets/tran1.png";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { useNivelesStockQuery } from "@/hooks/queries/useNivelesStockQueries";
 import { fetchNivelesStockExportar } from "@/services/nivelesStockService";
@@ -14,19 +13,13 @@ import {
 } from "@/lib/nivelesStockMappers";
 import { Skeleton } from "@/components/ui/skeleton";
 import Toast from "@/components/ui/Toast";
+import { generarInformeNivelStockPdf } from "@/lib/pdfExport";
 
 const PRODUCT_IMAGE_PLACEHOLDER =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
-const SIDEBAR_COLOR = [232, 48, 126];
 const SIDEBAR_COLOR_HEX = "#E8307E";
-const GRAY_LIGHT = [156, 163, 175];
-const GRAY_TEXT = [107, 114, 128];
 
-const cargarImagenComoDataUrl = async (src) => {
-  const response = await fetch(src);
-  if (!response.ok) throw new Error("No se pudo cargar el logo del reporte.");
-  const blob = await response.blob();
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -34,7 +27,6 @@ const cargarImagenComoDataUrl = async (src) => {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
-};
 
 const formatearFechaReporte = (valor) => {
   if (!valor) return "Fecha no disponible";
@@ -250,10 +242,14 @@ const ReporteStock = () => {
 
     try {
       const reporte = await fetchNivelesStockExportar();
-      const itemsFiltrados = reporte.items.filter((item) =>
-        !esSinPoliticaStock(item) &&
-        ["critico", "advertencia"].includes(normalizarEstadoStock(item.nivelStock))
-      );
+      const itemsFiltrados = reporte.items.filter((item) => {
+        const coincideProveedor =
+          proveedorFiltro === "todos" || item.proveedor === proveedorFiltro;
+        const coincideEstado =
+          estadoFiltro === "todos" ||
+          normalizarEstadoStock(item.nivelStock) === estadoFiltro;
+        return coincideProveedor && coincideEstado;
+      });
 
       await generarInformeNivelStockPdf({
         fecha: reporte.fecha,

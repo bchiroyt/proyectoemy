@@ -13,6 +13,7 @@ import Toast from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import ModalConfirmacion from "@/pages/inventario/components/ModalConfirmacion";
 import { useState } from "react";
+import Paginacion from "@/components/shared/Paginacion";
 
 function formatearFecha(iso) {
   if (!iso) return "—";
@@ -42,6 +43,8 @@ export default function Mayoreo() {
   const [cotizacionAAnular, setCotizacionAAnular] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState("TODOS");
   const [busqueda, setBusqueda] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const cotizacionesQ = useCotizacionesHistorialQuery();
   const anularM = useAnularCotizacionMutation();
@@ -69,6 +72,16 @@ export default function Mayoreo() {
     }
   };
 
+  const handleFiltroEstadoChange = (estado) => {
+    setFiltroEstado(estado);
+    setPage(1);
+  };
+
+  const handleBusquedaChange = (e) => {
+    setBusqueda(e.target.value);
+    setPage(1);
+  };
+
   const items = cotizacionesQ.data?.items ?? [];
 
   const itemsFiltrados = items.filter((c) => {
@@ -88,6 +101,13 @@ export default function Mayoreo() {
 
     return true;
   });
+
+  const totalRecords = itemsFiltrados.length;
+  const totalPages = Math.ceil(totalRecords / PAGE_SIZE) || 1;
+  const from = totalRecords === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
+
+  const paginatedItems = itemsFiltrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="flex flex-col h-full bg-(--color-pos-fondo) p-4 md:p-6 gap-6">
@@ -116,7 +136,7 @@ export default function Mayoreo() {
         {/* Filtro de estado */}
         <div className="flex p-1 bg-(--color-pos-fondo) rounded-lg gap-1 border border-(--color-pos-borde-suave) w-full sm:w-auto overflow-x-auto">
           <button
-            onClick={() => setFiltroEstado("TODOS")}
+            onClick={() => handleFiltroEstadoChange("TODOS")}
             className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${filtroEstado === "TODOS"
               ? "bg-(--color-pagina) text-(--color-blanco) shadow-sm"
               : "text-(--color-gris-letra) hover:bg-(--color-pagina-4)"
@@ -125,7 +145,7 @@ export default function Mayoreo() {
             Todos
           </button>
           <button
-            onClick={() => setFiltroEstado("COTIZACIONES")}
+            onClick={() => handleFiltroEstadoChange("COTIZACIONES")}
             className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${filtroEstado === "COTIZACIONES"
               ? "bg-(--color-pagina) text-(--color-blanco) shadow-sm"
               : "text-(--color-gris-letra) hover:bg-(--color-pagina-4)"
@@ -134,7 +154,7 @@ export default function Mayoreo() {
             Cotizaciones
           </button>
           <button
-            onClick={() => setFiltroEstado("ANULADOS")}
+            onClick={() => handleFiltroEstadoChange("ANULADOS")}
             className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${filtroEstado === "ANULADOS"
               ? "bg-(--color-pagina) text-(--color-blanco) shadow-sm"
               : "text-(--color-gris-letra) hover:bg-(--color-pagina-4)"
@@ -151,7 +171,7 @@ export default function Mayoreo() {
             type="text"
             placeholder="Buscar por cliente o No. cotización..."
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={handleBusquedaChange}
             className="w-full h-9 pl-9 pr-3 text-xs bg-(--color-pos-fondo) border border-(--color-pos-borde-suave) rounded-lg focus:outline-none focus:ring-2 focus:ring-(--color-pagina) text-(--color-negro)"
           />
         </div>
@@ -184,73 +204,87 @@ export default function Mayoreo() {
             )}
           </div>
         ) : (
-          <div className="overflow-auto flex-1">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-(--color-pagina-4) text-(--color-gris-letra) text-xs uppercase font-bold sticky top-0">
-                <tr>
-                  <th className="px-4 py-3">NO.</th>
-                  <th className="px-4 py-3">Cliente</th>
-                  <th className="px-4 py-3">Emisión</th>
-                  <th className="px-4 py-3">Vence</th>
-                  <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-center">Estado</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-(--color-pos-borde-suave)">
-                {itemsFiltrados.map((c, index) => (
-                  <tr key={c.idCotizacion} className="hover:bg-(--color-pagina-4)/50">
-                    <td className="px-4 py-3 font-semibold">{index + 1}</td>
-                    <td className="px-4 py-3">{c.nombreCliente || "—"}</td>
-                    <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaEmision)}</td>
-                    <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaVencimiento)}</td>
-                    <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtQ(c.total)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getBadgeClasses(c.estado)}`}>
-                        {etiquetaEstadoCotizacion(c.estado)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2 flex-wrap min-h-8">
-                        {String(c.estado ?? "").toUpperCase() === "PENDIENTE" ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => navigate(`/mayoreo/${c.idCotizacion}/editar`)}
-                              className="h-8 border-(--color-pagina) text-(--color-pagina)"
-                            >
-                              <Pencil className="size-3.5 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => navigate(`/mayoreo/${c.idCotizacion}/finalizar`)}
-                              className="bg-(--color-pagina-2) hover:bg-(--color-esmeralda-hover) text-(--color-blanco) h-8"
-                            >
-                              <BadgeCheck className="size-3.5 mr-1" />
-                              Finalizar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAnularClick(c)}
-                              disabled={anularM.isPending}
-                              className="h-8 text-(--color-rojo) border-(--color-rojo)/30 hover:bg-(--color-rojo-fondo)"
-                            >
-                              <Ban className="size-3.5 mr-1" />
-                              Anular
-                            </Button>
-                          </>
-                        ) : (
-                          <span className="text-xs text-(--color-gris-letra) select-none px-2">—</span>
-                        )}
-                      </div>
-                    </td>
+          <div className="overflow-auto flex-1 flex flex-col justify-between">
+            <div className="overflow-auto flex-1">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-(--color-pagina-4) text-(--color-gris-letra) text-xs uppercase font-bold sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3">NO.</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Emisión</th>
+                    <th className="px-4 py-3">Vence</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-center">Estado</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-(--color-pos-borde-suave)">
+                  {paginatedItems.map((c, index) => (
+                    <tr key={c.idCotizacion} className="hover:bg-(--color-pagina-4)/50">
+                      <td className="px-4 py-3 font-semibold">{(page - 1) * PAGE_SIZE + index + 1}</td>
+                      <td className="px-4 py-3">{c.nombreCliente || "—"}</td>
+                      <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaEmision)}</td>
+                      <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaVencimiento)}</td>
+                      <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtQ(c.total)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getBadgeClasses(c.estado)}`}>
+                          {etiquetaEstadoCotizacion(c.estado)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2 flex-wrap min-h-8">
+                          {String(c.estado ?? "").toUpperCase() === "PENDIENTE" ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/mayoreo/${c.idCotizacion}/editar`)}
+                                className="h-8 border-(--color-pagina) text-(--color-pagina)"
+                              >
+                                <Pencil className="size-3.5 mr-1" />
+                                Editar
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => navigate(`/mayoreo/${c.idCotizacion}/finalizar`)}
+                                className="bg-(--color-pagina-2) hover:bg-(--color-esmeralda-hover) text-(--color-blanco) h-8"
+                              >
+                                <BadgeCheck className="size-3.5 mr-1" />
+                                Finalizar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAnularClick(c)}
+                                disabled={anularM.isPending}
+                                className="h-8 text-(--color-rojo) border-(--color-rojo)/30 hover:bg-(--color-rojo-fondo)"
+                              >
+                                <Ban className="size-3.5 mr-1" />
+                                Anular
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-(--color-gris-letra) select-none px-2">—</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end border-t border-(--color-pos-borde-suave) p-3 bg-(--color-blanco)">
+              <Paginacion
+                from={from}
+                to={to}
+                total={totalRecords}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disablePrev={page <= 1}
+                disableNext={page >= totalPages}
+                isLoading={cotizacionesQ.isFetching}
+              />
+            </div>
           </div>
         )}
       </div>

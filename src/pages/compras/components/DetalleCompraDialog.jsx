@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarDays, Store, FileText, Printer, Download, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { generarDetalleCompraPdf } from "@/lib/pdfExport";
+import { useState } from "react";
 
 const fmtQ = (n) =>
   new Intl.NumberFormat("es-GT", {
@@ -32,6 +34,8 @@ const estadoBadge = (estado) => {
 };
 
 const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+
   if (!compra) return null;
 
   const esRecibida = compra.estado === "Recibido";
@@ -190,17 +194,24 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
 
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/80 shrink-0">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" type="button">
-              <Printer className="size-4" />
-              Imprimir recibo
-            </Button>
             <Button
               size="sm"
               className="gap-1.5 bg-(--color-pagina) hover:bg-(--color-borde-button) text-white"
               type="button"
+              disabled={generandoPdf}
+              onClick={async () => {
+                try {
+                  setGenerandoPdf(true);
+                  await generarDetalleCompraPdf(compra);
+                } catch (e) {
+                  console.error(e);
+                } finally {
+                  setGenerandoPdf(false);
+                }
+              }}
             >
               <Download className="size-4" />
-              Descargar PDF
+              {generandoPdf ? "Generando..." : "Descargar PDF"}
             </Button>
           </div>
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>

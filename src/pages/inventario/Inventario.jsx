@@ -6,7 +6,8 @@ import ModalNuevoProducto from "./components/ModalNuevoProducto";
 import { obtenerProductos, buscarVariantesCompra } from "@/services/productos";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Skeleton } from "@/components/ui/skeleton";
-const PAGE_SIZE = 15;
+
+const PAGE_SIZE = 50;
 
 const Inventario = () => {
   const setTitulo = useNavigationStore((s) => s.setTitulo);

@@ -20,6 +20,9 @@ import {
 } from "@/hooks/queries/useReportesQueries";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { normalizarEstadoStock } from "@/lib/nivelesStockMappers";
+import { generarInformeNivelStockPdf } from "@/lib/pdfExport";
+import { fetchNivelesStockExportar } from "@/services/nivelesStockService";
 
 const PAGE_SIZE = 20;
 
@@ -42,7 +45,7 @@ const ReporteInventarioPanel = () => {
   const filtros = { estadoStock };
   const listQ = useReporteInventarioQuery({ page, pageSize: PAGE_SIZE, ...filtros });
   const resumenQ = useResumenInventarioQuery(filtros);
-  const exportMut = useExportarInventarioMutation();
+  const [isExporting, setIsExporting] = useState(false);
 
   const items = listQ.data?.items ?? [];
   const resumen = resumenQ.data?.resumen ?? listQ.data?.resumen;
@@ -52,10 +55,25 @@ const ReporteInventarioPanel = () => {
   const to = Math.min(page * PAGE_SIZE, totalRegistros);
 
   const handleExport = async () => {
+    setIsExporting(true);
     try {
-      await exportMut.mutateAsync(filtros);
+      const reporte = await fetchNivelesStockExportar();
+      const itemsFiltrados = reporte.items.filter((item) => {
+        if (filtros.estadoStock !== "TODOS") {
+          const estadoLocal = normalizarEstadoStock(item.nivelStock);
+          return normalizarEstadoStock(filtros.estadoStock) === estadoLocal;
+        }
+        return true; // Cuando está en "TODOS", devuelve todo el inventario
+      });
+
+      await generarInformeNivelStockPdf({
+        fecha: reporte.fecha,
+        items: itemsFiltrados,
+      });
     } catch (e) {
-      window.alert(getApiErrorMessage(e, "No se pudo exportar el reporte."));
+      window.alert(getApiErrorMessage(e, "No se pudo generar el PDF del reporte."));
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -85,11 +103,11 @@ const ReporteInventarioPanel = () => {
         <Button
           type="button"
           onClick={handleExport}
-          disabled={exportMut.isPending}
+          disabled={isExporting}
           className="bg-(--color-pagina-2) hover:opacity-90 text-(--color-blanco) font-semibold gap-2"
         >
           <Download className="size-4" />
-          {exportMut.isPending ? "Exportando…" : "Exportar reporte"}
+          {isExporting ? "Exportando…" : "Exportar reporte"}
         </Button>
       </div>
 
