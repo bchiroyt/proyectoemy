@@ -360,11 +360,7 @@ const ModalDetalleProducto = ({
     <>
       <Dialog open={open} onOpenChange={handleIntentoCierre}>
         <DialogContent
-<<<<<<< HEAD
           className="z-50 flex max-h-[94vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl sm:max-w-6xl lg:max-w-7xl"
-=======
-          className="flex min-h-0 w-[95vw] sm:max-w-[90vw] md:max-w-[1100px] flex-col max-h-[90vh] overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl z-50"
->>>>>>> 6ab679a00adb7dc5e4aca959da145c12dde641ed
           onInteractOutside={solicitarConfirmacionSalida}
           onEscapeKeyDown={solicitarConfirmacionSalida}
         >
