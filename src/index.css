@@ -311,13 +311,14 @@
     display: block !important;
     position: absolute !important;
     left: 0 !important;
+    right: 0 !important;          /* left + right = ocupa todo el ancho del papel */
     top: 0 !important;
-    width: 74mm !important;      /* Aprovecha mejor el ancho de la Epson */
-    max-width: 74mm !important;
-    height: auto !important;     /* Que crezca según los productos */
+    width: auto !important;       /* Que llene los 80mm del papel */
+    max-width: 80mm !important;
+    height: auto !important;      /* Que crezca según los productos */
     min-height: 100px !important; /* Forzamos una altura mínima inicial */
-    margin: 0 !important;
-    padding: 2mm !important;
+    margin: 0 auto !important;    /* Centrado dentro del papel */
+    padding: 2mm 4mm !important;  /* Margen interno simétrico para que no se corte el texto */
     background: #ffffff !important;
     box-shadow: none !important;
     border: none !important;
@@ -351,6 +352,14 @@
   .ticket-print-area .ticket-header-text.font-bold,
   .ticket-print-area .ticket-header-text .font-bold {
     font-weight: 700 !important;
+  }
+
+  /* El span del cajero vive dentro de <header>, al que la regla global
+     "header *" le aplica display:none. Sin esto, el nombre del cajero
+     desaparece SOLO al imprimir (en pantalla sí se ve). */
+  .ticket-print-area .ticket-header-text .font-bold {
+    display: inline !important;
+    visibility: visible !important;
   }
 
   /* Versión compacta en papel: menos relleno y sin "tarjetas" de color */

@@ -27,6 +27,7 @@ import {
   FORM_NUEVA_VARIANTE_VACIO,
   crearFormNuevaVarianteDesdeReferencia,
   formatearEspecificacionVariante,
+  resolverIdCatalogoPorNombre,
 } from "@/lib/productoUtils";
 
 import {
@@ -306,16 +307,46 @@ const ModalDetalleProducto = ({
     setOpenConfirmarSalida(true);
   };
 
-  const iniciarEdicion = (v, idActual) => {
+  const resolverCatalogoVariante = (v, catalogos = { tallas, presentaciones }) => {
+    let tallaVal =
+      v.talla !== undefined && v.talla !== null && v.talla !== ""
+        ? String(v.talla)
+        : "";
+    if (!tallaVal && v.tallaNombre) {
+      tallaVal = resolverIdCatalogoPorNombre(catalogos.tallas, "idTalla", v.tallaNombre);
+    }
+
+    let presentacionVal =
+      v.presentacion !== undefined && v.presentacion !== null && v.presentacion !== ""
+        ? String(v.presentacion)
+        : "";
+    if (!presentacionVal && v.presentacionNombre) {
+      presentacionVal = resolverIdCatalogoPorNombre(
+        catalogos.presentaciones,
+        "idPresentacion",
+        v.presentacionNombre
+      );
+    }
+
+    return { tallaVal, presentacionVal };
+  };
+
+  const iniciarEdicion = async (v, idActual) => {
+    let catalogos = { tallas, presentaciones };
+    if (tallas.length === 0 || presentaciones.length === 0) {
+      catalogos = await cargarCatalogosVariante();
+    }
+
+    const { tallaVal, presentacionVal } = resolverCatalogoVariante(v, catalogos);
+
     setEditandoId(idActual);
     setColorInput(v.color || "");
     setPrecioVentaInput(v.precioVentaActual !== undefined ? v.precioVentaActual : "");
     setCodigoBarrasInput(v.codigoPrincipal || "");
-    setTallaInput(v.talla || "");
-    setPresentacionInput(v.presentacion || "");
+    setTallaInput(tallaVal);
+    setPresentacionInput(presentacionVal);
     setStockMinimoInput(v.stockMinimo !== undefined && v.stockMinimo !== null ? String(v.stockMinimo) : "");
-    
-    // Cargar códigos secundarios antiguos
+
     const secundarios = (v.codigosExternos || [])
       .filter((c) => !c.esPrincipal && c.codigo !== v.codigoPrincipal)
       .map((c) => c.codigo);
@@ -337,8 +368,8 @@ const ModalDetalleProducto = ({
     const colorOriginal = v.color || "";
     const precioOriginal = String(v.precioVentaActual !== undefined ? v.precioVentaActual : "");
     const codigoOriginal = v.codigoPrincipal || "";
-    const tallaOriginal = v.talla !== undefined && v.talla !== null ? String(v.talla) : "";
-    const presentacionOriginal = v.presentacion !== undefined && v.presentacion !== null ? String(v.presentacion) : "";
+    const { tallaVal: tallaOriginal, presentacionVal: presentacionOriginal } =
+      resolverCatalogoVariante(v);
     const stockMinimoOriginal = v.stockMinimo !== undefined && v.stockMinimo !== null ? String(v.stockMinimo) : "";
     
     const secundariosOriginales = (v.codigosExternos || [])
@@ -353,8 +384,8 @@ const ModalDetalleProducto = ({
       colorInput !== colorOriginal ||
       String(precioVentaInput) !== precioOriginal ||
       codigoBarrasInput !== codigoOriginal ||
-      tallaInput !== tallaOriginal ||
-      presentacionInput !== presentacionOriginal ||
+      String(tallaInput) !== tallaOriginal ||
+      String(presentacionInput) !== presentacionOriginal ||
       stockMinimoInput !== stockMinimoOriginal ||
       !mismosSecundarios
     );
@@ -386,18 +417,37 @@ const ModalDetalleProducto = ({
         }
       });
 
+      const colorOriginal = v.color || "";
+      const { tallaVal: tallaOriginal, presentacionVal: presentacionOriginal } =
+        resolverCatalogoVariante(v);
+      const stockMinimoOriginal =
+        v.stockMinimo !== undefined && v.stockMinimo !== null ? String(v.stockMinimo) : "";
+
       const payload = {
-        color: colorInput,
         precioVenta: Number(precioVentaInput),
-        talla: tallaInput ? Number(tallaInput) : null,
-        limpiarTalla: !tallaInput,
-        presentacion: presentacionInput ? Number(presentacionInput) : null,
-        limpiarPresentacion: !presentacionInput,
-        stockMinimo: stockMinimoInput !== "" ? Number(stockMinimoInput) : null,
         estado: v.estado !== undefined ? v.estado : true,
-        permiteNegativoDefault: v.permiteNegativoDefault !== undefined ? v.permiteNegativoDefault : true,
+        permiteNegativoDefault:
+          v.permiteNegativoDefault !== undefined ? v.permiteNegativoDefault : true,
         codigosExternos: nuevosCodigos,
       };
+
+      if (colorInput !== colorOriginal) {
+        payload.color = colorInput;
+      }
+
+      if (String(tallaInput) !== tallaOriginal) {
+        payload.talla = tallaInput ? Number(tallaInput) : null;
+        payload.limpiarTalla = !tallaInput;
+      }
+
+      if (String(presentacionInput) !== presentacionOriginal) {
+        payload.presentacion = presentacionInput ? Number(presentacionInput) : null;
+        payload.limpiarPresentacion = !presentacionInput;
+      }
+
+      if (String(stockMinimoInput) !== stockMinimoOriginal) {
+        payload.stockMinimo = stockMinimoInput !== "" ? Number(stockMinimoInput) : null;
+      }
 
       await actualizarVariante(idVariante, payload);
 

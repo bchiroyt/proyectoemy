@@ -5,6 +5,7 @@ import { Search, Trash2 } from "lucide-react";
 import { useVariantesBuscarQuery } from "@/hooks/queries/useComprasQueries";
 import {
   elegirVarianteParaAgregar,
+  unwrapVariantesCompraBuscar,
   valorInputCantidad,
   valorInputCosto,
 } from "@/lib/compraVarianteUtils";
@@ -200,8 +201,8 @@ export function CompraLineasProductos({
   }, []);
 
   const elegirVariante = useCallback(
-    (v) => {
-      onAgregar(v);
+    async (v) => {
+      await onAgregar(v);
       setBusqueda("");
       setDebounced("");
       setListaAbierta(false);
@@ -225,7 +226,7 @@ export function CompraLineasProductos({
       if (raw && raw.exito === false) {
         throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
       }
-      const items = raw?.data ?? raw?.Data ?? [];
+      const items = unwrapVariantesCompraBuscar(raw);
       queryClient.setQueryData(cacheKey, items);
       return items;
     },
@@ -251,7 +252,7 @@ export function CompraLineasProductos({
 
       const elegida = elegirVarianteParaAgregar(items, criterio);
       if (elegida) {
-        elegirVariante(elegida);
+        await elegirVariante(elegida);
       }
     } catch {
       /* La query en pantalla mostrará el error si aplica */

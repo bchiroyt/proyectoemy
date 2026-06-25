@@ -158,6 +158,17 @@ export function normalizarVarianteDetalle(raw) {
     tallaNombre: talla.nombre,
     codigoPrincipal: pick(raw, "codigoPrincipal", "CodigoPrincipal", "codigoBarras", "CodigoBarras"),
     precioVentaActual: pick(raw, "precioVentaActual", "PrecioVentaActual", "precioVenta", "PrecioVenta"),
+    precioCompraActual: pick(
+      raw,
+      "precioCompraActual",
+      "PrecioCompraActual",
+      "precioCompra",
+      "PrecioCompra"
+    ),
+    costoPromedioActual: pick(raw, "costoPromedioActual", "CostoPromedioActual"),
+    idUbicacionDefault: toNumberOrNull(
+      pick(raw, "idUbicacionDefault", "IdUbicacionDefault", "ubicacion", "Ubicacion")
+    ),
     stockMinimo: pick(raw, "stockMinimo", "StockMinimo"),
     stockActual,
     stock: stockActual,
