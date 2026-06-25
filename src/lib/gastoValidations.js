@@ -30,7 +30,6 @@ export const gastoCrearSchema = z.object({
     .trim()
     .min(1, "La fecha es obligatoria")
     .refine((valor) => valor === "" || fechaValida(valor), "La fecha no es válida"),
-  observaciones: z.string().trim().optional(),
 });
 
 export function validateCrearGasto(input) {

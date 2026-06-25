@@ -88,7 +88,6 @@ const Gastos = () => {
     descripcion: "",
     monto: "",
     idMetodoPago: "",
-    observaciones: "",
   });
 
   // FUNCIÓN PARA DISPARAR AVISOS FLOTANTES
@@ -219,7 +218,6 @@ const Gastos = () => {
         descripcion: gastoValidado.descripcion,
         monto: gastoValidado.monto,
         fecha: gastoValidado.fecha,
-        observaciones: gastoValidado.observaciones || null,
       };
       
       if (modoEditar) {
@@ -261,7 +259,6 @@ const Gastos = () => {
       descripcion: "",
       monto: "",
       idMetodoPago: "",
-      observaciones: "",
     });
     setModalAbierto(true);
     cargarPreparacionGasto();
@@ -276,7 +273,6 @@ const Gastos = () => {
       descripcion: gasto.descripcion || "",
       monto: gasto.monto || "",
       idMetodoPago: gasto.idMetodoPago || "",
-      observaciones: gasto.observaciones || "",
     });
     setModoEditar(true);
     setModalAbierto(true);
@@ -296,7 +292,6 @@ const Gastos = () => {
       descripcion: "",
       monto: "",
       idMetodoPago: "",
-      observaciones: "",
     });
   };
 
@@ -578,17 +573,6 @@ const Gastos = () => {
                 {erroresCampos.descripcion?.[0] ? (
                   <p className="text-xs text-(--color-rojo)">{erroresCampos.descripcion[0]}</p>
                 ) : null}
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-(--color-gris-letra) block">Observaciones</label>
-                <textarea
-                  rows="2"
-                  value={formGasto.observaciones}
-                  onChange={(e) => actualizarCampo("observaciones", e.target.value)}
-                  placeholder="Información adicional del gasto (opcional)..."
-                  className="w-full border border-(--color-gris-claro-2) p-3 rounded-lg outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm resize-none bg-(--color-blanco) text-(--color-negro)"
-                />
               </div>
 
               {/* ACCIONES FORMULARIO */}

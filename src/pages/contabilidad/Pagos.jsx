@@ -14,9 +14,7 @@ const formatoMoneda = new Intl.NumberFormat("es-GT", {
 
 const formatearMoneda = (valor) => formatoMoneda.format(Number(valor) || 0);
 const formatearFecha = (valor) => (valor ? String(valor).split("T")[0] : "---");
-const obtenerDescripcionAbono = (abono) =>
-  abono?.descripcion ??
-  abono?.Descripcion ??
+const obtenerObservacionesAbono = (abono) =>
   abono?.observaciones ??
   abono?.Observaciones ??
   abono?.observacion ??
@@ -463,7 +461,7 @@ const Pagos = () => {
                       <th className="p-4 text-left">No. abono</th>
                       <th className="p-4 text-left">Fecha abono</th>
                       <th className="p-4 text-left">Metodo pago</th>
-                      <th className="p-4 text-left">Descripcion</th>
+                      <th className="p-4 text-left">Observaciones</th>
                       <th className="p-4 text-right">Monto</th>
                     </tr>
                   </thead>
@@ -504,7 +502,7 @@ const Pagos = () => {
                       </tr>
                     ) : (
                       abonosHistorial.map((abono) => {
-                        const descripcion = obtenerDescripcionAbono(abono);
+                        const observaciones = obtenerObservacionesAbono(abono);
                         return (
                           <tr key={abono.idDeudaAbono} className="text-(--color-negro)">
                             <td className="p-4 font-semibold">#{abono.idDeudaAbono}</td>
@@ -515,8 +513,8 @@ const Pagos = () => {
                               </span>
                             </td>
                             <td className="max-w-[18rem] p-4 text-(--color-gris-letra)">
-                              <span className="line-clamp-2" title={descripcion || "Sin descripcion"}>
-                                {descripcion || "---"}
+                              <span className="line-clamp-2" title={observaciones || "Sin observaciones"}>
+                                {observaciones || "---"}
                               </span>
                             </td>
                             <td className="p-4 text-right font-bold text-(--color-verde)">{formatearMoneda(abono.monto)}</td>
