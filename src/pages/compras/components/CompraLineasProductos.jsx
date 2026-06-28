@@ -38,12 +38,30 @@ const tdClass = "py-1 px-2 align-middle";
 const inputNumClass =
   "h-7 tabular-nums text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]";
 
+function resolverStockVariante(v) {
+  const stock =
+    v.stockActual ??
+    v.StockActual ??
+    v.existenciaActual ??
+    v.ExistenciaActual ??
+    v.existencia ??
+    v.Existencia ??
+    v.cantidadExistente ??
+    v.CantidadExistente ??
+    v.stock ??
+    v.Stock ??
+    0;
+  const n = Number(stock);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function VarianteOpcion({ v, onElegir }) {
   const idVariante = v.idVariante ?? v.IdVariante;
   const disp = v.disponibleParaCompra ?? v.DisponibleParaCompra;
   const motivo = v.motivoNoDisponible ?? v.MotivoNoDisponible;
   const nombre = v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
   const sku = v.sku ?? v.Sku ?? "";
+  const stock = resolverStockVariante(v);
   const color = v.color ?? v.Color ?? "";
   const talla = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
   const detalle = [color, talla].filter(Boolean).join(" · ");
@@ -65,8 +83,8 @@ function VarianteOpcion({ v, onElegir }) {
         if (!deshabilitado) onElegir(v);
       }}
       className={cn(
-        "w-full min-w-0 text-left px-3 py-2 text-sm border-b border-(--color-gris-claro-2) last:border-0",
-        deshabilitado ? "cursor-not-allowed opacity-50" : "hover:bg-(--color-pagina-hover)"
+        "w-full min-w-0 text-left px-3 py-2 text-sm border-b border-(--color-gris-claro-2) transition-colors last:border-0",
+        deshabilitado ? "cursor-not-allowed opacity-50" : "hover:bg-(--color-pagina-4)"
       )}
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
@@ -79,7 +97,14 @@ function VarianteOpcion({ v, onElegir }) {
             <span className="text-[10px] font-bold uppercase text-(--color-rojo)">Sin id variante</span>
           ) : null}
         </div>
-        <span className="shrink-0 font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
+        <div className="flex max-w-[45%] shrink-0 items-center justify-end gap-1 text-right">
+          <span className="min-w-0 truncate font-mono text-[11px] text-(--color-gris-letra)">
+            {sku}
+          </span>
+          <span className="shrink-0 rounded border border-(--color-gris-claro-2) px-1 py-px font-mono text-[10px] leading-none text-(--color-gris-letra)">
+            Stock: {stock}
+          </span>
+        </div>
       </div>
     </button>
   );

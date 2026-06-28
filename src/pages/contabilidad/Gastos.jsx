@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Plus, Search, Loader2, X, CheckCircle, AlertCircle, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
@@ -6,6 +6,9 @@ import { useNavigationStore } from "@/context/useNavigationStore";
 // IMPORTAMOS TU CLIENTE CONFIGURADO
 import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
 import { validateCrearGasto } from "@/lib/gastoValidations";
+import Paginacion from "@/components/shared/Paginacion";
+
+const PAGE_SIZE = 15;
 
 const obtenerCampo = (objeto, ...campos) => {
   if (!objeto || typeof objeto !== "object") return undefined;
@@ -66,6 +69,7 @@ const Gastos = () => {
   const [tiposGasto, setTiposGasto] = useState([]);
   const [metodosPago, setMetodosPago] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+  const [page, setPage] = useState(1);
   const [cargando, setCargando] = useState(false);
   const [cargandoPreparacion, setCargandoPreparacion] = useState(false);
   const [errorPreparacion, setErrorPreparacion] = useState("");
@@ -296,9 +300,21 @@ const Gastos = () => {
   };
 
   // FILTRADO LOCAL POR DESCRIPCIÓN
-  const gastosFiltrados = gastos.filter((g) =>
-    g.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const gastosFiltrados = useMemo(() => {
+    const termino = busqueda.trim().toLowerCase();
+    if (!termino) return gastos;
+
+    return gastos.filter((g) =>
+      String(g.descripcion ?? "").toLowerCase().includes(termino)
+    );
+  }, [gastos, busqueda]);
+
+  const totalRegistros = gastosFiltrados.length;
+  const totalPages = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE));
+  const paginaActual = Math.min(page, totalPages);
+  const from = totalRegistros === 0 ? 0 : (paginaActual - 1) * PAGE_SIZE + 1;
+  const to = Math.min(from + PAGE_SIZE - 1, totalRegistros);
+  const gastosPagina = gastosFiltrados.slice(from === 0 ? 0 : from - 1, to);
 
   return (
     <div className="p-6 space-y-6 relative bg-(--color-pagina-4) min-h-full w-full">
@@ -326,20 +342,36 @@ const Gastos = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--color-gris-claro)" />
           <input
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setPage(1);
+            }}
             placeholder="Buscar gasto por descripción..."
             className="w-full bg-(--color-blanco) border border-(--color-gris-claro-2) rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm text-(--color-negro)"
           />
         </div>
 
-        <button
-          type="button"
-          onClick={abrirNuevo}
-          className="flex items-center gap-2 bg-(--color-pagina) border border-(--color-borde-button) text-(--color-blanco) px-5 py-3 rounded-xl hover:bg-(--color-rosa-hover) hover:text-(--color-negro) transition-colors cursor-pointer text-sm font-medium shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo Gasto
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <Paginacion
+            from={from}
+            to={to}
+            total={totalRegistros}
+            onPrev={() => setPage(Math.max(1, paginaActual - 1))}
+            onNext={() => setPage(Math.min(totalPages, paginaActual + 1))}
+            disablePrev={paginaActual <= 1}
+            disableNext={paginaActual >= totalPages}
+            isLoading={cargando}
+          />
+
+          <button
+            type="button"
+            onClick={abrirNuevo}
+            className="flex items-center gap-2 bg-(--color-pagina) border border-(--color-borde-button) text-(--color-blanco) px-5 py-3 rounded-xl hover:bg-(--color-rosa-hover) hover:text-(--color-negro) transition-colors cursor-pointer text-sm font-medium shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Gasto
+          </button>
+        </div>
       </div>
 
       {/* TABLA DE RESULTADOS */}
@@ -363,14 +395,14 @@ const Gastos = () => {
             </thead>
 
             <tbody className="divide-y divide-(--color-gris-claro-2)">
-              {gastosFiltrados.length === 0 ? (
+              {gastosPagina.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="p-12 text-center text-(--color-gris-claro) font-medium">
                     No se encontraron gastos registrados en este periodo.
                   </td>
                 </tr>
               ) : (
-                gastosFiltrados.map((gasto) => (
+                gastosPagina.map((gasto) => (
                   <tr key={gasto.idGasto || gasto.id} className="hover:bg-(--color-pagina-4) transition-colors text-(--color-negro)">
                     <td className="p-4 whitespace-nowrap text-(--color-gris-letra) font-medium">
                       {gasto.fecha ? gasto.fecha.split('T')[0] : "---"}
