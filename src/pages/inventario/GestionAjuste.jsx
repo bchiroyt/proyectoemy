@@ -8,8 +8,15 @@ import { useAjustesCatalogosQuery, useAjustesListQuery, useAjusteDetalleQuery,
   useCrearAjusteMutation } from "@/hooks/queries/useAjustesQueries";
 import { useVariantesBuscarQuery } from "@/hooks/queries/useComprasQueries";
 import { buscarVariantesCompra } from "@/services/productosService";
-import { elegirVariantePorCriterio } from "@/lib/compraVarianteUtils";
+import {
+  elegirVariantePorCriterio,
+  consultarStockVarianteUbicacion,
+  enriquecerVarianteDesdeDetalleProducto,
+  invalidarCacheDetalleProductoVariantes,
+  unwrapVariantesCompraBuscar,
+} from "@/lib/compraVarianteUtils";
 import { fmtQ } from "@/lib/cajaMappers";
+import { cantidadAjusteDisplay, esEntradaAjusteDetalle } from "@/lib/ajustesMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +27,25 @@ import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 
 const thClass = "p-3 text-left text-[11px] leading-tight uppercase font-bold text-(--color-gris-letra) bg-(--color-gris-fondo)";
 const tdClass = "p-3 align-middle text-sm border-t border-(--color-gris-claro-2)";
+
+const resolverStockLinea = (variante) =>
+  Number(
+    variante?.stockActual ??
+      variante?.StockActual ??
+      variante?.stock ??
+      variante?.Stock ??
+      0
+  ) || 0;
+
+const esTipoSalida = (tipo) => tipo?.naturaleza?.toUpperCase() === "SALIDA";
+
+const nombreUbicacion = (catalogos, idUbicacion) => {
+  const id = Number(idUbicacion);
+  if (!id) return "";
+  return (
+    catalogos?.ubicaciones?.find((u) => Number(u.idUbicacion) === id)?.nombre ?? ""
+  );
+};
 
 const GestionAjuste = () => {
   const navigate = useNavigate();
@@ -101,32 +127,36 @@ const GestionAjuste = () => {
   }, []);
 
   // Agregar Variante a las líneas
-  const handleAgregarVariante = useCallback((v) => {
-    const idVariante = v.idVariante ?? v.IdVariante;
+  const handleAgregarVariante = useCallback(async (v) => {
+    const enriquecida = await enriquecerVarianteDesdeDetalleProducto(v);
+    const idVariante = enriquecida.idVariante ?? enriquecida.IdVariante;
     if (lineas.some((l) => l.idVariante === idVariante)) {
       setNotification({
         type: "error",
         title: "Producto ya agregado",
-        message: `El producto "${v.productoNombre ?? v.nombre}" ya está en el detalle del ajuste.`
+        message: `El producto "${enriquecida.productoNombre ?? enriquecida.nombre}" ya está en el detalle del ajuste.`
       });
       return;
     }
 
     const primerTipo = catalogos?.tiposAjuste?.[0]?.idTipoAjuste || 0;
 
-    const color = v.color ?? v.Color ?? "";
-    const talla = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
-    const presentacion = v.presentacionNombre ?? v.PresentacionNombre ?? v.presentacion ?? v.Presentacion ?? "";
+    const color = enriquecida.color ?? enriquecida.Color ?? "";
+    const talla = enriquecida.tallaNombre ?? enriquecida.TallaNombre ?? enriquecida.talla ?? enriquecida.Talla ?? "";
+    const presentacion = enriquecida.presentacionNombre ?? enriquecida.PresentacionNombre ?? enriquecida.presentacion ?? enriquecida.Presentacion ?? "";
     const extra = [color, talla, presentacion].filter(Boolean).join(" · ");
+    const sku = enriquecida.sku ?? enriquecida.Sku ?? "";
+    const stockActual = resolverStockLinea(enriquecida);
 
     setLineas((prev) => [
       ...prev,
       {
         idVariante,
-        nombre: v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "",
-        sku: v.sku ?? v.Sku ?? "",
+        idProducto: enriquecida.idProducto ?? enriquecida.IdProducto ?? null,
+        nombre: enriquecida.productoNombre ?? enriquecida.ProductoNombre ?? enriquecida.nombre ?? enriquecida.Nombre ?? "",
+        sku,
         extra,
-        stockActual: v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0,
+        stockActual,
         idTipoAjuste: primerTipo,
         idUbicacion: null,
         cantidadAjuste: 1,
@@ -153,7 +183,7 @@ const GestionAjuste = () => {
     if (raw && raw.exito === false) {
       throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
     }
-    const items = raw?.data ?? raw?.Data ?? [];
+    const items = unwrapVariantesCompraBuscar(raw);
     queryClient.setQueryData(cacheKey, items);
     return items;
   }, [queryClient]);
@@ -177,7 +207,7 @@ const GestionAjuste = () => {
 
       const elegida = elegirVariantePorCriterio(items, criterio);
       if (elegida) {
-        handleAgregarVariante(elegida);
+        await handleAgregarVariante(elegida);
       } else {
         setNotification({
           type: "error",
@@ -208,6 +238,49 @@ const GestionAjuste = () => {
       prev.map((l) => (l.idVariante === idVariante ? { ...l, [campo]: valor } : l))
     );
   };
+
+  const handleCambioUbicacion = useCallback(async (idVariante, idUbicacion) => {
+    const idUbi = idUbicacion ? Number(idUbicacion) : null;
+    let lineaSnapshot = null;
+
+    setLineas((prev) =>
+      prev.map((l) => {
+        if (l.idVariante === idVariante) {
+          lineaSnapshot = { ...l, idUbicacion: idUbi };
+          return lineaSnapshot;
+        }
+        return l;
+      })
+    );
+
+    if (!lineaSnapshot) return;
+
+    if (!idUbi) {
+      const enriquecida = await enriquecerVarianteDesdeDetalleProducto(lineaSnapshot);
+      const stockTotal = resolverStockLinea(enriquecida);
+      setLineas((prev) =>
+        prev.map((l) =>
+          l.idVariante === idVariante ? { ...l, stockActual: stockTotal } : l
+        )
+      );
+      return;
+    }
+
+    if (!lineaSnapshot.sku) return;
+
+    const stockUbicacion = await consultarStockVarianteUbicacion(
+      idVariante,
+      idUbi,
+      lineaSnapshot.sku
+    );
+    if (stockUbicacion == null) return;
+
+    setLineas((prev) =>
+      prev.map((l) =>
+        l.idVariante === idVariante ? { ...l, stockActual: stockUbicacion } : l
+      )
+    );
+  }, []);
 
   const handleQuitarRow = (idVariante) => {
     setLineas((prev) => prev.filter((l) => l.idVariante !== idVariante));
@@ -241,8 +314,27 @@ const GestionAjuste = () => {
       return;
     }
 
-    // Validar costos de las líneas
-    for (const l of lineas) {
+    // Refrescar stock según ubicación (total inventario si no hay ubicación)
+    const lineasConStock = await Promise.all(
+      lineas.map(async (l) => {
+        if (l.idUbicacion && l.sku) {
+          const stockUbicacion = await consultarStockVarianteUbicacion(
+            l.idVariante,
+            l.idUbicacion,
+            l.sku
+          );
+          if (stockUbicacion != null) {
+            return { ...l, stockActual: stockUbicacion };
+          }
+        }
+
+        const enriquecida = await enriquecerVarianteDesdeDetalleProducto(l);
+        return { ...l, stockActual: resolverStockLinea(enriquecida) };
+      })
+    );
+    setLineas(lineasConStock);
+
+    for (const l of lineasConStock) {
       const tipo = catalogos?.tiposAjuste?.find((t) => t.idTipoAjuste === l.idTipoAjuste);
       if (tipo?.requiereCostoUnitario) {
         const costo = Number(l.costoUnitario);
@@ -264,7 +356,7 @@ const GestionAjuste = () => {
         return;
       }
 
-      const esSalida = tipo?.naturaleza?.toUpperCase() === "SALIDA";
+      const esSalida = esTipoSalida(tipo);
       if (esSalida && Number(l.cantidadAjuste) > Number(l.stockActual)) {
         setNotification({
           type: "error",
@@ -278,15 +370,15 @@ const GestionAjuste = () => {
     try {
       const payload = {
         observacion: observacion.trim(),
-        detalles: lineas.map((l) => {
+        detalles: lineasConStock.map((l) => {
           const tipo = catalogos?.tiposAjuste?.find((t) => t.idTipoAjuste === l.idTipoAjuste);
-          const esSalida = tipo?.naturaleza?.toUpperCase() === "SALIDA";
+          const esSalida = esTipoSalida(tipo);
           const cantidadVal = Math.abs(Number(l.cantidadAjuste));
 
           return {
             idTipoAjuste: l.idTipoAjuste,
             idVariante: l.idVariante,
-            idUbicacion: null,
+            idUbicacion: l.idUbicacion ?? null,
             cantidadAjuste: esSalida ? -cantidadVal : cantidadVal,
             costoUnitario: l.costoUnitario ? Number(l.costoUnitario) : null,
             observacionDetalle: l.observacionDetalle.trim() || null,
@@ -391,7 +483,9 @@ const GestionAjuste = () => {
               <div className="border-b border-(--color-gris-claro-2) px-5 py-4 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-(--color-texto-principal)">Líneas de Ajuste</h3>
-                  <p className="text-xs text-(--color-gris-letra) mt-0.5">Agregue productos y defina el tipo de movimiento.</p>
+                  <p className="text-xs text-(--color-gris-letra) mt-0.5">
+                    Sin ubicación se usa el stock total (como en inventario). Si elige una ubicación, el stock y el ajuste aplican solo ahí.
+                  </p>
                 </div>
                 {lineas.length > 0 && (
                   <span className="rounded-full bg-(--color-pagina-2)/10 px-3 py-1 text-xs font-bold text-(--color-pagina-2) tabular-nums">
@@ -401,15 +495,16 @@ const GestionAjuste = () => {
               </div>
 
               <div className="flex-1 overflow-x-auto">
-                <table className="w-full min-w-[900px] border-collapse text-sm">
+                <table className="w-full min-w-[1050px] border-collapse text-sm">
                   <thead>
                     <tr>
-                      <th className={thClass} style={{ width: "25%" }}>Producto</th>
-                      <th className={thClass} style={{ width: "15%" }}>SKU</th>
-                      <th className={thClass} style={{ width: "15%" }}>Tipo Ajuste</th>
-                      <th className={thClass} style={{ width: "10%", textAlign: "center" }}>Cantidad</th>
+                      <th className={thClass} style={{ width: "22%" }}>Producto</th>
+                      <th className={thClass} style={{ width: "10%" }}>SKU</th>
+                      <th className={thClass} style={{ width: "14%" }}>Ubicación</th>
+                      <th className={thClass} style={{ width: "14%" }}>Tipo Ajuste</th>
+                      <th className={thClass} style={{ width: "8%", textAlign: "center" }}>Cantidad</th>
                       <th className={thClass} style={{ width: "10%", textAlign: "right" }}>Costo Unit.</th>
-                      <th className={thClass} style={{ width: "20%" }}>Observación Línea</th>
+                      <th className={thClass} style={{ width: "17%" }}>Observación Línea</th>
                       <th className={thClass} style={{ width: "5%", textAlign: "center" }}></th>
                     </tr>
                   </thead>
@@ -428,7 +523,8 @@ const GestionAjuste = () => {
                       lineas.map((row) => {
                         const tipo = catalogos?.tiposAjuste?.find((t) => t.idTipoAjuste === row.idTipoAjuste);
                         const requiereCosto = tipo?.requiereCostoUnitario === true;
-                        const esSalida = tipo?.naturaleza?.toUpperCase() === "SALIDA";
+                        const esSalida = esTipoSalida(tipo);
+                        const ubicacionLabel = nombreUbicacion(catalogos, row.idUbicacion);
 
                         return (
                           <tr key={row.idVariante} className="hover:bg-(--color-gris-fondo-suave)/50">
@@ -439,12 +535,26 @@ const GestionAjuste = () => {
                                   <p className="text-xs text-(--color-gris-letra) truncate mt-0.5">{row.extra}</p>
                                 )}
                                 <p className={cn("text-[10px] font-bold mt-1", row.stockActual > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
-                                  Stock: {row.stockActual}
+                                  Stock{ubicacionLabel ? ` (${ubicacionLabel})` : " (total)"}: {row.stockActual}
                                 </p>
                               </div>
                             </td>
                             <td className={cn(tdClass, "font-mono text-xs text-(--color-gris-letra)")}>
                               {row.sku}
+                            </td>
+                            <td className={tdClass}>
+                              <select
+                                value={row.idUbicacion ?? ""}
+                                onChange={(e) => void handleCambioUbicacion(row.idVariante, e.target.value)}
+                                className="w-full rounded-lg border border-(--color-gris-claro-2) p-2 text-xs outline-none bg-(--color-blanco) focus:border-(--color-gris-claro)"
+                              >
+                                <option value="">Automática (total inventario)</option>
+                                {catalogos?.ubicaciones?.map((u) => (
+                                  <option key={u.idUbicacion} value={u.idUbicacion}>
+                                    {u.nombre}
+                                  </option>
+                                ))}
+                              </select>
                             </td>
                             <td className={tdClass}>
                               <select
@@ -564,7 +674,7 @@ const GestionAjuste = () => {
                           <button
                             key={id}
                             type="button"
-                            onClick={() => handleAgregarVariante(v)}
+                            onClick={() => void handleAgregarVariante(v)}
                             className="w-full text-left px-4 py-2.5 text-xs border-b border-(--color-gris-separador) last:border-0 hover:bg-(--color-gris-fondo-suave) flex justify-between items-center gap-3"
                           >
                             <div>
@@ -830,7 +940,7 @@ function DetalleAjusteDialog({ idAjuste, onClose }) {
                         <th className="p-3 font-bold text-(--color-gris-letra)">Producto</th>
                         <th className="p-3 font-bold text-(--color-gris-letra)">SKU</th>
                         <th className="p-3 font-bold text-(--color-gris-letra)">Movimiento</th>
-                        {/**<th className="p-3 font-bold text-(--color-gris-letra)">Ubicación</th>*/}
+                        <th className="p-3 font-bold text-(--color-gris-letra)">Ubicación</th>
                         <th className="p-3 font-bold text-(--color-gris-letra) text-right">Antes</th>
                         <th className="p-3 font-bold text-(--color-gris-letra) text-right">Ajuste</th>
                         <th className="p-3 font-bold text-(--color-gris-letra) text-right">Después</th>
@@ -840,7 +950,8 @@ function DetalleAjusteDialog({ idAjuste, onClose }) {
                     </thead>
                     <tbody>
                       {ajuste.detalles?.map((det) => {
-                        const esEntrada = det.tipoAjusteNaturaleza?.toUpperCase() === "ENTRADA" || det.tipoAjusteNaturaleza?.toUpperCase() === "SUMA" || det.tipoAjusteNaturaleza?.toUpperCase() === "MAS";
+                        const esEntrada = esEntradaAjusteDetalle(det);
+                        const cantidadMostrar = cantidadAjusteDisplay(det);
                         return (
                           <tr key={det.idAjusteDetalle} className="border-t border-(--color-gris-separador) hover:bg-(--color-gris-fondo-suave)/50">
                             <td className="p-3 font-semibold text-(--color-texto-principal)">{det.productoNombre}</td>
@@ -853,20 +964,20 @@ function DetalleAjusteDialog({ idAjuste, onClose }) {
                                 {det.tipoAjusteNombre}
                               </span>
                             </td>
-                            {/**<td className="p-3 text-(--color-texto-secundario)">
+                            <td className="p-3 text-(--color-texto-secundario)">
                               {det.ubicacionNombre ? (
                                 <span className="flex items-center gap-1">
                                   <MapPin className="size-3 text-(--color-gris-claro)" />
                                   {det.ubicacionNombre}
                                 </span>
                               ) : "—"}
-                            </td>*/}
+                            </td>
                             <td className="p-3 text-right font-mono tabular-nums text-(--color-texto-terciario)">{det.stockSistema}</td>
                             <td className={cn(
                               "p-3 text-right font-bold font-mono tabular-nums",
                               esEntrada ? "text-(--color-verde-acento)" : "text-(--color-rojo-obscuro)"
                             )}>
-                              {esEntrada ? "+" : "-"}{det.cantidadAjuste}
+                              {esEntrada ? "+" : "-"}{cantidadMostrar}
                             </td>
                             <td className="p-3 text-right font-bold font-mono tabular-nums text-(--color-texto-principal)">{det.stockProyectado}</td>
                             <td className="p-3 text-right font-mono tabular-nums">

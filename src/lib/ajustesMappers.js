@@ -23,6 +23,9 @@ export function mapAjusteDetalle(raw) {
     ubicacionNombre: pick(raw, "ubicacionNombre", "UbicacionNombre") ?? "",
     stockSistema: Number(pick(raw, "stockSistema", "StockSistema") ?? 0),
     cantidadAjuste: Number(pick(raw, "cantidadAjuste", "CantidadAjuste") ?? 0),
+    cantidadAjusteAbsoluta: toNumberOrNull(
+      pick(raw, "cantidadAjusteAbsoluta", "CantidadAjusteAbsoluta")
+    ),
     stockProyectado: Number(pick(raw, "stockProyectado", "StockProyectado") ?? 0),
     costoUnitario: toNumberOrNull(pick(raw, "costoUnitario", "CostoUnitario")),
     observacionDetalle: pick(raw, "observacionDetalle", "ObservacionDetalle") ?? "",
@@ -59,4 +62,20 @@ export function unwrapAjustesPaged(resp) {
   ) || 0;
   const totalPages = Number(pick(inner, "totalPages", "TotalPages") ?? 1) || 1;
   return { items, page, pageSize, totalCount, totalPages };
+}
+
+/** Cantidad a mostrar en UI (usa cantidadAjusteAbsoluta del backend si existe). */
+export function cantidadAjusteDisplay(det) {
+  const abs = toNumberOrNull(
+    pick(det, "cantidadAjusteAbsoluta", "CantidadAjusteAbsoluta")
+  );
+  if (abs != null) return Math.abs(abs);
+  return Math.abs(Number(det?.cantidadAjuste ?? 0));
+}
+
+export function esEntradaAjusteDetalle(det) {
+  const nat = String(det?.tipoAjusteNaturaleza ?? "").toUpperCase();
+  if (nat === "ENTRADA" || nat === "SUMA" || nat === "MAS") return true;
+  if (nat === "SALIDA") return false;
+  return Number(det?.cantidadAjuste ?? 0) >= 0;
 }

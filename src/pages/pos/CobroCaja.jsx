@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
 import { usePosTicketsStore } from "@/context/usePosTicketsStore";
+import { useAuthStore } from "@/context/useAuthStore";
 import { useMontoTeclado } from "@/hooks/useMontoTeclado";
 import { useCrearVentaMutation } from "@/hooks/queries/useVentaQueries";
 import {
@@ -12,7 +13,7 @@ import {
 } from "@/hooks/queries/useReembolsoQueries";
 import { useMiCajaActivaQuery, useMetodosPagoQuery } from "@/hooks/queries/useCajaQueries";
 import { getMetodosPagoConfig } from "@/constants/metodosPago";
-import { montoBaseLineaReembolso } from "@/lib/reembolsoMappers";
+import { buildTicketReembolso, montoBaseLineaReembolso } from "@/lib/reembolsoMappers";
 import { buildVentaCrearBody, roundVenta, subtotalLinea } from "@/lib/ventaMappers";
 import {
   calcularVistaCobro,
@@ -23,6 +24,7 @@ import { fmtQ } from "@/lib/cajaMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import Toast from "@/components/ui/Toast";
 import { VentaTicketPanel } from "@/pages/pos/components/VentaTicketPanel";
+import { ReembolsoTicketPanel } from "@/pages/pos/components/ReembolsoTicketPanel";
 import { cn } from "@/lib/utils";
 
 function SeccionTitulo({ children }) {
@@ -42,6 +44,8 @@ const CobroCaja = () => {
   const pendienteKey = usePosVentaStore((s) => s.pendienteKey);
   const ultimaVenta = usePosVentaStore((s) => s.ultimaVenta);
   const setUltimaVenta = usePosVentaStore((s) => s.setUltimaVenta);
+  const ultimoReembolso = usePosVentaStore((s) => s.ultimoReembolso);
+  const setUltimoReembolso = usePosVentaStore((s) => s.setUltimoReembolso);
   const clearPendiente = usePosVentaStore((s) => s.clearPendiente);
   const clearParaNuevaVenta = usePosVentaStore((s) => s.clearParaNuevaVenta);
   const notificarReembolsoFinalizado = usePosVentaStore(
@@ -49,7 +53,15 @@ const CobroCaja = () => {
   );
   const limpiarTicketActivo = usePosTicketsStore((s) => s.limpiarTicketActivo);
 
+  const user = useAuthStore((s) => s.user);
+  const nombreMostrar =
+    user?.nombreMostrar ||
+    [user?.nombres, user?.apellidos].filter(Boolean).join(" ").trim() ||
+    user?.username ||
+    "";
+
   const [mostrarTicket, setMostrarTicket] = useState(false);
+  const [mostrarTicketReembolso, setMostrarTicketReembolso] = useState(false);
 
   const metodosQ = useMetodosPagoQuery();
   const metodos = useMemo(() => {
@@ -328,18 +340,23 @@ const CobroCaja = () => {
           });
           return;
         }
-        await reembolsoM.mutateAsync(body);
+        const resReembolso = await reembolsoM.mutateAsync(body);
+        setUltimoReembolso(
+          buildTicketReembolso({
+            reembolsoAplicado: resReembolso?.data,
+            lineas,
+            pagos: pagosFinales,
+            cajeroNombre: nombreMostrar,
+            motivo,
+            observacion: operacion?.reembolso?.observacion ?? "",
+            idVentaOriginal: operacion?.reembolso?.idVenta ?? null,
+          })
+        );
         limpiarTicketActivo();
-        clearParaNuevaVenta();
         setPagos([]);
         resetMonto();
-        notificarReembolsoFinalizado();
-        navigate("/pos/ventas", { replace: true });
-        setToast({
-          open: true,
-          message: "Reembolso aplicado correctamente.",
-          type: "success",
-        });
+        setTitulo("POS · Reembolso");
+        setMostrarTicketReembolso(true);
         return;
       }
 
@@ -386,7 +403,9 @@ const CobroCaja = () => {
     reembolsoM,
     operacion,
     idCaja,
+    nombreMostrar,
     setUltimaVenta,
+    setUltimoReembolso,
     limpiarTicketActivo,
     clearParaNuevaVenta,
     clearPendiente,
@@ -419,15 +438,22 @@ const CobroCaja = () => {
   }, [setTitulo, esReembolso]);
 
   useEffect(() => {
-    if (mostrarTicket) return;
+    if (mostrarTicket || mostrarTicketReembolso) return;
     if (!carrito?.length || lineas.length === 0) {
       navigate("/pos/ventas", { replace: true });
     }
-  }, [carrito, lineas.length, navigate, mostrarTicket]);
+  }, [carrito, lineas.length, navigate, mostrarTicket, mostrarTicketReembolso]);
 
   const handleNuevaVenta = () => {
     clearParaNuevaVenta();
     setMostrarTicket(false);
+    navigate("/pos/ventas", { replace: true });
+  };
+
+  const handleFinalizarReembolso = () => {
+    setMostrarTicketReembolso(false);
+    clearParaNuevaVenta();
+    notificarReembolsoFinalizado();
     navigate("/pos/ventas", { replace: true });
   };
 
@@ -446,6 +472,22 @@ const CobroCaja = () => {
     if (vista.cubreDeuda) return "Cubre la venta · Pulse VALIDAR";
     return `Falta ${fmtQ(vista.falta)} · Puede combinar EFECTIVO y BANCO`;
   }, [metodoActivo, montoDigitando, vista, esReembolso]);
+
+  if (mostrarTicketReembolso && ultimoReembolso) {
+    return (
+      <div className="flex flex-col h-full min-h-0 bg-(--color-pos-fondo)">
+        <div className="shrink-0 px-4 py-3 border-b border-(--color-pos-borde-suave) bg-(--color-pos-panel)">
+          <h1 className="text-center text-xl sm:text-2xl font-black tracking-wide text-(--color-negro)">
+            TICKET DE REEMBOLSO
+          </h1>
+        </div>
+        <ReembolsoTicketPanel
+          onFinalizar={handleFinalizarReembolso}
+          className="flex-1 min-h-0"
+        />
+      </div>
+    );
+  }
 
   if (mostrarTicket && ultimaVenta) {
     return (

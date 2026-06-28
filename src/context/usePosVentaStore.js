@@ -26,6 +26,10 @@ export const usePosVentaStore = create((set) => ({
 
   ultimaVenta: null,
 
+  /** Snapshot del último reembolso aplicado, para mostrar/imprimir su ticket. */
+
+  ultimoReembolso: null,
+
   operacion: { tipo: "venta", reembolso: null },
 
   /** Persiste al navegar ventas ↔ cobro (VentasPos se desmonta en cobro). */
@@ -118,6 +122,24 @@ export const usePosVentaStore = create((set) => ({
 
 
 
+  /** Guarda el snapshot del reembolso para su ticket; libera el carrito de cobro. */
+
+  setUltimoReembolso: (reembolso) =>
+
+    set({
+
+      ultimoReembolso: reembolso,
+
+      carrito: null,
+
+      total: 0,
+
+      operacion: { tipo: "venta", reembolso: null },
+
+    }),
+
+
+
   clear: () =>
 
     set({
@@ -127,6 +149,8 @@ export const usePosVentaStore = create((set) => ({
       total: 0,
 
       ultimaVenta: null,
+
+      ultimoReembolso: null,
 
       operacion: { tipo: "venta", reembolso: null },
 
@@ -145,6 +169,8 @@ export const usePosVentaStore = create((set) => ({
       total: 0,
 
       ultimaVenta: null,
+
+      ultimoReembolso: null,
 
       operacion: { tipo: "venta", reembolso: null },
 

@@ -5,6 +5,7 @@ import {
   fetchAjusteById,
   crearAjuste,
 } from "@/services/ajustesService";
+import { invalidarCacheDetalleProductoVariantes } from "@/lib/compraVarianteUtils";
 
 export function useAjustesCatalogosQuery(options = {}) {
   return useQuery({
@@ -60,9 +61,10 @@ export function useCrearAjusteMutation() {
   return useMutation({
     mutationFn: crearAjuste,
     onSuccess: () => {
-      // Invalidar listas de ajustes e inventario
+      invalidarCacheDetalleProductoVariantes();
       qc.invalidateQueries({ queryKey: ["ajustes"] });
       qc.invalidateQueries({ queryKey: ["productos"] });
+      qc.removeQueries({ queryKey: ["productos", "variantes-buscar"] });
     },
   });
 }

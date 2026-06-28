@@ -14,6 +14,7 @@ import {
 import { buscarVariantesCompra } from "@/services/productosService";
 import { fetchProveedores } from "@/services/proveedoresService";
 import { pick } from "@/lib/apiNormalizer";
+import { unwrapVariantesCompraBuscar } from "@/lib/compraVarianteUtils";
 
 function unwrapPaged(resp) {
   const inner = pick(resp, "data", "Data") ?? resp;
@@ -85,7 +86,7 @@ export function useVariantesBuscarQuery(criterio, options = {}) {
       if (raw && raw.exito === false) {
         throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
       }
-      return raw?.data ?? raw?.Data ?? [];
+      return unwrapVariantesCompraBuscar(raw);
     },
     enabled: Boolean(options.enabled && q.length >= 1),
   });
