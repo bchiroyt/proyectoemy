@@ -25,7 +25,9 @@ export const useMayoreoStore = create((set) => ({
           }),
         };
       }
-      const precio = Number(producto.precio) || 0;
+      const precioNormal = Number(producto.precio) || 0;
+      const precioMayoreo = Number(producto.precioVentaMayor) || 0;
+      const precioNegociado = precioMayoreo > 0 ? precioMayoreo : precioNormal;
       return {
         carrito: [
           ...state.carrito,
@@ -33,8 +35,8 @@ export const useMayoreoStore = create((set) => ({
             ...producto,
             cantidad: 1,
             cantidadText: "1",
-            precioNegociado: precio,
-            precioNegociadoText: precio > 0 ? String(precio) : "",
+            precioNegociado: precioNegociado,
+            precioNegociadoText: precioNegociado > 0 ? String(precioNegociado) : "",
           },
         ],
       };

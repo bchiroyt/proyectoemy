@@ -62,14 +62,16 @@ export function permisosMapFromServer(list) {
   return m;
 }
 
-/** Payload completo de permisos de un rol (matriz módulo × submódulo × acción). */
+/** Payload de permisos concedidos de un rol (solo los que tienen permitido: true). */
 export function buildPermisosRolPayload(rows, localMap) {
-  return rows.map((row) => ({
-    idModulo: row.idModulo,
-    idSubmodulo: row.idSubmodulo,
-    idAccion: row.idAccion,
-    permitido: Boolean(localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion))),
-  }));
+  return rows
+    .map((row) => ({
+      idModulo: row.idModulo,
+      idSubmodulo: row.idSubmodulo,
+      idAccion: row.idAccion,
+      permitido: Boolean(localMap.get(permKey(row.idModulo, row.idSubmodulo, row.idAccion))),
+    }))
+    .filter((p) => p.permitido);
 }
 
 /** Compara listas de permisos de rol sin importar el orden. */

@@ -112,7 +112,6 @@ function VarianteOpcion({ v, onElegir }) {
     : disp === false
     ? motivo || "No disponible para compra"
     : undefined;
-
   return (
     <button
       type="button"
@@ -135,11 +134,9 @@ function VarianteOpcion({ v, onElegir }) {
             <span className="text-[10px] font-bold uppercase text-(--color-rojo)">Sin id variante</span>
           ) : null}
         </div>
-        <div className="flex max-w-[45%] shrink-0 items-center justify-end gap-1 text-right">
-          <span className="min-w-0 truncate font-mono text-[11px] text-(--color-gris-letra)">
-            {sku}
-          </span>
-          <span className="shrink-0 rounded border border-(--color-gris-claro-2) px-1 py-px font-mono text-[10px] leading-none text-(--color-gris-letra)">
+        <div className="shrink-0 flex flex-col items-end text-right gap-0.5">
+          <span className="font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
+          <span className={cn("text-[10px] font-bold", stock > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
             Stock: {stock}
           </span>
         </div>
@@ -426,6 +423,16 @@ export function CompraLineasProductos({
                     <div>
                       <p className="text-xs font-medium leading-tight text-(--color-negro)">{row.nombre}</p>
                       <EtiquetasVarianteCompactas item={row} />
+                      <div className="flex flex-wrap items-center gap-x-2 text-[10px]">
+                        {row.detalle ? (
+                          <span className="text-(--color-gris-letra)">{row.detalle}</span>
+                        ) : null}
+                        {row.stockActual !== undefined && row.stockActual !== null ? (
+                          <span className={cn("font-bold", row.stockActual > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
+                            {row.detalle ? " · " : ""}Stock: {row.stockActual}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className={cn(tdClass, "font-mono text-[10px]")}>{row.sku}</TableCell>

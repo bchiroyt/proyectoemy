@@ -86,6 +86,29 @@ const obtenerPrecioVentaProducto = (producto) => {
   return minimo;
 };
 
+const obtenerPrecioVentaMayorProducto = (producto) => {
+  const directo = toNumberOrNull(
+    pick(producto, "precioVentaMayorActual", "PrecioVentaMayorActual", "precioVentaMayor", "PrecioVentaMayor")
+  );
+  if (directo != null) return directo;
+
+  if (!Array.isArray(producto.variantes) || producto.variantes.length === 0) {
+    return null;
+  }
+
+  let minimo = null;
+  for (const variante of producto.variantes) {
+    const precio = toNumberOrNull(
+      pick(variante, "precioVentaMayorActual", "PrecioVentaMayorActual", "precioVentaMayor", "PrecioVentaMayor")
+    );
+    if (precio != null && (minimo === null || precio < minimo)) {
+      minimo = precio;
+    }
+  }
+
+  return minimo;
+};
+
 const obtenerEstadoStock = (stock, stockMinimo) => {
   const min = stockMinimo > 0 ? stockMinimo : 10;
 
@@ -222,6 +245,8 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                       : 1);
                   const precioVentaVisual = formatearMoneda(obtenerPrecioVentaProducto(item));
                   const imagenProductoSrc = construirSrcImagenProducto(item);
+                  const precioVentaMayor = obtenerPrecioVentaMayorProducto(item);
+                  const precioVentaMayorVisual = precioVentaMayor != null ? formatearMoneda(precioVentaMayor) : null;
 
                   return (
                     <tr key={llaveUnica} className="border-t transition hover:bg-gray-50">
@@ -288,7 +313,14 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                       </td>
 
                       <td className="p-4 text-xs text-gray-500">
-                        {precioVentaVisual}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-slate-800">{precioVentaVisual}</span>
+                          {precioVentaMayorVisual && (
+                            <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">
+                              Mayor: {precioVentaMayorVisual}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-4">

@@ -1,9 +1,6 @@
 import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
 import { enriquecerTicketEncabezado, roundVenta } from "@/lib/ventaMappers";
 
-/** Ubicación por defecto al reintegrar inventario en reembolso (no se pide al cajero). */
-export const ID_UBICACION_REEMBOLSO = 1;
-
 export function mapReembolsoVentaDisponible(raw) {
   if (!raw) return null;
   const idVenta = toNumberOrNull(pick(raw, "idVenta", "IdVenta"));

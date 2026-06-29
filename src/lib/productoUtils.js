@@ -138,6 +138,20 @@ export function normalizarVarianteBusqueda(raw) {
         "Precio"
       )
     ) ?? null;
+  const precioVentaMayor =
+    toNumberOrNull(
+      pickFrom(
+        sources,
+        "precioVentaMayorActual",
+        "PrecioVentaMayorActual",
+        "precioVentaMayor",
+        "PrecioVentaMayor",
+        "precioMayor",
+        "PrecioMayor",
+        "precioVentaMayor",
+        "PrecioVentaMayor"
+      )
+    ) ?? null;
 
   return {
     ...raw,
@@ -163,6 +177,8 @@ export function normalizarVarianteBusqueda(raw) {
       pickFrom(sources, "estado", "Estado"),
     precioVenta,
     precioVentaActual: precioVenta,
+    precioVentaMayor,
+    precioVentaMayorActual: precioVentaMayor,
     stockActual,
     stock: stockActual,
     stockMinimo,
@@ -271,6 +287,7 @@ export const FORM_NUEVA_VARIANTE_VACIO = {
   presentacion: "",
   color: "",
   precioVenta: "",
+  precioVentaMayor: "",
   precioCompra: "",
   stockMinimo: "10",
   codigoBarras: "",
@@ -304,6 +321,13 @@ export function crearFormNuevaVarianteDesdeReferencia(variantes = [], catalogos 
     "precioVenta",
     "PrecioVenta"
   );
+  const precioVentaMayor = pick(
+    referencia,
+    "precioVentaMayorActual",
+    "PrecioVentaMayorActual",
+    "precioVentaMayor",
+    "PrecioVentaMayor"
+  );
   const stockMinimo = pick(referencia, "stockMinimo", "StockMinimo");
 
   return {
@@ -312,6 +336,8 @@ export function crearFormNuevaVarianteDesdeReferencia(variantes = [], catalogos 
     talla,
     precioVenta:
       precioVenta != null && precioVenta !== "" ? String(precioVenta) : "",
+    precioVentaMayor:
+      precioVentaMayor != null && precioVentaMayor !== "" ? String(precioVentaMayor) : "",
     stockMinimo:
       stockMinimo != null && stockMinimo !== "" ? String(stockMinimo) : "",
   };
@@ -395,6 +421,15 @@ export function normalizarVarianteDetalle(raw) {
       "PrecioVenta",
       "precio",
       "Precio"
+    ),
+    precioVentaMayorActual: pickFrom(
+      sources,
+      "precioVentaMayorActual",
+      "PrecioVentaMayorActual",
+      "precioVentaMayor",
+      "PrecioVentaMayor",
+      "precioMayor",
+      "PrecioMayor"
     ),
     precioCompraActual: pickFrom(
       sources,

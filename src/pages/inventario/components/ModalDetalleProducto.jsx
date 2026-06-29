@@ -177,6 +177,7 @@ const ModalDetalleProducto = ({
   const [editandoId, setEditandoId] = useState(null);
   const [colorInput, setColorInput] = useState("");
   const [precioVentaInput, setPrecioVentaInput] = useState("");
+  const [precioVentaMayorInput, setPrecioVentaMayorInput] = useState("");
   const [codigoBarrasInput, setCodigoBarrasInput] = useState("");
   const [codigosSecundariosInput, setCodigosSecundariosInput] = useState([]);
   const [tallaInput, setTallaInput] = useState("");
@@ -537,6 +538,13 @@ const ModalDetalleProducto = ({
     return {
       color: variante.color || "",
       precioVenta: String(variante.precioVentaActual !== undefined ? variante.precioVentaActual : ""),
+      precioVentaMayor: String(
+        variante.precioVentaMayorActual !== undefined
+          ? variante.precioVentaMayorActual
+          : variante.precioVentaMayor !== undefined
+          ? variante.precioVentaMayor
+          : ""
+      ),
       codigoPrincipal: variante.codigoPrincipal || "",
       talla: resolverValorCatalogoVariante(
         variante,
@@ -593,6 +601,7 @@ const ModalDetalleProducto = ({
     const valores = obtenerValoresOriginalesVariante(v, catalogos);
     setColorInput(valores.color);
     setPrecioVentaInput(valores.precioVenta);
+    setPrecioVentaMayorInput(valores.precioVentaMayor);
     setCodigoBarrasInput(valores.codigoPrincipal);
     setTallaInput(valores.talla);
     setPresentacionInput(valores.presentacion);
@@ -609,6 +618,7 @@ const ModalDetalleProducto = ({
     setErrorEdicion("");
     setColorInput("");
     setPrecioVentaInput("");
+    setPrecioVentaMayorInput("");
     setCodigoBarrasInput("");
     setTallaInput("");
     setPresentacionInput("");
@@ -627,6 +637,7 @@ const ModalDetalleProducto = ({
     return (
       colorInput !== valoresOriginales.color ||
       String(precioVentaInput) !== valoresOriginales.precioVenta ||
+      String(precioVentaMayorInput) !== valoresOriginales.precioVentaMayor ||
       codigoBarrasInput !== valoresOriginales.codigoPrincipal ||
       tallaInput !== valoresOriginales.talla ||
       presentacionInput !== valoresOriginales.presentacion ||
@@ -649,6 +660,18 @@ const ModalDetalleProducto = ({
     const precioVenta = Number(precioVentaInput);
     if (cambioPrecioVenta && (!Number.isFinite(precioVenta) || precioVenta <= 0)) {
       const message = "El precio de venta debe ser mayor que 0.";
+      setErrorEdicion(message);
+      return;
+    }
+
+    const cambioPrecioVentaMayor = String(precioVentaMayorInput) !== valoresOriginales.precioVentaMayor;
+    const precioVentaMayor = Number(precioVentaMayorInput);
+    if (
+      cambioPrecioVentaMayor &&
+      precioVentaMayorInput !== "" &&
+      (!Number.isFinite(precioVentaMayor) || precioVentaMayor < 0)
+    ) {
+      const message = "El precio de venta al por mayor debe ser un número válido mayor o igual a 0.";
       setErrorEdicion(message);
       return;
     }
@@ -685,6 +708,10 @@ const ModalDetalleProducto = ({
 
       if (cambioPrecioVenta) {
         payload.precioVenta = precioVenta;
+      }
+
+      if (cambioPrecioVentaMayor) {
+        payload.precioVentaMayor = precioVentaMayorInput !== "" ? precioVentaMayor : null;
       }
 
       if (tallaInput !== valoresOriginales.talla) {
@@ -743,6 +770,7 @@ const ModalDetalleProducto = ({
                 ...variante,
                 color: colorInput,
                 precioVentaActual: Number(precioVentaInput),
+                precioVentaMayorActual: precioVentaMayorInput !== "" ? Number(precioVentaMayorInput) : null,
                 codigoPrincipal: codigoBarrasInput,
                 talla: tallaInput ? Number(tallaInput) : null,
                 tallaNombre: tNombre,
@@ -797,11 +825,16 @@ const ModalDetalleProducto = ({
     const stockMinimoInvalido =
       stockMinimo !== "" &&
       (!Number.isFinite(Number(stockMinimo)) || Number(stockMinimo) < 0);
+    const precioVentaMayor = formNuevaVariante.precioVentaMayor;
+    const precioVentaMayorInvalido =
+      precioVentaMayor !== "" &&
+      (!Number.isFinite(Number(precioVentaMayor)) || Number(precioVentaMayor) < 0);
     return (
       tieneEspecificacion &&
       Number.isFinite(precioVenta) &&
       precioVenta > 0 &&
-      !stockMinimoInvalido
+      !stockMinimoInvalido &&
+      !precioVentaMayorInvalido
     );
   };
 
@@ -822,6 +855,7 @@ const ModalDetalleProducto = ({
         presentacion: formNuevaVariante.presentacion ? Number(formNuevaVariante.presentacion) : null,
         color: formNuevaVariante.color.trim() || null,
         precioVenta: Number(formNuevaVariante.precioVenta),
+        precioVentaMayor: formNuevaVariante.precioVentaMayor !== "" ? Number(formNuevaVariante.precioVentaMayor) : null,
         stockMinimo: formNuevaVariante.stockMinimo !== "" ? Number(formNuevaVariante.stockMinimo) : null,
         codigosExternos: formNuevaVariante.codigoBarras ? [{ codigo: formNuevaVariante.codigoBarras, esPrincipal: true }] : []
       }];
@@ -1228,7 +1262,7 @@ const ModalDetalleProducto = ({
                     {mostrandoNuevaVariante && (
                       <Card className="border-2 border-pink-200 shadow-md bg-pink-50/30 overflow-hidden mb-4">
                         <CardContent className="p-4">
-                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7">
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-8">
                             <div className="lg:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Talla</label>
                               <select
@@ -1292,6 +1326,20 @@ const ModalDetalleProducto = ({
                             </div>
                             <div className="lg:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">
+                                P. Mayor
+                              </label>
+                              <Input
+                                type="number"
+                                min="0.00"
+                                step="0.01"
+                                className="h-8 text-xs"
+                                placeholder="Opcional"
+                                value={formNuevaVariante.precioVentaMayor}
+                                onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, precioVentaMayor: e.target.value })}
+                              />
+                            </div>
+                            <div className="lg:col-span-1">
+                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">
                                 Stock mín.
                               </label>
                               <Input
@@ -1344,7 +1392,7 @@ const ModalDetalleProducto = ({
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
                               
                               {/* SKU */}
-                              <div className="lg:col-span-2">
+                              <div className="lg:col-span-1">
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                   SKU Variante
                                 </p>
@@ -1578,6 +1626,26 @@ const ModalDetalleProducto = ({
                                 ) : (
                                   <p className="text-xs font-extrabold text-pink-600">
                                     Q {Number(v.precioVentaActual || 0).toFixed(2)}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* PRECIO VENTA MAYOR */}
+                              <div className="lg:col-span-1">
+                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                  P. Mayor
+                                </p>
+                                {esModoEdicion ? (
+                                  <Input
+                                    type="number"
+                                    className="h-8 text-xs focus-visible:ring-pink-500"
+                                    value={precioVentaMayorInput}
+                                    onChange={(e) => setPrecioVentaMayorInput(e.target.value)}
+                                    placeholder="Mayor"
+                                  />
+                                ) : (
+                                  <p className="text-xs font-extrabold text-amber-600">
+                                    Q {Number(v.precioVentaMayorActual || v.precioVentaMayor || 0).toFixed(2)}
                                   </p>
                                 )}
                               </div>

@@ -21,6 +21,12 @@ import { useVentasHistorialQuery } from "@/hooks/queries/useVentaQueries";
 import { etiquetaEstadoVenta } from "@/lib/ventaMappers";
 import { fmtQ } from "@/lib/cajaMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { useVentaTicketQuery } from "@/hooks/queries/useVentaQueries";
+import { TicketVentaPreview } from "@/pages/pos/components/TicketVentaPreview";
+import { ReembolsoTicketPreview } from "@/pages/pos/components/ReembolsoTicketPreview";
+import { imprimirTicket } from "@/lib/printTicket";
+import { Button } from "@/components/ui/button";
+import { Printer, Loader2 } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -44,14 +50,15 @@ function formatearFechaHora(valor) {
 
 export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
   const [page, setPage] = useState(1);
+  const [ticketPreviewId, setTicketPreviewId] = useState(null);
 
   useEffect(() => {
     if (open) setPage(1);
   }, [open, idCaja]);
 
   const ventasQ = useVentasHistorialQuery(
-    { page, pageSize: PAGE_SIZE, idCaja },
-    { enabled: open && Number(idCaja) > 0 }
+    { page, pageSize: PAGE_SIZE },
+    { enabled: open }
   );
 
   const items = ventasQ.data?.items ?? [];
@@ -93,7 +100,11 @@ export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
                 </TableHeader>
                 <TableBody>
                   {items.map((venta) => (
-                    <TableRow key={venta.idVenta} className="hover:bg-muted/30">
+                    <TableRow 
+                      key={venta.idVenta} 
+                      className="hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => setTicketPreviewId(venta.idVenta)}
+                    >
                       <TableCell className="font-mono font-semibold text-(--color-pagina)">
                         {venta.numeroTicket || `#${venta.idVenta}`}
                       </TableCell>
@@ -119,7 +130,7 @@ export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
                         colSpan={5}
                         className="py-10 text-center text-sm text-muted-foreground"
                       >
-                        No hay transacciones registradas para esta caja.
+                        No hay transacciones registradas.
                       </TableCell>
                     </TableRow>
                   )}
@@ -145,6 +156,62 @@ export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
           )}
         </div>
       </DialogContent>
+      
+      <Dialog open={!!ticketPreviewId} onOpenChange={(o) => !o && setTicketPreviewId(null)}>
+        <DialogContent aria-describedby={undefined} className="flex flex-col gap-0 p-0 sm:max-w-md h-[90vh] sm:h-auto overflow-hidden">
+          <DialogHeader className="shrink-0 border-b px-6 py-4 flex flex-row justify-between items-center">
+            <DialogTitle className="text-lg">Reimpresión de ticket</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-muted/30 p-4">
+            <TicketPreviewContent idVenta={ticketPreviewId} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
+  );
+}
+
+function TicketPreviewContent({ idVenta }) {
+  const ticketQ = useVentaTicketQuery(idVenta, { enabled: !!idVenta });
+  
+  if (ticketQ.isLoading) {
+    return (
+      <div className="flex h-40 flex-col items-center justify-center text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin mb-2" />
+        <p>Cargando ticket...</p>
+      </div>
+    );
+  }
+  
+  if (ticketQ.isError) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-red-50 p-4 text-sm text-(--color-rojo)">
+        {getApiErrorMessage(ticketQ.error, "Error al cargar el ticket.")}
+      </div>
+    );
+  }
+  
+  const ticket = ticketQ.data?.data;
+  if (!ticket) return null;
+  
+  const isReembolso = ticket.tipo === "reembolso";
+
+  return (
+    <div className="flex flex-col gap-4">
+      {isReembolso ? (
+        <ReembolsoTicketPreview ticket={ticket} />
+      ) : (
+        <TicketVentaPreview ticket={ticket} />
+      )}
+      
+      <Button 
+        onClick={() => imprimirTicket()} 
+        className="w-full mt-2 font-bold bg-(--color-pagina) hover:bg-(--color-pagina-2) text-white"
+        size="lg"
+      >
+        <Printer className="mr-2 h-5 w-5" />
+        Imprimir Ticket
+      </Button>
+    </div>
   );
 }

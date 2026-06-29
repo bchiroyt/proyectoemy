@@ -19,7 +19,12 @@ import { ReembolsoLineaDetalleDialog } from "@/pages/pos/components/ReembolsoLin
 import { CerrarTurnoMenu } from "@/pages/pos/components/CerrarTurnoMenu";
 import { useCarritoCantidadTeclado } from "@/hooks/useCarritoCantidadTeclado";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
-import { ID_UBICACION_REEMBOLSO } from "@/lib/reembolsoMappers";
+import {
+  mapReembolsoCatalogos,
+  mapReembolsoPreparacion,
+  mapReembolsoPrevisualizacion,
+  unwrapReembolsoVentasDisponibles,
+} from "@/lib/reembolsoMappers";
 import { subtotalLinea, roundVenta, descuentoMontoLinea } from "@/lib/ventaMappers";
 import {
   useReembolsoPreparacionQuery, useReembolsoVentasDisponiblesQuery,
@@ -313,7 +318,7 @@ const VentasPOS = () => {
       idVariante: l.idVariante,
       idVentaDetalle: l.idVentaDetalle,
       idVentaOrigen: idVenta,
-      idUbicacion: null,
+      idUbicacion: 1,
       nombre: l.nombre,
       sku: l.sku,
       precio: -precioNetoUnitario,
@@ -426,11 +431,7 @@ const VentasPOS = () => {
     if (next.productoRecibido === false) {
       next.regresaInventario = false;
     }
-    if (next.regresaInventario) {
-      next.idUbicacion = ID_UBICACION_REEMBOLSO;
-    } else {
-      next.idUbicacion = null;
-    }
+    next.idUbicacion = 1;
     return next;
   }, []);
 
@@ -589,20 +590,6 @@ const VentasPOS = () => {
       setToast({
         open: true,
         message: "El motivo de reembolso es obligatorio.",
-        type: "warning",
-      });
-      return;
-    }
-    const invalida = lineas.find(
-      (l) =>
-        l.esReembolso &&
-        l.regresaInventario &&
-        (!l.idUbicacion || !Number.isFinite(Number(l.idUbicacion)))
-    );
-    if (enReembolso && invalida) {
-      setToast({
-        open: true,
-        message: `En «${invalida.nombre}»: si devuelve a inventario, elija la ubicación en el carrito.`,
         type: "warning",
       });
       return;
@@ -1036,6 +1023,7 @@ const VentasPOS = () => {
         open={historialOpen}
         onOpenChange={setHistorialOpen}
         idCaja={idCaja}
+        idSucursal={miCajaQ.data?.data?.idSucursal}
       />
 
       <MovimientoCajaDialog
