@@ -25,7 +25,7 @@ import {
   mapReembolsoPrevisualizacion,
   unwrapReembolsoVentasDisponibles,
 } from "@/lib/reembolsoMappers";
-import { subtotalLinea, roundVenta, descuentoMontoLinea } from "@/lib/ventaMappers";
+import { subtotalLinea, roundVenta, precioUnitarioLinea, precioUnitarioConDescuentoLinea } from "@/lib/ventaMappers";
 import {
   useReembolsoPreparacionQuery, useReembolsoVentasDisponiblesQuery,
   QK_REEMBOLSOS
@@ -101,6 +101,7 @@ const VentasPOS = () => {
   const [historialOpen, setHistorialOpen] = useState(false);
   const [cambiarCajeroOpen, setCambiarCajeroOpen] = useState(false);
   const [reembolsoFiltro, setReembolsoFiltro] = useState("");
+  const [reembolsoPagina, setReembolsoPagina] = useState(1);
   const [reembolsoLineaModalId, setReembolsoLineaModalId] = useState(null);
   const [reembolsoLineaBorrador, setReembolsoLineaBorrador] = useState(null);
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
@@ -193,7 +194,7 @@ const VentasPOS = () => {
   );
 
   const ventasReembolsoQ = useReembolsoVentasDisponiblesQuery(
-    { page: 1, pageSize: 30, criterio: reembolsoFiltro, idCaja },
+    { page: reembolsoPagina, pageSize: 15, criterio: reembolsoFiltro },
     { enabled: !!idCaja && modoReembolso }
   );
   const preparacionReembolsoQ = useReembolsoPreparacionQuery(ventaReembolsoId, {
@@ -204,6 +205,11 @@ const VentasPOS = () => {
   const totalPages = catalogoQ.data?.totalPages ?? 1;
   const from = totalCount === 0 ? 0 : (pagina - 1) * PAGE_SIZE + 1;
   const to = Math.min(from + PAGE_SIZE - 1, totalCount);
+
+  const reembolsoTotalCount = ventasReembolsoQ.data?.totalCount ?? 0;
+  const reembolsoTotalPages = ventasReembolsoQ.data?.totalPages ?? 1;
+  const reembolsoFrom = reembolsoTotalCount === 0 ? 0 : (reembolsoPagina - 1) * 15 + 1;
+  const reembolsoTo = Math.min(reembolsoFrom + 15 - 1, reembolsoTotalCount);
 
   useEffect(() => {
     if (productosPagina.length === 0 || carrito.length === 0) return;
@@ -756,7 +762,7 @@ const VentasPOS = () => {
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-[10px] font-semibold text-(--color-pos-texto-muted)">
-                    Monto fijo (Q)
+                    Monto fijo por unidad (Q)
                     <input
                       type="number"
                       min="0"
@@ -811,6 +817,7 @@ const VentasPOS = () => {
                 onChange={(e) => {
                   if (modoReembolso) {
                     setReembolsoFiltro(e.target.value);
+                    setReembolsoPagina(1);
                   } else {
                     setBusqueda(e.target.value);
                     setPagina(1);
@@ -907,11 +914,25 @@ const VentasPOS = () => {
           {modoReembolso && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <section className="rounded-xl border border-(--color-pos-borde-suave) bg-(--color-pos-panel) min-h-[18rem]">
-                <header className="px-3 py-2 border-b border-(--color-pos-borde-suave) flex items-center gap-2">
-                  <Search className="size-4 text-(--color-pagina)" />
-                  <h3 className="text-sm font-bold">Transacciones para reembolso</h3>
+                <header className="px-3 py-2 border-b border-(--color-pos-borde-suave) flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Search className="size-4 text-(--color-pagina)" />
+                    <h3 className="text-sm font-bold">Transacciones para reembolso</h3>
+                  </div>
+                  {reembolsoTotalCount > 0 && (
+                    <Paginacion
+                      from={reembolsoFrom}
+                      to={reembolsoTo}
+                      total={reembolsoTotalCount}
+                      onPrev={() => setReembolsoPagina((p) => Math.max(1, p - 1))}
+                      onNext={() => setReembolsoPagina((p) => Math.min(reembolsoTotalPages, p + 1))}
+                      disablePrev={reembolsoPagina <= 1}
+                      disableNext={reembolsoPagina >= reembolsoTotalPages}
+                      isLoading={ventasReembolsoQ.isLoading}
+                    />
+                  )}
                 </header>
-                <div className="max-h-[24rem] overflow-y-auto">
+                <div className="max-h-[28rem] overflow-y-auto">
                   {ventasReembolsoQ.isLoading && (
                     <div className="p-3 space-y-2">
                       {Array.from({ length: 4 }).map((_, i) => (
@@ -1022,8 +1043,6 @@ const VentasPOS = () => {
       <HistorialTransaccionesDialog
         open={historialOpen}
         onOpenChange={setHistorialOpen}
-        idCaja={idCaja}
-        idSucursal={miCajaQ.data?.data?.idSucursal}
       />
 
       <MovimientoCajaDialog
@@ -1231,21 +1250,28 @@ const VentasPOS = () => {
                   </div>
                   <div>
                     <span className="text-[9px] font-semibold text-(--color-pos-texto-muted) block mb-0.5">
-                      Descuento
+                      P. unitario
                     </span>
-                    <span className="font-bold text-sm text-(--color-esmeralda-hover)">
-                      {lineaSeleccionada.descuentoValor > 0
-                        ? (lineaSeleccionada.descuentoTipo === "porcentaje"
-                          ? `-${lineaSeleccionada.descuentoValor}%`
-                          : `-Q${Number(descuentoMontoLinea(lineaSeleccionada)).toFixed(2)}`)
-                        : "Q0.00"}
-                    </span>
+                    {(lineaSeleccionada.descuentoValor ?? 0) > 0 ? (
+                      <div className="font-bold text-sm tabular-nums">
+                        <span className="block text-[11px] font-normal text-(--color-pos-texto-muted) line-through">
+                          Q {Number(precioUnitarioLinea(lineaSeleccionada)).toFixed(2)}
+                        </span>
+                        <span className="block text-(--color-esmeralda-hover)">
+                          Q {Number(precioUnitarioConDescuentoLinea(lineaSeleccionada)).toFixed(2)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="font-bold text-sm tabular-nums">
+                        Q {Number(precioUnitarioLinea(lineaSeleccionada)).toFixed(2)}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <span className="text-[9px] font-semibold text-(--color-pos-texto-muted) block mb-0.5">
                       Subtotal
                     </span>
-                    <span className="font-bold text-sm text-(--color-pagina)">
+                    <span className="font-bold text-sm text-(--color-pagina) tabular-nums">
                       Q {Number(subtotalLinea(lineaSeleccionada)).toFixed(2)}
                     </span>
                   </div>

@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
+import { useSalidaSinGuardar } from "@/hooks/useSalidaSinGuardar";
+import { ModalConfirmarSalida } from "@/components/shared/ModalConfirmarSalida";
 import { useAuthStore } from "@/context/useAuthStore";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { esUsuarioAdmin } from "@/lib/authz";
@@ -117,6 +119,45 @@ const NuevaCompra = () => {
   const [lineas, setLineas] = useState([]);
   const [formError, setFormError] = useState("");
   const initialLineasRef = useRef(null);
+  const fechaHoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const formularioTieneDatos = useCallback(() => {
+    if (isEdit) return false;
+    if (proveedor) return true;
+    if (documentoRef.trim() || notas.trim()) return true;
+    if (tipoComprobante !== "none") return true;
+    if (lineas.length > 0) return true;
+    if (esCredito || fechaVencimientoCredito) return true;
+    if (fechaPedido !== fechaHoy) return true;
+    return false;
+  }, [
+    isEdit,
+    proveedor,
+    documentoRef,
+    notas,
+    tipoComprobante,
+    lineas.length,
+    esCredito,
+    fechaVencimientoCredito,
+    fechaPedido,
+    fechaHoy,
+  ]);
+
+  const {
+    confirmExitOpen,
+    cancelExit,
+    salirSinGuardar,
+    intentarNavegar,
+    permitirSalida,
+  } = useSalidaSinGuardar({
+    enabled: !isEdit,
+    tieneDatos: formularioTieneDatos,
+    rutaFallback: "/compras",
+  });
+
+  const intentarIrACompras = () => {
+    intentarNavegar("/compras");
+  };
 
   const provQ = useProveedoresCompraQuery();
   const compraQ = useCompraDetalleQuery(idCompraEdit, { enabled: isEdit });
@@ -360,6 +401,7 @@ const NuevaCompra = () => {
           }),
         };
         await crearDirectaMut.mutateAsync(body);
+        permitirSalida();
         navigate("/compras");
         return;
       }
@@ -380,6 +422,7 @@ const NuevaCompra = () => {
           })),
         };
         await crearMut.mutateAsync(body);
+        permitirSalida();
         navigate("/compras");
         return;
       }
@@ -430,6 +473,7 @@ const NuevaCompra = () => {
         }
       }
 
+      permitirSalida();
       navigate("/compras");
     } catch (e) {
       setFormError(getApiErrorMessage(e, "No se pudo guardar la compra."));
@@ -467,12 +511,22 @@ const NuevaCompra = () => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <ModalConfirmarSalida
+        open={confirmExitOpen}
+        onConfirm={salirSinGuardar}
+        onCancel={cancelExit}
+      />
+
       <div className="sticky top-0 z-10 flex w-full flex-wrap items-center gap-1 border-b border-border bg-(--color-blanco) p-2 shadow-sm">
-        <Button variant="ghost" size="sm" className="gap-1.5 w-fit -ml-2" asChild>
-          <Link to="/compras">
-            <ArrowLeft className="size-4" />
-            Volver
-          </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          className="gap-1.5 w-fit -ml-2"
+          onClick={intentarIrACompras}
+        >
+          <ArrowLeft className="size-4" />
+          Volver
         </Button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -605,8 +659,8 @@ const NuevaCompra = () => {
         <Button variant="outline" type="button" onClick={() => setLineas([])} disabled={busy}>
           Limpiar líneas
         </Button>
-        <Button variant="secondary" type="button" asChild disabled={busy}>
-          <Link to="/compras">Cancelar</Link>
+        <Button variant="secondary" type="button" disabled={busy} onClick={intentarIrACompras}>
+          Cancelar
         </Button>
         <Button
           type="button"

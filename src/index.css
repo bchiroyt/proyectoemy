@@ -273,6 +273,32 @@
     display: none !important;
   }
 
+  /* Modal de reimpresión: sin transform ni overlay (evita recorte lateral) */
+  html.printing-ticket [data-slot="dialog-overlay"] {
+    display: none !important;
+  }
+
+  html.printing-ticket [data-slot="dialog-header"],
+  html.printing-ticket [data-slot="dialog-close"] {
+    display: none !important;
+  }
+
+  html.printing-ticket [data-slot="dialog-content"] {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    translate: none !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
   /* Hacer visible únicamente el tique, sus contenedores padres y todos sus descendientes */
   html.printing-ticket,
   html.printing-ticket body,
@@ -335,8 +361,8 @@
 
   .ticket-print-area .ticket-logo-img {
     display: inline-block !important;
-    width: 140px !important;     /* Pixeles fijos de renderizado web */
-    height: 60px !important;     /* Forzamos alto fijo */
+    width: 165px !important;
+    height: 72px !important;
     object-fit: contain !important;
     filter: grayscale(100%) contrast(250%) !important;
   }

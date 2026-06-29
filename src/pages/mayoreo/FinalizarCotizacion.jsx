@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, BadgeCheck, Banknote, Building2, Loader2 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
+import { useSalidaSinGuardar } from "@/hooks/useSalidaSinGuardar";
+import { ModalConfirmarSalida } from "@/components/shared/ModalConfirmarSalida";
 import { useMontoTeclado } from "@/hooks/useMontoTeclado";
 import { useMiCajaActivaQuery, useMetodosPagoQuery } from "@/hooks/queries/useCajaQueries";
 import {
@@ -58,6 +60,8 @@ export default function FinalizarCotizacion() {
   const cotizacion = cotizacionQ.data?.data;
   const idCaja = cajaQ.data?.data?.idCaja ?? null;
   const total = roundVenta(cotizacion?.total ?? 0);
+  const cotizacionPendiente =
+    cotizacion && String(cotizacion.estado).toUpperCase() === "PENDIENTE";
 
   useEffect(() => {
     setTitulo("Mayoreo · Finalizar venta");
@@ -92,6 +96,27 @@ export default function FinalizarCotizacion() {
     enabled: tecladoHabilitado,
     onEnter: () => validarRef.current?.(),
   });
+
+  const formularioTieneDatos = useCallback(
+    () => pagos.length > 0 || montoDigitando > 0.005,
+    [pagos.length, montoDigitando]
+  );
+
+  const {
+    confirmExitOpen,
+    cancelExit,
+    salirSinGuardar,
+    intentarNavegar,
+    permitirSalida,
+  } = useSalidaSinGuardar({
+    enabled: Boolean(cotizacionPendiente && metodos.length > 0),
+    tieneDatos: formularioTieneDatos,
+    rutaFallback: "/mayoreo",
+  });
+
+  const intentarIrAMayoreo = () => {
+    intentarNavegar("/mayoreo");
+  };
 
   const metodoSeleccionado = metodos.find((m) => m.clave === metodoActivo);
 
@@ -159,6 +184,7 @@ export default function FinalizarCotizacion() {
         message: `Venta finalizada · Ticket ${result.data?.numeroTicket || ""}`,
         type: "success",
       });
+      permitirSalida();
       setTimeout(() => navigate("/mayoreo", { replace: true }), 1200);
     } catch (error) {
       setToast({
@@ -210,8 +236,8 @@ export default function FinalizarCotizacion() {
         <p className="text-sm text-(--color-rojo)">
           {cotizacionQ.error?.message || "Cotización no encontrada"}
         </p>
-        <Button asChild variant="outline">
-          <Link to="/mayoreo">Volver al listado</Link>
+        <Button variant="outline" onClick={intentarIrAMayoreo}>
+          Volver al listado
         </Button>
       </div>
     );
@@ -223,8 +249,8 @@ export default function FinalizarCotizacion() {
         <p className="text-sm text-(--color-gris-letra)">
           Esta cotización ya no está pendiente (estado: {cotizacion.estado}).
         </p>
-        <Button asChild variant="outline">
-          <Link to="/mayoreo">Volver al listado</Link>
+        <Button variant="outline" onClick={intentarIrAMayoreo}>
+          Volver al listado
         </Button>
       </div>
     );
@@ -236,8 +262,8 @@ export default function FinalizarCotizacion() {
         <p className="text-sm font-medium text-(--color-rojo-obscuro)">
           Configure <code className="text-xs">VITE_METODOS_PAGO</code> en .env.
         </p>
-        <Button asChild variant="outline">
-          <Link to="/mayoreo">Volver</Link>
+        <Button variant="outline" onClick={intentarIrAMayoreo}>
+          Volver
         </Button>
       </div>
     );
@@ -245,12 +271,22 @@ export default function FinalizarCotizacion() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-(--color-pos-fondo)">
+      <ModalConfirmarSalida
+        open={confirmExitOpen}
+        onConfirm={salirSinGuardar}
+        onCancel={cancelExit}
+      />
+
       <div className="shrink-0 px-4 py-3 border-b border-(--color-pos-borde-suave) bg-(--color-pos-panel) flex items-center gap-4">
-        <Button asChild variant="outline" size="sm" className="border-(--color-pagina) text-(--color-pagina)">
-          <Link to="/mayoreo">
-            <ArrowLeft className="size-4 mr-1" />
-            Volver
-          </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          className="border-(--color-pagina) text-(--color-pagina)"
+          onClick={intentarIrAMayoreo}
+        >
+          <ArrowLeft className="size-4 mr-1" />
+          Volver
         </Button>
         <div className="flex-1 text-center">
           <h1 className="text-lg sm:text-xl font-black text-(--color-negro)">

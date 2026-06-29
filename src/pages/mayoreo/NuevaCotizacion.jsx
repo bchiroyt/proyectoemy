@@ -1,7 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Save, ShoppingCart, Loader2 } from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
+import { useSalidaSinGuardar } from "@/hooks/useSalidaSinGuardar";
+import { ModalConfirmarSalida } from "@/components/shared/ModalConfirmarSalida";
 import { useVentaCatalogoQuery } from "@/hooks/queries/useVentaQueries";
 import {
   useActualizarCotizacionMutation,
@@ -104,7 +106,43 @@ export default function NuevaCotizacion() {
   const actualizarM = useActualizarCotizacionMutation();
   const guardando = crearM.isPending || actualizarM.isPending;
 
+  const formularioTieneDatos = useCallback(() => {
+    if (esEdicion) return false;
+    if (nombreCliente.trim() || telefonoCliente.trim()) return true;
+    if (carrito.length > 0) return true;
+    return false;
+  }, [esEdicion, nombreCliente, telefonoCliente, carrito.length]);
+
+  const {
+    confirmExitOpen,
+    cancelExit,
+    salirSinGuardar: salirSinGuardarBase,
+    intentarNavegar,
+    permitirSalida,
+  } = useSalidaSinGuardar({
+    enabled: !esEdicion,
+    tieneDatos: formularioTieneDatos,
+    rutaFallback: "/mayoreo",
+  });
+
+  const salirSinGuardar = () => {
+    limpiarCarrito();
+    setNombreCliente("");
+    setTelefonoCliente("");
+    salirSinGuardarBase();
+  };
+
+  const intentarIrAMayoreo = () => {
+    intentarNavegar("/mayoreo");
+  };
+
   const handleAgregarProducto = (producto) => {
+    console.log("[Mayoreo Debug] Producto seleccionado del buscador:", {
+      idVariante: producto.idVariante,
+      nombre: producto.nombre,
+      precioMenudeo: producto.precio,
+      precioMayoreo: producto.precioVentaMayor,
+    });
     agregarProducto(producto);
     setCriterio("");
   };
@@ -153,6 +191,7 @@ export default function NuevaCotizacion() {
         setNombreCliente("");
         setTelefonoCliente("");
       }
+      permitirSalida();
       setTimeout(() => navigate("/mayoreo", { replace: true }), 800);
     } catch (error) {
       setToast({
@@ -178,8 +217,8 @@ export default function NuevaCotizacion() {
         <p className="text-sm text-(--color-rojo)">
           {cotizacionQ.error?.message || "No se pudo cargar la cotización"}
         </p>
-        <Button asChild variant="outline">
-          <Link to="/mayoreo">Volver al listado</Link>
+        <Button variant="outline" onClick={intentarIrAMayoreo}>
+          Volver al listado
         </Button>
       </div>
     );
@@ -195,8 +234,8 @@ export default function NuevaCotizacion() {
         <p className="text-sm text-(--color-gris-letra)">
           Solo se pueden editar cotizaciones pendientes (estado: {cotizacionQ.data.data.estado}).
         </p>
-        <Button asChild variant="outline">
-          <Link to="/mayoreo">Volver al listado</Link>
+        <Button variant="outline" onClick={intentarIrAMayoreo}>
+          Volver al listado
         </Button>
       </div>
     );
@@ -204,12 +243,22 @@ export default function NuevaCotizacion() {
 
   return (
     <div className="flex flex-col h-full bg-(--color-pos-fondo) p-4 md:p-6 gap-6">
+      <ModalConfirmarSalida
+        open={confirmExitOpen}
+        onConfirm={salirSinGuardar}
+        onCancel={cancelExit}
+      />
+
       <div className="flex items-center justify-between gap-4">
-        <Button asChild variant="outline" size="sm" className="border-(--color-pagina) text-(--color-pagina)">
-          <Link to="/mayoreo">
-            <ArrowLeft className="size-4 mr-1" />
-            Cotizaciones
-          </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          className="border-(--color-pagina) text-(--color-pagina)"
+          onClick={intentarIrAMayoreo}
+        >
+          <ArrowLeft className="size-4 mr-1" />
+          Cotizaciones
         </Button>
         <p className="text-xs text-(--color-gris-letra) text-right max-w-md">
           {esEdicion

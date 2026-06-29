@@ -87,9 +87,13 @@ export async function fetchVentas({
 }
 
 /** GET /api/Ventas/{idVenta}/ticket */
-export async function fetchVentaTicket(idVenta) {
+export async function fetchVentaTicket(idVenta, { idCaja } = {}) {
+  const params = {};
+  const caja = Number(idCaja);
+  if (Number.isFinite(caja) && caja > 0) params.idCaja = caja;
+
   try {
-    const { data } = await apiClient.get(`/api/Ventas/${idVenta}/ticket`);
+    const { data } = await apiClient.get(`/api/Ventas/${idVenta}/ticket`, { params });
     throwIfEnvelopeFailed(data, "No se pudo cargar el ticket.");
     return {
       exito: true,

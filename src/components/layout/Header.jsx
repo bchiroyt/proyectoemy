@@ -5,6 +5,7 @@ import { useNavigationStore } from "@/context/useNavigationStore";
 import { useHeaderUserActionStore } from "@/context/useHeaderUserActionStore";
 import { useHeaderTicketsStore } from "@/context/useHeaderTicketsStore";
 import { PosTicketsHeaderDropdown } from "@/components/layout/PosTicketsHeaderDropdown";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const Header = () => {
     const user = useAuthStore((s) => s.user);
@@ -25,10 +26,21 @@ const Header = () => {
             </div>
 
             <div className="flex items-center gap-5">
-                <button className="relative p-2 rounded-full cursor-pointer bg-(--color-blanco) hover:bg-(--color-rosa-hover) transition-colors">
-                    <Bell className="w-5 h-5 text-(--color-gris-letra)" />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-(--color-pagina) rounded-full ring-2 ring-(--color-blanco)"></span>
-                </button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label="Notificaciones"
+                            className="relative p-2 rounded-full cursor-pointer bg-(--color-blanco) hover:bg-(--color-rosa-hover) transition-colors"
+                        >
+                            <Bell className="w-5 h-5 text-(--color-gris-letra)" />
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-(--color-pagina) rounded-full ring-2 ring-(--color-blanco)" />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={8}>
+                        Próximo a implementar
+                    </TooltipContent>
+                </Tooltip>
                 <div className="h-8 w-[1px] bg-(--color-blanco) hidden sm:block"></div>
                 <button
                     type="button"

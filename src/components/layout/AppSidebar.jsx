@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import logoImg from "@/assets/tran1.png";
 import logo1Img from "@/assets/logo1.jpeg";
 import { useAuthStore } from "@/context/useAuthStore";
+import { useNavigationStore } from "@/context/useNavigationStore";
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -43,7 +44,16 @@ const AppSidebar = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const logout = useAuthStore((s) => s.logout);
+    const attemptNavigation = useNavigationStore((s) => s.attemptNavigation);
     const [logoutOpen, setLogoutOpen] = useState(false);
+
+    const handleMenuNavigate = (event, to) => {
+        setOpenMobile(false);
+        if (location.pathname === to) return;
+        if (!attemptNavigation(to)) {
+            event.preventDefault();
+        }
+    };
 
     const handleLogout = () => {
         logout();
@@ -120,7 +130,7 @@ const AppSidebar = () => {
                                 >
                                     <NavLink
                                         to={item.to}
-                                        onClick={() => setOpenMobile(false)}
+                                        onClick={(event) => handleMenuNavigate(event, item.to)}
                                         className="flex w-full items-center gap-2 outline-none ring-sidebar-ring [&_svg]:size-7"
                                     >
                                         <item.icon className="size-8 shrink-0" />

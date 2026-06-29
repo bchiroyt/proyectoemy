@@ -22,14 +22,26 @@ export function unwrapReembolsoVentasDisponibles(resp) {
   const exito = pick(resp, "exito", "Exito") !== false;
   const mensaje = pick(resp, "mensaje", "Mensaje") ?? "";
   const inner = pick(resp, "data", "Data") ?? resp;
-  const items = unwrapList(inner).map(mapReembolsoVentaDisponible).filter(Boolean);
-  const page = Number(pick(inner, "page", "Page") ?? 1) || 1;
-  const pageSize = Number(pick(inner, "pageSize", "PageSize") ?? 10) || 10;
+  const itemsRaw = pick(inner, "items", "Items", "ventas", "Ventas") ?? inner;
+  const items = unwrapList(itemsRaw).map(mapReembolsoVentaDisponible).filter(Boolean);
+  const pageSource = inner ?? resp;
+  const page = Number(pick(pageSource, "page", "Page") ?? 1) || 1;
+  const pageSize = Number(pick(pageSource, "pageSize", "PageSize") ?? 10) || 10;
   const totalCount =
-    Number(pick(inner, "totalCount", "TotalCount") ?? items.length) || items.length;
+    Number(
+      pick(
+        pageSource,
+        "totalCount",
+        "TotalCount",
+        "totalRecords",
+        "TotalRecords"
+      ) ?? 0
+    ) || 0;
   const totalPages =
-    Number(pick(inner, "totalPages", "TotalPages") ?? Math.max(1, Math.ceil(totalCount / pageSize))) ||
-    1;
+    Number(
+      pick(pageSource, "totalPages", "TotalPages") ??
+        Math.max(1, Math.ceil(totalCount / pageSize))
+    ) || 1;
   return { exito, mensaje, items, page, pageSize, totalCount, totalPages };
 }
 

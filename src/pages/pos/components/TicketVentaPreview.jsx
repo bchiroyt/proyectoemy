@@ -14,7 +14,7 @@ function fmtFechaTicket(valor) {
 /**
  * Vista del ticket (pantalla e impresión).
  */
-export function TicketVentaPreview({ ticket, className }) {
+export function TicketVentaPreview({ ticket, className, ...rest }) {
   if (!ticket) return null;
 
   const totalDescuento = ticket.detalles.reduce(
@@ -29,6 +29,7 @@ export function TicketVentaPreview({ ticket, className }) {
         "px-5 py-6 shadow-sm border border-(--color-pos-borde-suave) rounded-lg",
         className
       )}
+      {...rest}
     >
       <header className="ticket-header border-b border-dashed border-(--color-gris-claro) pb-4 mb-4 text-center">
         <TicketEncabezadoImagen className="mb-3" />

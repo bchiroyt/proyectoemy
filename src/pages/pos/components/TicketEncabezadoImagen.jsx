@@ -8,14 +8,14 @@ const LOGO_BASE64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAYG
  */
 export function TicketEncabezadoImagen({ src, alt = "Encabezado del ticket", className }) {
   return (
-    <div className={cn("ticket-logo-wrap mx-auto w-full max-w-[280px]", className)}>
+    <div className={cn("ticket-logo-wrap mx-auto w-full max-w-[300px]", className)}>
       <img
         /* Si viene un src por props lo usa, 
           de lo contrario usa el LOGO_BASE64 que está incrustado aquí mismo
         */
         src={src ?? LOGO_BASE64}
         alt={alt}
-        className="ticket-logo-img mx-auto h-auto w-full max-h-24 object-contain"
+        className="ticket-logo-img mx-auto h-auto w-full max-h-28 object-contain"
       />
     </div>
   );
