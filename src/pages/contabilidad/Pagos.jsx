@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Search, Loader2, X, CheckCircle, AlertCircle, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
 import { obtenerFechaGuatemala, validateCrearDeudaAbono } from "@/lib/deudaAbonoValidations";
 import { Skeleton } from "@/components/ui/skeleton";
+import Paginacion from "@/components/shared/Paginacion";
+
+const PAGE_SIZE = 15;
 
 const formatoMoneda = new Intl.NumberFormat("es-GT", {
   style: "currency",
@@ -35,6 +38,7 @@ const Pagos = () => {
   const [deudas, setDeudas] = useState([]);
   const [metodosPago, setMetodosPago] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+  const [page, setPage] = useState(1);
   const [cargando, setCargando] = useState(false);
   const [errorCarga, setErrorCarga] = useState("");
 
@@ -226,20 +230,30 @@ const Pagos = () => {
     }
   };
 
-  const terminoBusqueda = busqueda.trim().toLowerCase();
-  const deudasFiltradas = deudas.filter((deuda) => {
-    if (!terminoBusqueda) return true;
-    return [
-      deuda.idDeuda,
-      deuda.numeroDeuda,
-      deuda.nombreAcreedor,
-      deuda.tipo,
-      deuda.fechaOperacion,
-      deuda.fechaVencimiento,
-      deuda.estado,
-      deuda.montoPendiente,
-    ].some((valor) => String(valor ?? "").toLowerCase().includes(terminoBusqueda));
-  });
+  const deudasFiltradas = useMemo(() => {
+    const terminoBusqueda = busqueda.trim().toLowerCase();
+    if (!terminoBusqueda) return deudas;
+
+    return deudas.filter((deuda) =>
+      [
+        deuda.idDeuda,
+        deuda.numeroDeuda,
+        deuda.nombreAcreedor,
+        deuda.tipo,
+        deuda.fechaOperacion,
+        deuda.fechaVencimiento,
+        deuda.estado,
+        deuda.montoPendiente,
+      ].some((valor) => String(valor ?? "").toLowerCase().includes(terminoBusqueda))
+    );
+  }, [deudas, busqueda]);
+
+  const totalRegistros = deudasFiltradas.length;
+  const totalPages = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE));
+  const paginaActual = Math.min(page, totalPages);
+  const from = totalRegistros === 0 ? 0 : (paginaActual - 1) * PAGE_SIZE + 1;
+  const to = Math.min(from + PAGE_SIZE - 1, totalRegistros);
+  const deudasPagina = deudasFiltradas.slice(from === 0 ? 0 : from - 1, to);
 
   return (
     <div className="p-6 space-y-6 relative bg-(--color-pagina-4) min-h-full w-full">
@@ -263,11 +277,25 @@ const Pagos = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--color-gris-claro)" />
           <input
             value={busqueda}
-            onChange={(event) => setBusqueda(event.target.value)}
+            onChange={(event) => {
+              setBusqueda(event.target.value);
+              setPage(1);
+            }}
             placeholder="Buscar por acreedor, tipo, estado o deuda..."
             className="w-full bg-(--color-blanco) border border-(--color-gris-claro-2) rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-(--color-pagina) text-sm text-(--color-negro)"
           />
         </div>
+
+        <Paginacion
+          from={from}
+          to={to}
+          total={totalRegistros}
+          onPrev={() => setPage(Math.max(1, paginaActual - 1))}
+          onNext={() => setPage(Math.min(totalPages, paginaActual + 1))}
+          disablePrev={paginaActual <= 1}
+          disableNext={paginaActual >= totalPages}
+          isLoading={cargando}
+        />
       </div>
 
       {!cargando && !errorCarga ? (
@@ -338,14 +366,14 @@ const Pagos = () => {
                   </div>
                 </td>
               </tr>
-            ) : deudasFiltradas.length === 0 ? (
+            ) : deudasPagina.length === 0 ? (
               <tr>
                 <td colSpan="9" className="p-12 text-center text-(--color-gris-claro) font-medium">
                   No hay deudas disponibles para abonar.
                 </td>
               </tr>
             ) : (
-              deudasFiltradas.map((deuda) => (
+              deudasPagina.map((deuda) => (
                 <tr key={deuda.idDeuda} className="hover:bg-(--color-pagina-4) transition-colors text-(--color-negro)">
                   <td className="p-4 font-semibold">#{deuda.idDeuda}</td>
                   <td className="p-4 font-semibold text-(--color-gris-letra)">{deuda.numeroDeuda ?? "---"}</td>

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Eye, PackageSearch, Clock, Package } from "lucide-react";
 import { API_BASE_URL } from "@/lib/apiClient";
+import { obtenerProductoPorId } from "@/services/productos";
 
 import ModalDetalleProducto from "./ModalDetalleProducto";
 import ModalVariantesProducto from "./ModalVariantesProducto";
 import ModalKardexProducto from "./ModalKardexProducto";
 import { pick, toNumberOrNull } from "@/lib/apiNormalizer";
-import { resolverIdProducto } from "@/lib/productoUtils";
+import { resolverIdProducto, unwrapProductoDetalleBody } from "@/lib/productoUtils";
 
 const obtenerSkuProducto = (producto) =>
   producto.sku || producto.codigoPrincipal || producto.variantes?.[0]?.sku || "Sin SKU";
@@ -134,6 +135,16 @@ const obtenerEstadoStock = (stock, stockMinimo) => {
   };
 };
 
+const construirSrcImagenProducto = (producto) => {
+  if (!producto?.urlImagen) return null;
+
+  const version = producto.__imagenVersion;
+  if (!version) return `${API_BASE_URL}${producto.urlImagen}`;
+
+  const separador = producto.urlImagen.includes("?") ? "&" : "?";
+  return `${API_BASE_URL}${producto.urlImagen}${separador}v=${version}`;
+};
+
 const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
   const [openDetalle, setOpenDetalle] = useState(false);
   const [openVariantes, setOpenVariantes] = useState(false);
@@ -146,18 +157,37 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
     return idProducto != null ? { ...item, idProducto } : item;
   };
 
+  const obtenerProductoConDetalleSiHaceFalta = async (item) => {
+    const base = prepararProductoSeleccionado(item);
+    if (Array.isArray(base?.variantes) && base.variantes.length > 0) {
+      return base;
+    }
+
+    const idProducto = resolverIdProducto(base);
+    if (!idProducto) return base;
+
+    try {
+      const raw = await obtenerProductoPorId(idProducto);
+      const detalle = unwrapProductoDetalleBody(raw);
+      return detalle ? { ...base, ...detalle, idProducto: resolverIdProducto(detalle) ?? idProducto } : base;
+    } catch (error) {
+      console.error("No se pudo enriquecer el producto para la accion:", error);
+      return base;
+    }
+  };
+
   const handleDetalle = (item) => {
     setProductoSeleccionado(prepararProductoSeleccionado(item));
     setOpenDetalle(true);
   };
 
-  const handleKardex = (item) => {
-    setProductoSeleccionado(prepararProductoSeleccionado(item));
+  const handleKardex = async (item) => {
+    setProductoSeleccionado(await obtenerProductoConDetalleSiHaceFalta(item));
     setOpenKardex(true);
   };
 
-  const handleVariantes = (item) => {
-    setProductoSeleccionado(prepararProductoSeleccionado(item));
+  const handleVariantes = async (item) => {
+    setProductoSeleccionado(await obtenerProductoConDetalleSiHaceFalta(item));
     setOpenVariantes(true);
   };
 
@@ -193,6 +223,10 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
               ) : (
                 productos.map((item, index) => {
                   const skuProducto = obtenerSkuProducto(item);
+                  const esResultadoBusqueda = Boolean(item.__resultadoBusquedaInventario);
+                  const identificadorProducto = esResultadoBusqueda
+                    ? `ID: ${item.idProducto || "Sin ID"}`
+                    : `SKU: ${skuProducto}`;
                   const stockProducto = obtenerStockProducto(item);
                   const stockMinimoProducto = obtenerStockMinimoProducto(item);
                   const estadoStock = obtenerEstadoStock(stockProducto, stockMinimoProducto);
@@ -204,8 +238,13 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                   const nombreVisual = item.nombre || item.presentacionNombre || "Producto sin nombre";
                   const categoriaVisual =
                     item.categoriaNombre || item.nombreCategoria || item.categoria || "Sin categoria";
-                  const cantidadVariantes = typeof item.variantes?.length === "number" ? item.variantes.length : 1;
+                  const cantidadVariantes =
+                    Number(item.numeroVariantes ?? item.cantidadVariantes) ||
+                    (typeof item.variantes?.length === "number" && item.variantes.length > 0
+                      ? item.variantes.length
+                      : 1);
                   const precioVentaVisual = formatearMoneda(obtenerPrecioVentaProducto(item));
+                  const imagenProductoSrc = construirSrcImagenProducto(item);
                   const precioVentaMayor = obtenerPrecioVentaMayorProducto(item);
                   const precioVentaMayorVisual = precioVentaMayor != null ? formatearMoneda(precioVentaMayor) : null;
 
@@ -213,10 +252,10 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                     <tr key={llaveUnica} className="border-t transition hover:bg-gray-50">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          {item.urlImagen ? (
+                          {imagenProductoSrc ? (
                             <div className="relative z-0 h-10 w-10 shrink-0 rounded-md border border-gray-200 bg-gray-50 transition-transform duration-300 ease-out hover:z-20 hover:scale-150 hover:shadow-xl">
                               <img
-                                src={`${API_BASE_URL}${item.urlImagen}`}
+                                src={imagenProductoSrc}
                                 alt={nombreVisual}
                                 className="h-full w-full rounded-md object-cover"
                                 onError={(event) => {
@@ -234,7 +273,7 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                               {nombreVisual}
                             </span>
                             <span className="font-mono text-xs text-gray-400">
-                              SKU: {skuProducto}
+                              {identificadorProducto}
                             </span>
                           </div>
                         </div>

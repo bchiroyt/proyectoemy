@@ -13,7 +13,14 @@ import {
 } from "lucide-react";
 
 // IMPORTACIONES OFICIALES DE TU ARQUITECTURA
-import { actualizarVariante, obtenerProductoPorId, agregarVariantesAProducto, actualizarImagenProducto, actualizarProducto } from "@/services/productos";
+import {
+  actualizarVariante,
+  obtenerProductoPorId,
+  agregarVariantesAProducto,
+  actualizarImagenProducto,
+  actualizarProducto,
+  sincronizarCacheImagenProducto,
+} from "@/services/productos";
 import { obtenerTallas } from "@/services/tallas";
 import { obtenerPresentaciones } from "@/services/presentaciones";
 import { obtenerUbicaciones } from "@/services/ubicaciones";
@@ -43,6 +50,90 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+const CLASES_ETIQUETA_VARIANTE = {
+  color: "border-sky-200 bg-sky-50 text-sky-700",
+  talla: "border-amber-200 bg-amber-50 text-amber-700",
+  presentacion: "border-emerald-200 bg-emerald-50 text-emerald-700",
+};
+
+const normalizarTextoVariante = (valor) => {
+  const texto = String(valor ?? "").trim();
+  return texto && texto.toUpperCase() !== "N/A" ? texto : "";
+};
+
+const obtenerUbicacionVariante = (variante) =>
+  normalizarTextoVariante(
+    variante?.ubicacionNombre ??
+      variante?.nombreUbicacion ??
+      variante?.UbicacionNombre ??
+      variante?.NombreUbicacion ??
+      variante?.ubicacion ??
+      variante?.Ubicacion ??
+      variante?.ubicacionDefaultNombre ??
+      variante?.UbicacionDefaultNombre
+  );
+
+const obtenerEtiquetasVariante = (variante) => {
+  const color = normalizarTextoVariante(variante?.color ?? variante?.Color);
+  const talla = normalizarTextoVariante(
+    variante?.tallaNombre ?? variante?.nombreTalla ?? variante?.TallaNombre ?? variante?.NombreTalla
+  );
+  const presentacion = normalizarTextoVariante(
+    variante?.presentacionNombre ??
+      variante?.nombrePresentacion ??
+      variante?.PresentacionNombre ??
+      variante?.NombrePresentacion
+  );
+
+  return [
+    presentacion ? { key: "presentacion", value: presentacion } : null,
+    talla ? { key: "talla", value: talla } : null,
+    color ? { key: "color", value: color } : null,
+  ].filter(Boolean);
+};
+
+function EtiquetasVariante({ variante, keys, className = "" }) {
+  const permitidas = new Set(keys);
+  const etiquetas = obtenerEtiquetasVariante(variante).filter((etiqueta) =>
+    permitidas.has(etiqueta.key)
+  );
+
+  if (!etiquetas.length) return null;
+
+  return (
+    <div className={`flex min-w-0 flex-wrap items-center gap-1 ${className}`.trim()}>
+      {etiquetas.map((etiqueta) => (
+        <span
+          key={etiqueta.key}
+          className={`min-w-0 max-w-full truncate rounded border px-1.5 py-px text-[10px] leading-none font-medium ${CLASES_ETIQUETA_VARIANTE[etiqueta.key]}`}
+          title={etiqueta.value}
+        >
+          {etiqueta.value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function EtiquetaUbicacionVariante({ variante }) {
+  const ubicacion = obtenerUbicacionVariante(variante);
+  if (!ubicacion) return null;
+
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+        Ubicación
+      </span>
+      <span
+        className="inline-flex min-w-0 max-w-full items-center truncate rounded border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] leading-none font-medium text-slate-700"
+        title={ubicacion}
+      >
+        {ubicacion}
+      </span>
+    </div>
+  );
+}
 
 const mergeDetalleConFuenteBusqueda = (detalle, fuenteBusqueda) => {
   const fallback = normalizarProductoDetalleDesdeBusqueda(fuenteBusqueda);
@@ -214,10 +305,12 @@ const ModalDetalleProducto = ({
       const raw = await obtenerProductoPorId(idProducto);
       const detalle = unwrapProductoDetalleBody(raw);
       if (detalle) {
+        const imagenCache = sincronizarCacheImagenProducto(idProducto, raw, { forzarRecarga: true });
         const detalleConFallback = mergeDetalleConFuenteBusqueda(detalle, estadoProducto || producto);
         setEstadoProducto({
           ...detalleConFallback,
           idProducto: resolverIdProducto(detalleConFallback) ?? idProducto,
+          __imagenVersion: imagenCache?.version ?? Date.now(),
         });
       }
       mostrarAviso("exito", "Imagen actualizada correctamente");
@@ -694,6 +787,18 @@ const ModalDetalleProducto = ({
           }),
         };
       });
+
+      if (idProducto) {
+        const rawDetalle = await obtenerProductoPorId(idProducto);
+        const detalle = unwrapProductoDetalleBody(rawDetalle);
+        if (detalle) {
+          const detalleConFallback = mergeDetalleConFuenteBusqueda(detalle, estadoProducto || producto);
+          setEstadoProducto({
+            ...detalleConFallback,
+            idProducto: resolverIdProducto(detalleConFallback) ?? idProducto,
+          });
+        }
+      }
 
       if (onRefresh) {
         await onRefresh();
@@ -1276,6 +1381,10 @@ const ModalDetalleProducto = ({
                       const esModoEdicion = idVarianteValido && editandoId === idActual;
                       const tieneCambios = verificarCambios(v);
                       const stockActual = v.stockActual ?? v.stock ?? 0;
+                      const etiquetasVariante = obtenerEtiquetasVariante(v);
+                      const tieneEtiquetasEspecificacion = etiquetasVariante.some(
+                        (etiqueta) => etiqueta.key === "presentacion" || etiqueta.key === "talla"
+                      );
 
                       return (
                         <Card key={keyVariante} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
@@ -1334,15 +1443,14 @@ const ModalDetalleProducto = ({
                                     </select>
                                   </div>
                                 ) : (
-                                  <div className="space-y-1">
-                                    <p className="text-xs text-slate-600 truncate" title={formatearEspecificacionVariante(v)}>
-                                      {formatearEspecificacionVariante(v)}
-                                    </p>
-                                    {(v.ubicacionNombre || v.nombreUbicacion || v.ubicacionDefaultNombre) && (
-                                      <p className="text-[10px] text-slate-400 truncate">
-                                        {v.ubicacionNombre || v.nombreUbicacion || v.ubicacionDefaultNombre}
+                                  <div className="space-y-1.5">
+                                    <EtiquetasVariante variante={v} keys={["presentacion", "talla"]} />
+                                    {!tieneEtiquetasEspecificacion ? (
+                                      <p className="text-xs text-slate-600 truncate" title={formatearEspecificacionVariante(v)}>
+                                        {formatearEspecificacionVariante(v)}
                                       </p>
-                                    )}
+                                    ) : null}
+                                    <EtiquetaUbicacionVariante variante={v} />
                                   </div>
                                 )}
                               </div>
@@ -1359,9 +1467,12 @@ const ModalDetalleProducto = ({
                                     onChange={(e) => setColorInput(e.target.value)}
                                   />
                                 ) : (
-                                  <p className="text-xs font-bold uppercase text-slate-800">
-                                    {v.color || "N/A"}
-                                  </p>
+                                  <>
+                                    <EtiquetasVariante variante={v} keys={["color"]} />
+                                    {!normalizarTextoVariante(v.color || v.Color) ? (
+                                      <p className="text-xs font-bold uppercase text-slate-800">N/A</p>
+                                    ) : null}
+                                  </>
                                 )}
                               </div>
 

@@ -39,15 +39,72 @@ const tdClass = "py-1 px-2 align-middle";
 const inputNumClass =
   "h-7 tabular-nums text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]";
 
+const CLASES_ETIQUETA_VARIANTE = {
+  color: "border-sky-200 bg-sky-50 text-sky-700",
+  talla: "border-amber-200 bg-amber-50 text-amber-700",
+  presentacion: "border-emerald-200 bg-emerald-50 text-emerald-700",
+};
+
+function resolverStockVariante(v) {
+  const stock =
+    v.stockActual ??
+    v.StockActual ??
+    v.existenciaActual ??
+    v.ExistenciaActual ??
+    v.existencia ??
+    v.Existencia ??
+    v.cantidadExistente ??
+    v.CantidadExistente ??
+    v.stock ??
+    v.Stock ??
+    0;
+  const n = Number(stock);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function obtenerEtiquetasVariante(v) {
+  const color = String(v.color ?? v.Color ?? "").trim();
+  const talla = String(v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "").trim();
+  const presentacion = String(
+    v.presentacionNombre ?? v.PresentacionNombre ?? v.presentacion ?? v.Presentacion ?? ""
+  ).trim();
+
+  return [
+    color ? { key: "color", value: color } : null,
+    talla ? { key: "talla", value: talla } : null,
+    presentacion ? { key: "presentacion", value: presentacion } : null,
+  ].filter(Boolean);
+}
+
+function EtiquetasVarianteCompactas({ item, className = "" }) {
+  const etiquetas = obtenerEtiquetasVariante(item);
+  if (!etiquetas.length) return null;
+
+  return (
+    <div className={cn("mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden", className)}>
+      {etiquetas.map((etiqueta) => (
+        <span
+          key={etiqueta.key}
+          className={cn(
+            "min-w-0 max-w-[7.5rem] truncate rounded border px-1.5 py-px text-[10px] leading-none font-medium",
+            CLASES_ETIQUETA_VARIANTE[etiqueta.key]
+          )}
+          title={etiqueta.value}
+        >
+          {etiqueta.value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function VarianteOpcion({ v, onElegir }) {
   const idVariante = v.idVariante ?? v.IdVariante;
   const disp = v.disponibleParaCompra ?? v.DisponibleParaCompra;
   const motivo = v.motivoNoDisponible ?? v.MotivoNoDisponible;
   const nombre = v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
   const sku = v.sku ?? v.Sku ?? "";
-  const color = v.color ?? v.Color ?? "";
-  const talla = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
-  const detalle = [color, talla].filter(Boolean).join(" · ");
+  const stock = resolverStockVariante(v);
   const sinId = idVariante == null || Number(idVariante) <= 0;
   const deshabilitado = disp === false || sinId;
   const tooltip = sinId
@@ -55,9 +112,6 @@ function VarianteOpcion({ v, onElegir }) {
     : disp === false
     ? motivo || "No disponible para compra"
     : undefined;
-
-  const stockVal = v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0;
-
   return (
     <button
       type="button"
@@ -68,24 +122,22 @@ function VarianteOpcion({ v, onElegir }) {
         if (!deshabilitado) onElegir(v);
       }}
       className={cn(
-        "w-full min-w-0 text-left px-3 py-2 text-sm border-b border-(--color-gris-claro-2) last:border-0",
-        deshabilitado ? "cursor-not-allowed opacity-50" : "hover:bg-(--color-pagina-hover)"
+        "w-full min-w-0 text-left px-3 py-2 text-sm border-b border-(--color-gris-claro-2) transition-colors last:border-0",
+        deshabilitado ? "cursor-not-allowed opacity-50" : "hover:bg-(--color-pagina-4)"
       )}
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="min-w-0 flex-1 overflow-hidden">
           <p className="truncate font-medium text-(--color-negro)">{nombre}</p>
-          {detalle ? (
-            <p className="truncate text-xs text-(--color-gris-letra)">{detalle}</p>
-          ) : null}
+          <EtiquetasVarianteCompactas item={v} />
           {sinId ? (
             <span className="text-[10px] font-bold uppercase text-(--color-rojo)">Sin id variante</span>
           ) : null}
         </div>
         <div className="shrink-0 flex flex-col items-end text-right gap-0.5">
           <span className="font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
-          <span className={cn("text-[10px] font-bold", stockVal > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
-            Stock: {stockVal}
+          <span className={cn("text-[10px] font-bold", stock > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
+            Stock: {stock}
           </span>
         </div>
       </div>
@@ -370,6 +422,7 @@ export function CompraLineasProductos({
                   <TableCell className={tdClass}>
                     <div>
                       <p className="text-xs font-medium leading-tight text-(--color-negro)">{row.nombre}</p>
+                      <EtiquetasVarianteCompactas item={row} />
                       <div className="flex flex-wrap items-center gap-x-2 text-[10px]">
                         {row.detalle ? (
                           <span className="text-(--color-gris-letra)">{row.detalle}</span>

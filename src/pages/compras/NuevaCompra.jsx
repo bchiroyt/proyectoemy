@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
+import { useAuthStore } from "@/context/useAuthStore";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { esUsuarioAdmin } from "@/lib/authz";
 import {
   useActualizarCompraMutation,
   useActualizarDetalleCompraMutation,
@@ -43,6 +45,8 @@ function mapVarianteToLinea(v) {
     v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
   const color = v.color ?? v.Color ?? "";
   const tallaNombre = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
+  const presentacionNombre =
+    v.presentacionNombre ?? v.PresentacionNombre ?? v.presentacion ?? v.Presentacion ?? "";
   const detalle = [color, tallaNombre].filter(Boolean).join(" · ");
   const costo = resolverCostoCompraVariante(v);
   return {
@@ -50,6 +54,9 @@ function mapVarianteToLinea(v) {
     idVariante,
     sku,
     nombre,
+    color,
+    tallaNombre,
+    presentacionNombre,
     detalle,
     costoEstimado: costo,
     cantidadSolicitada: 1,
@@ -66,6 +73,8 @@ function mapDetalleToLinea(d) {
   const nombre = d.productoNombre ?? d.ProductoNombre ?? "";
   const color = d.color ?? d.Color ?? "";
   const tallaNombre = d.tallaNombre ?? d.TallaNombre ?? "";
+  const presentacionNombre =
+    d.presentacionNombre ?? d.PresentacionNombre ?? d.presentacion ?? d.Presentacion ?? "";
   const detalle = [color, tallaNombre].filter(Boolean).join(" · ");
   const cantidadSolicitada = Number(d.cantidadSolicitada ?? d.CantidadSolicitada ?? 1);
   const costoEstimado = Number(d.costoEstimado ?? d.CostoEstimado ?? 0);
@@ -74,6 +83,9 @@ function mapDetalleToLinea(d) {
     idVariante,
     sku,
     nombre,
+    color,
+    tallaNombre,
+    presentacionNombre,
     detalle,
     costoEstimado,
     cantidadSolicitada,
@@ -85,6 +97,7 @@ function mapDetalleToLinea(d) {
 const NuevaCompra = () => {
   const navigate = useNavigate();
   const setTitulo = useNavigationStore((s) => s.setTitulo);
+  const user = useAuthStore((s) => s.user);
   const [searchParams] = useSearchParams();
   const editParam = searchParams.get("edit");
   const idCompraEdit = editParam && /^\d+$/.test(editParam) ? Number(editParam) : null;
@@ -92,6 +105,7 @@ const NuevaCompra = () => {
 
   const modeParam = (searchParams.get("mode") || "").toLowerCase();
   const isDirecta = !isEdit && modeParam === "directa";
+  const puedeGestionarCompraCredito = useMemo(() => esUsuarioAdmin(user), [user]);
 
   const [proveedor, setProveedor] = useState("");
   const [fechaPedido, setFechaPedido] = useState(() => new Date().toISOString().slice(0, 10));
@@ -151,6 +165,12 @@ const NuevaCompra = () => {
     setEsCredito(false);
     setFechaVencimientoCredito("");
   }, [isDirecta]);
+
+  useEffect(() => {
+    if (puedeGestionarCompraCredito) return;
+    setEsCredito(false);
+    setFechaVencimientoCredito("");
+  }, [puedeGestionarCompraCredito]);
 
   const proveedores = useMemo(() => {
     const raw = provQ.data ?? [];
@@ -301,7 +321,8 @@ const NuevaCompra = () => {
 
     try {
       if (isDirecta) {
-        if (esCredito) {
+        const esCompraCredito = puedeGestionarCompraCredito && esCredito;
+        if (esCompraCredito) {
           if (!fechaVencimientoCredito) {
             setFormError("Seleccione la fecha de vencimiento del credito.");
             return;
@@ -325,8 +346,8 @@ const NuevaCompra = () => {
         const body = {
           ...header,
           confirmarCantidadMayorSolicitada: false,
-          esCredito,
-          ...(esCredito ? { fechaVencimientoCredito } : {}),
+          esCredito: esCompraCredito,
+          ...(esCompraCredito ? { fechaVencimientoCredito } : {}),
           detalles: lineas.map((l) => {
             const sync = sincronizarLineaCompraDirecta(l);
             return {
@@ -498,7 +519,7 @@ const NuevaCompra = () => {
           onDocumentoRefChange={setDocumentoRef}
           tipoComprobante={tipoComprobante}
           onTipoComprobanteChange={setTipoComprobante}
-          showCreditoControls={isDirecta}
+          showCreditoControls={isDirecta && puedeGestionarCompraCredito}
           esCredito={esCredito}
           onEsCreditoChange={cambiarEsCredito}
           fechaVencimientoCredito={fechaVencimientoCredito}
