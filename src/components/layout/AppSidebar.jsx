@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { Home, Package, PlusCircle, ShoppingCart, Landmark, Users, LayoutDashboard,
-    Settings, LogOut, Store, PanelLeft, Briefcase } from "lucide-react";
+import { Home, Boxes, ShoppingCart, Landmark, Users, LayoutDashboard,
+    Settings, LogOut, Store, PanelLeft, Briefcase, ChevronDown, Truck, BarChart3, SlidersHorizontal } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter,
-    SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
+    SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuAction,
+    SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import logoImg from "@/assets/tran1.png";
@@ -20,10 +21,27 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const menuItems = [
     { icon: Home, label: "Panel de Control", to: "/panel-control" },
-    { icon: Package, label: "Inventario", to: "/inventario" },
+    {
+        icon: Boxes,
+        label: "Inventario",
+        to: "/inventario",
+        children: [
+            { icon: Truck, label: "Proveedores", to: "/inventario/proveedores" },
+            { icon: BarChart3, label: "Reporte de Stock", to: "/inventario/reporte-stock" },
+            { icon: SlidersHorizontal, label: "Ajustes", to: "/inventario/ajuste" },
+        ],
+    },
     { icon: ShoppingCart, label: "Compras", to: "/compras" },
     { icon: Store, label: "POS", to: "/pos" },
     { icon: Briefcase, label: "Mayoreo", to: "/mayoreo" },
@@ -33,6 +51,7 @@ const menuItems = [
 ];
 
 const isRouteActive = (pathname, to) => {
+    if (to === "/inventario") return pathname === "/inventario" || pathname.startsWith("/inventario/");
     if (to === "/compras") return pathname === "/compras" || pathname.startsWith("/compras/");
     if (to === "/pos") return pathname === "/pos" || pathname.startsWith("/pos/");
     if (to === "/mayoreo") return pathname === "/mayoreo" || pathname.startsWith("/mayoreo/");
@@ -40,19 +59,80 @@ const isRouteActive = (pathname, to) => {
 };
 
 const AppSidebar = () => {
-    const { setOpenMobile, state, toggleSidebar } = useSidebar();
+    const { isMobile, open, setOpen, setOpenMobile, state, toggleSidebar } = useSidebar();
     const location = useLocation();
     const navigate = useNavigate();
     const logout = useAuthStore((s) => s.logout);
     const attemptNavigation = useNavigationStore((s) => s.attemptNavigation);
     const [logoutOpen, setLogoutOpen] = useState(false);
+    const inventarioItem = menuItems.find((item) => item.to === "/inventario");
+    const inventarioChildren = inventarioItem?.children ?? [];
+    const inventarioSubmenuActivo = inventarioChildren.some((item) => isRouteActive(location.pathname, item.to));
+    const sidebarColapsada = !isMobile && state === "collapsed";
+    const [inventarioMenuOpen, setInventarioMenuOpen] = useState(
+        () => isRouteActive(location.pathname, "/inventario") || inventarioSubmenuActivo
+    );
+    const [inventarioDropdownOpen, setInventarioDropdownOpen] = useState(false);
 
-    const handleMenuNavigate = (event, to) => {
+    useEffect(() => {
+        if (inventarioSubmenuActivo) {
+            setInventarioMenuOpen(true);
+        }
+    }, [inventarioSubmenuActivo]);
+
+    useEffect(() => {
+        if (!sidebarColapsada) {
+            setInventarioDropdownOpen(false);
+        }
+    }, [sidebarColapsada]);
+
+    useEffect(() => {
+        setInventarioDropdownOpen(false);
+    }, [location.pathname]);
+
+    const handleParentMenuClick = (item) => {
         setOpenMobile(false);
+
+        if (sidebarColapsada) {
+            setInventarioDropdownOpen((prev) => !prev);
+            return;
+        }
+
+        setInventarioMenuOpen(true);
+        if (location.pathname === item.to) return;
+        if (!attemptNavigation(item.to)) return;
+        navigate(item.to);
+    };
+
+    const handleMenuNavigate = (event, item) => {
+        setOpenMobile(false);
+        const to = item.to;
         if (location.pathname === to) return;
         if (!attemptNavigation(to)) {
             event.preventDefault();
         }
+    };
+
+    const handleCollapsedSubmenuSelect = (event, item) => {
+        if (location.pathname === item.to) {
+            setInventarioDropdownOpen(false);
+            return;
+        }
+
+        if (!attemptNavigation(item.to)) {
+            event.preventDefault();
+            return;
+        }
+
+        setInventarioDropdownOpen(false);
+        navigate(item.to);
+    };
+
+    const handleToggleInventarioMenu = () => {
+        if (!isMobile && !open) {
+            setOpen(true);
+        }
+        setInventarioMenuOpen((prev) => !prev);
     };
 
     const handleLogout = () => {
@@ -116,31 +196,162 @@ const AppSidebar = () => {
 
                 <SidebarContent className="p-2">
                     <SidebarMenu className="gap-1">
-                        {menuItems.map((item) => (
-                            <SidebarMenuItem key={item.to}>
-                                <SidebarMenuButton
-                                    asChild
-                                    size="lg"
-                                    isActive={isRouteActive(location.pathname, item.to)}
-                                    tooltip={item.label}
-                                    className={cn(
-                                        "min-h-11 data-[active=true]:bg-(--color-pagina) data-[active=true]:text-(--color-blanco)",
-                                        "hover:bg-(--color-pagina)/10 hover:text-(--color-pagina) data-[active=true]:hover:bg-(--color-pagina) data-[active=true]:hover:text-(--color-blanco)"
+                        {menuItems.map((item) => {
+                            const itemActivo = isRouteActive(location.pathname, item.to);
+                            const tieneSubmenu = item.children?.length > 0;
+
+                            return (
+                                <SidebarMenuItem key={item.to}>
+                                    {tieneSubmenu && sidebarColapsada ? (
+                                        <DropdownMenu open={inventarioDropdownOpen} onOpenChange={setInventarioDropdownOpen}>
+                                            <DropdownMenuTrigger asChild>
+                                                <SidebarMenuButton
+                                                    type="button"
+                                                    size="lg"
+                                                    isActive={itemActivo}
+                                                    aria-label={item.label}
+                                                    className={cn(
+                                                        "min-h-11 data-[active=true]:bg-(--color-pagina) data-[active=true]:text-(--color-blanco) [&_svg]:size-7",
+                                                        "hover:bg-(--color-pagina)/10 hover:text-(--color-pagina) data-[active=true]:hover:bg-(--color-pagina) data-[active=true]:hover:text-(--color-blanco)"
+                                                    )}
+                                                >
+                                                    <item.icon className="size-8 shrink-0" />
+                                                    <span className="overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] max-w-40 opacity-100 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:-translate-x-1 group-data-[state=collapsed]:opacity-0">
+                                                        {item.label}
+                                                    </span>
+                                                </SidebarMenuButton>
+                                            </DropdownMenuTrigger>
+
+                                            <DropdownMenuContent
+                                                side="right"
+                                                align="start"
+                                                sideOffset={12}
+                                                className="w-60 rounded-xl border border-(--color-gris-claro-2) bg-(--color-blanco) p-1.5 shadow-xl"
+                                            >
+                                                <DropdownMenuLabel className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-(--color-gris-letra)">
+                                                    {item.label}
+                                                </DropdownMenuLabel>
+                                                <DropdownMenuSeparator className="mx-0 my-1 bg-(--color-gris-claro-2)" />
+                                                <DropdownMenuItem
+                                                    onSelect={(event) => handleCollapsedSubmenuSelect(event, item)}
+                                                    className="cursor-pointer rounded-lg px-2 py-2 text-sm font-semibold text-(--color-negro) focus:bg-(--color-pagina)/10 focus:text-(--color-pagina)"
+                                                >
+                                                    <item.icon className="size-4" />
+                                                    <span>Ver inventario</span>
+                                                </DropdownMenuItem>
+                                                {item.children.map((subitem) => (
+                                                    <DropdownMenuItem
+                                                        key={subitem.to}
+                                                        onSelect={(event) => handleCollapsedSubmenuSelect(event, subitem)}
+                                                        className={cn(
+                                                            "cursor-pointer rounded-lg px-2 py-2 text-sm text-(--color-gris-letra) focus:bg-(--color-pagina)/10 focus:text-(--color-pagina)",
+                                                            isRouteActive(location.pathname, subitem.to) && "bg-(--color-pagina) font-semibold text-(--color-blanco) focus:bg-(--color-pagina) focus:text-(--color-blanco)"
+                                                        )}
+                                                    >
+                                                        {subitem.icon ? <subitem.icon className="size-4" /> : null}
+                                                        <span>{subitem.label}</span>
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    ) : tieneSubmenu ? (
+                                        <div className="relative">
+                                            <SidebarMenuButton
+                                                type="button"
+                                                size="lg"
+                                                isActive={itemActivo || inventarioMenuOpen}
+                                                tooltip={item.label}
+                                                onClick={() => handleParentMenuClick(item)}
+                                                className={cn(
+                                                    "min-h-11 data-[active=true]:bg-(--color-pagina) data-[active=true]:text-(--color-blanco) [&_svg]:size-7",
+                                                    "hover:bg-(--color-pagina)/10 hover:text-(--color-pagina) data-[active=true]:hover:bg-(--color-pagina) data-[active=true]:hover:text-(--color-blanco)"
+                                                )}
+                                            >
+                                                <item.icon className="size-8 shrink-0" />
+                                                <span className="overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] max-w-40 opacity-100 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:-translate-x-1 group-data-[state=collapsed]:opacity-0">
+                                                    {item.label}
+                                                </span>
+                                            </SidebarMenuButton>
+
+                                            <SidebarMenuAction
+                                                aria-label={inventarioMenuOpen ? "Contraer submenú de inventario" : "Expandir submenú de inventario"}
+                                                aria-expanded={inventarioMenuOpen}
+                                                onClick={handleToggleInventarioMenu}
+                                                className={cn(
+                                                    "top-1 bottom-1 right-1 w-8 aspect-auto rounded-lg px-1.5 text-(--color-gris-letra) hover:bg-(--color-pagina)/10 hover:text-(--color-pagina) focus:bg-(--color-pagina)/10 focus:text-(--color-pagina)",
+                                                    (itemActivo || inventarioMenuOpen) &&
+                                                      "text-(--color-blanco) hover:bg-(--color-pagina) hover:text-(--color-blanco)"
+                                                )}
+                                            >
+                                                <ChevronDown
+                                                    className={cn(
+                                                        "size-4 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                                                        inventarioMenuOpen && "rotate-180"
+                                                    )}
+                                                />
+                                            </SidebarMenuAction>
+                                        </div>
+                                    ) : (
+                                        <SidebarMenuButton
+                                            asChild
+                                            size="lg"
+                                            isActive={itemActivo}
+                                            tooltip={item.label}
+                                            className={cn(
+                                                "min-h-11 data-[active=true]:bg-(--color-pagina) data-[active=true]:text-(--color-blanco)",
+                                                "hover:bg-(--color-pagina)/10 hover:text-(--color-pagina) data-[active=true]:hover:bg-(--color-pagina) data-[active=true]:hover:text-(--color-blanco)"
+                                            )}
+                                        >
+                                            <NavLink
+                                                to={item.to}
+                                                onClick={(event) => handleMenuNavigate(event, item)}
+                                                className="flex w-full items-center gap-2 outline-none ring-sidebar-ring [&_svg]:size-7"
+                                            >
+                                                <item.icon className="size-8 shrink-0" />
+                                                <span className="overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] max-w-40 opacity-100 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:-translate-x-1 group-data-[state=collapsed]:opacity-0">
+                                                    {item.label}
+                                                </span>
+                                            </NavLink>
+                                        </SidebarMenuButton>
                                     )}
-                                >
-                                    <NavLink
-                                        to={item.to}
-                                        onClick={(event) => handleMenuNavigate(event, item.to)}
-                                        className="flex w-full items-center gap-2 outline-none ring-sidebar-ring [&_svg]:size-7"
-                                    >
-                                        <item.icon className="size-8 shrink-0" />
-                                        <span className="overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] max-w-40 opacity-100 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:-translate-x-1 group-data-[state=collapsed]:opacity-0">
-                                            {item.label}
-                                        </span>
-                                    </NavLink>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        ))}
+
+                                    {tieneSubmenu && !sidebarColapsada ? (
+                                        <div
+                                            className={cn(
+                                                "grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[state=collapsed]:hidden",
+                                                inventarioMenuOpen ? "mt-1 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                                            )}
+                                        >
+                                            <div className="min-h-0 overflow-hidden">
+                                                <SidebarMenuSub className="border-l-(--color-gris-claro-2) py-1">
+                                                    {item.children.map((subitem) => (
+                                                        <SidebarMenuSubItem key={subitem.to}>
+                                                            <SidebarMenuSubButton
+                                                                asChild
+                                                                isActive={isRouteActive(location.pathname, subitem.to)}
+                                                                className={cn(
+                                                                    "h-8 rounded-lg text-[13px] text-(--color-gris-letra) hover:bg-(--color-pagina)/10 hover:text-(--color-pagina)",
+                                                                    "data-[active=true]:bg-(--color-pagina) data-[active=true]:font-semibold data-[active=true]:text-(--color-blanco)"
+                                                                )}
+                                                            >
+                                                                <NavLink
+                                                                    to={subitem.to}
+                                                                    onClick={(event) => handleMenuNavigate(event, subitem)}
+                                                                    className="flex w-full items-center gap-2"
+                                                                >
+                                                                    {subitem.icon ? <subitem.icon className="size-4 shrink-0" /> : null}
+                                                                    <span>{subitem.label}</span>
+                                                                </NavLink>
+                                                            </SidebarMenuSubButton>
+                                                        </SidebarMenuSubItem>
+                                                    ))}
+                                                </SidebarMenuSub>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </SidebarMenuItem>
+                            );
+                        })}
                     </SidebarMenu>
                 </SidebarContent>
 

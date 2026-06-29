@@ -340,14 +340,14 @@ const TablaProductos = ({ productos = [], loading = false, onRefresh }) => {
                           >
                             <PackageSearch className="h-5 w-5" />
                           </button>
-
+{/* 
                           <button
                             onClick={() => handleVariantes(item)}
                             className="text-gray-500 transition hover:text-yellow-500"
                             title="Variantes"
                           >
                             <Clock className="h-5 w-5" />
-                          </button>
+                          </button> */}
                         </div>
                       </td>
                     </tr>
