@@ -125,15 +125,15 @@ export function SinCajaActivaCard({
               <div className="mx-auto my-8 max-w-md border-t border-gray-200" />
               <div className="mx-auto max-w-md space-y-3 text-left text-base">
                 <div className="flex items-center justify-between gap-4 text-gray-900">
-                  <span className="font-bold">Fecha de cierre</span>
-                  <span className="font-bold">{ULTIMO_CIERRE_MOCK.fecha}</span>
+                  {/* <span className="font-bold">Fecha de cierre</span>
+                  <span className="font-bold">{ULTIMO_CIERRE_MOCK.fecha}</span> */}
                 </div>
                 <div className="flex items-center justify-between gap-4 text-gray-900">
-                  <span className="font-bold">Último balance de cierre de efectivo</span>
+{/*                   <span className="font-bold">Último balance de cierre de efectivo</span>
                   <span className="font-bold tabular-nums">
                     Q {ULTIMO_CIERRE_MOCK.balanceEfectivo.toFixed(2)}
                   </span>
-                </div>
+ */}                </div>
               </div>
             </>
           )}
