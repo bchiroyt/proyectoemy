@@ -46,12 +46,14 @@ export function useCrearVentaMutation(options = {}) {
 
 export function useVentaTicketQuery(idVenta, options = {}) {
   const id = Number(idVenta);
+  const { idCaja, enabled, ...rest } = options;
+  const idCajaNorm = idCaja != null ? Number(idCaja) : undefined;
   return useQuery({
-    queryKey: [QK_VENTA_CATALOGO, "ticket", id],
-    queryFn: () => fetchVentaTicket(id),
-    enabled: Number.isFinite(id) && id > 0 && (options.enabled ?? true),
+    queryKey: [QK_VENTA_CATALOGO, "ticket", id, { idCaja: idCajaNorm }],
+    queryFn: () => fetchVentaTicket(id, { idCaja: idCajaNorm }),
+    enabled: Number.isFinite(id) && id > 0 && (enabled ?? true),
     retry: 1,
-    ...options,
+    ...rest,
   });
 }
 

@@ -1,6 +1,6 @@
 import { ShoppingCart, Barcode } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { descuentoMontoLinea, subtotalLinea, roundVenta } from "@/lib/ventaMappers";
+import { descuentoMontoLinea, subtotalLinea, roundVenta, precioUnitarioLinea, precioUnitarioConDescuentoLinea, brutoLinea } from "@/lib/ventaMappers";
 import {
   Table,
   TableBody,
@@ -29,7 +29,7 @@ export function CarritoPanel({
 
   const subtotalBrutoCarrito = roundVenta(
     carrito.reduce(
-      (acc, p) => acc + (lineaAportaTotal(p) ? p.precio * p.cantidad : 0),
+      (acc, p) => acc + (lineaAportaTotal(p) ? brutoLinea(p) : 0),
       0
     )
   );
@@ -103,7 +103,7 @@ export function CarritoPanel({
                 <TableHead className="text-(--color-pos-texto-muted) text-right w-12">
                   Cant.
                 </TableHead>
-                <TableHead className="text-(--color-pos-texto-muted) text-right w-16">
+                <TableHead className="text-(--color-pos-texto-muted) text-right w-[4.5rem]">
                   P.u.
                 </TableHead>
                 <TableHead className="text-(--color-pos-texto-muted) text-right w-20">
@@ -118,6 +118,9 @@ export function CarritoPanel({
                 const cantNum = item.cantidad;
                 const descLinea = descuentoMontoLinea(item);
                 const subLinea = subtotalLinea(item);
+                const precioUnit = precioUnitarioLinea(item);
+                const precioUnitDesc = precioUnitarioConDescuentoLinea(item);
+                const brutoLineaItem = brutoLinea(item);
 
                 return (
                   <TableRow
@@ -161,24 +164,30 @@ export function CarritoPanel({
                     >
                       {cantStr}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-(--color-pos-texto-muted) align-top py-2.5">
-                      {item.precio.toFixed(2)}
+                    <TableCell className="text-right tabular-nums align-top py-2.5">
+                      {descLinea > 0 ? (
+                        <>
+                          <span className="block text-[11px] font-normal text-(--color-pos-texto-muted) line-through">
+                            {precioUnit.toFixed(2)}
+                          </span>
+                          <span className="block font-semibold text-(--color-esmeralda-hover)">
+                            {precioUnitDesc.toFixed(2)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-(--color-pos-texto-muted)">{precioUnit.toFixed(2)}</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums align-top py-2.5">
                       {descLinea > 0 ? (
                         <>
                           <span className="block text-[11px] font-normal text-(--color-pos-texto-muted) line-through">
-                            {(item.precio * cantNum).toFixed(2)}
+                            {brutoLineaItem.toFixed(2)}
                           </span>
                           <span className="block">{subLinea.toFixed(2)}</span>
-                          <span className="block text-[10px] font-semibold text-(--color-esmeralda-hover)">
-                            {item.descuentoTipo === "porcentaje"
-                              ? `-${item.descuentoValor}%`
-                              : `-Q${descLinea.toFixed(2)}`}
-                          </span>
                         </>
                       ) : (
-                        (item.precio * cantNum).toFixed(2)
+                        brutoLineaItem.toFixed(2)
                       )}
                     </TableCell>
                   </TableRow>

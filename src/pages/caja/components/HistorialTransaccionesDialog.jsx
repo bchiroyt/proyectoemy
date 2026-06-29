@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,8 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import Paginacion from "@/components/shared/Paginacion";
 import { useVentasHistorialQuery } from "@/hooks/queries/useVentaQueries";
-import { etiquetaEstadoVenta } from "@/lib/ventaMappers";
+import { etiquetaEstadoVenta, enriquecerTicketEncabezado } from "@/lib/ventaMappers";
+import { useAuthStore } from "@/context/useAuthStore";
 import { fmtQ } from "@/lib/cajaMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { useVentaTicketQuery } from "@/hooks/queries/useVentaQueries";
@@ -48,13 +49,13 @@ function formatearFechaHora(valor) {
   return fecha.toLocaleString("es-GT");
 }
 
-export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
+export function HistorialTransaccionesDialog({ open, onOpenChange }) {
   const [page, setPage] = useState(1);
-  const [ticketPreviewId, setTicketPreviewId] = useState(null);
+  const [ticketPreview, setTicketPreview] = useState(null);
 
   useEffect(() => {
     if (open) setPage(1);
-  }, [open, idCaja]);
+  }, [open]);
 
   const ventasQ = useVentasHistorialQuery(
     { page, pageSize: PAGE_SIZE },
@@ -103,7 +104,13 @@ export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
                     <TableRow 
                       key={venta.idVenta} 
                       className="hover:bg-muted/30 cursor-pointer transition-colors"
-                      onClick={() => setTicketPreviewId(venta.idVenta)}
+                      onClick={() =>
+                        setTicketPreview({
+                          idVenta: venta.idVenta,
+                          idCaja: venta.idCaja,
+                          cajeroNombre: venta.usuarioNombre,
+                        })
+                      }
                     >
                       <TableCell className="font-mono font-semibold text-(--color-pagina)">
                         {venta.numeroTicket || `#${venta.idVenta}`}
@@ -157,13 +164,13 @@ export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
         </div>
       </DialogContent>
       
-      <Dialog open={!!ticketPreviewId} onOpenChange={(o) => !o && setTicketPreviewId(null)}>
+      <Dialog open={!!ticketPreview} onOpenChange={(o) => !o && setTicketPreview(null)}>
         <DialogContent aria-describedby={undefined} className="flex flex-col gap-0 p-0 sm:max-w-md h-[90vh] sm:h-auto overflow-hidden">
           <DialogHeader className="shrink-0 border-b px-6 py-4 flex flex-row justify-between items-center">
             <DialogTitle className="text-lg">Reimpresión de ticket</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto bg-muted/30 p-4">
-            <TicketPreviewContent idVenta={ticketPreviewId} />
+            <TicketPreviewContent venta={ticketPreview} />
           </div>
         </DialogContent>
       </Dialog>
@@ -171,8 +178,27 @@ export function HistorialTransaccionesDialog({ open, onOpenChange, idCaja }) {
   );
 }
 
-function TicketPreviewContent({ idVenta }) {
-  const ticketQ = useVentaTicketQuery(idVenta, { enabled: !!idVenta });
+function TicketPreviewContent({ venta }) {
+  const user = useAuthStore((s) => s.user);
+  const nombreSesion =
+    user?.nombreMostrar ||
+    [user?.nombres, user?.apellidos].filter(Boolean).join(" ").trim() ||
+    user?.username ||
+    "";
+  const cajeroFallback = venta?.cajeroNombre || nombreSesion;
+  const idVenta = venta?.idVenta;
+  const idCaja = venta?.idCaja;
+
+  const ticketQ = useVentaTicketQuery(idVenta, {
+    enabled: !!idVenta,
+    idCaja,
+  });
+
+  const ticket = useMemo(() => {
+    const base = ticketQ.data?.data;
+    if (!base) return null;
+    return enriquecerTicketEncabezado(base, { cajeroFallback });
+  }, [ticketQ.data, cajeroFallback]);
   
   if (ticketQ.isLoading) {
     return (
@@ -187,31 +213,37 @@ function TicketPreviewContent({ idVenta }) {
     return (
       <div className="rounded-lg border border-destructive/30 bg-red-50 p-4 text-sm text-(--color-rojo)">
         {getApiErrorMessage(ticketQ.error, "Error al cargar el ticket.")}
+        <p className="mt-2 text-xs text-(--color-rojo-obscuro)/80 leading-relaxed">
+          Este mensaje lo devuelve el servidor al generar el ticket. Si menciona
+          sucursal activa, debe corregirse en el backend para que use la ubicación
+          o sucursal guardada en la venta, no la sesión actual.
+        </p>
       </div>
     );
   }
-  
-  const ticket = ticketQ.data?.data;
+
   if (!ticket) return null;
   
   const isReembolso = ticket.tipo === "reembolso";
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="ticket-page flex flex-col gap-4">
       {isReembolso ? (
-        <ReembolsoTicketPreview ticket={ticket} />
+        <ReembolsoTicketPreview ticket={ticket} data-print-source />
       ) : (
-        <TicketVentaPreview ticket={ticket} />
+        <TicketVentaPreview ticket={ticket} data-print-source />
       )}
-      
-      <Button 
-        onClick={() => imprimirTicket()} 
-        className="w-full mt-2 font-bold bg-(--color-pagina) hover:bg-(--color-pagina-2) text-white"
-        size="lg"
-      >
-        <Printer className="mr-2 h-5 w-5" />
-        Imprimir Ticket
-      </Button>
+
+      <div className="ticket-actions">
+        <Button
+          onClick={() => imprimirTicket()}
+          className="w-full mt-2 font-bold bg-(--color-pagina) hover:bg-(--color-pagina-2) text-white"
+          size="lg"
+        >
+          <Printer className="mr-2 h-5 w-5" />
+          Imprimir Ticket
+        </Button>
+      </div>
     </div>
   );
 }

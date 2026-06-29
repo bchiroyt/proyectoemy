@@ -151,24 +151,39 @@ export function roundVenta(n) {
 
 /** Importe bruto de la línea (precio × cantidad), sin descuento. */
 export function brutoLinea(item) {
-  const precioUnitario = item?.precioNegociado != null ? Number(item.precioNegociado) : Number(item?.precio) || 0;
+  const precioUnitario = precioUnitarioLinea(item);
   return roundVenta(precioUnitario * (Number(item?.cantidad) || 0));
+}
+
+/** Precio unitario de catálogo (sin descuento de línea). */
+export function precioUnitarioLinea(item) {
+  return item?.precioNegociado != null
+    ? Number(item.precioNegociado)
+    : Number(item?.precio) || 0;
+}
+
+/** Precio unitario efectivo tras aplicar el descuento de la línea. */
+export function precioUnitarioConDescuentoLinea(item) {
+  const cantidad = Number(item?.cantidad) || 0;
+  if (cantidad <= 0) return precioUnitarioLinea(item);
+  return roundVenta(subtotalLinea(item) / cantidad);
 }
 
 /**
  * Descuento en MONTO de una línea, derivado de su tipo/valor.
- * - tipo "porcentaje": valor es el % (tope 100) → monto = bruto × %/100.
- * - tipo "monto": valor es el monto fijo.
+ * - tipo "porcentaje": valor es el % por unidad (tope 100) → monto = bruto × %/100.
+ * - tipo "monto": valor es el descuento fijo por unidad → monto = valor × cantidad.
  * Siempre se topa entre 0 y el bruto (el backend rechaza subtotal negativo).
  */
 export function descuentoMontoLinea(item) {
   const bruto = brutoLinea(item);
+  const cantidad = Number(item?.cantidad) || 0;
   const valor = Number(item?.descuentoValor) || 0;
-  if (!item?.descuentoTipo || valor <= 0 || bruto <= 0) return 0;
+  if (!item?.descuentoTipo || valor <= 0 || bruto <= 0 || cantidad <= 0) return 0;
   const monto =
     item.descuentoTipo === "porcentaje"
       ? roundVenta((bruto * Math.min(valor, 100)) / 100)
-      : roundVenta(valor);
+      : roundVenta(valor * cantidad);
   return Math.max(0, Math.min(monto, bruto));
 }
 
@@ -252,19 +267,17 @@ function mapTicketPago(raw) {
 export function enriquecerTicketEncabezado(ticket, { cajeroFallback = "" } = {}) {
   if (!ticket) return null;
 
-  const nombre =
-    String(ticket.nombreNegocio ?? "").trim() || TICKET_NEGOCIO_NOMBRE;
-  const direccion =
-    String(ticket.direccion ?? "").trim() || TICKET_NEGOCIO_DIRECCION;
   const cajero =
     String(ticket.cajero || "").trim() ||
     String(cajeroFallback || "").trim() ||
     "Cajero";
 
+  // El API suele enviar el nombre de la ubicación en nombreNegocio; en ticket
+  // mostramos solo el negocio y dirección fijos, sin ubicación de inventario.
   return {
     ...ticket,
-    nombreNegocio: nombre,
-    direccion,
+    nombreNegocio: TICKET_NEGOCIO_NOMBRE,
+    direccion: TICKET_NEGOCIO_DIRECCION,
     cajero,
   };
 }
