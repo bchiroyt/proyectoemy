@@ -56,6 +56,8 @@ function VarianteOpcion({ v, onElegir }) {
     ? motivo || "No disponible para compra"
     : undefined;
 
+  const stockVal = v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0;
+
   return (
     <button
       type="button"
@@ -80,7 +82,12 @@ function VarianteOpcion({ v, onElegir }) {
             <span className="text-[10px] font-bold uppercase text-(--color-rojo)">Sin id variante</span>
           ) : null}
         </div>
-        <span className="shrink-0 font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
+        <div className="shrink-0 flex flex-col items-end text-right gap-0.5">
+          <span className="font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
+          <span className={cn("text-[10px] font-bold", stockVal > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
+            Stock: {stockVal}
+          </span>
+        </div>
       </div>
     </button>
   );
@@ -363,9 +370,16 @@ export function CompraLineasProductos({
                   <TableCell className={tdClass}>
                     <div>
                       <p className="text-xs font-medium leading-tight text-(--color-negro)">{row.nombre}</p>
-                      {row.detalle ? (
-                        <p className="text-[10px] text-(--color-gris-letra)">{row.detalle}</p>
-                      ) : null}
+                      <div className="flex flex-wrap items-center gap-x-2 text-[10px]">
+                        {row.detalle ? (
+                          <span className="text-(--color-gris-letra)">{row.detalle}</span>
+                        ) : null}
+                        {row.stockActual !== undefined && row.stockActual !== null ? (
+                          <span className={cn("font-bold", row.stockActual > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
+                            {row.detalle ? " · " : ""}Stock: {row.stockActual}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className={cn(tdClass, "font-mono text-[10px]")}>{row.sku}</TableCell>

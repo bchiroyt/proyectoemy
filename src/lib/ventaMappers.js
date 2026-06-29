@@ -34,6 +34,17 @@ export function mapCatalogoProducto(raw) {
 
   const categoria = pick(raw, "categoria", "Categoria") ?? "";
   const precio = Number(pick(raw, "precioVentaActual", "PrecioVentaActual") ?? 0);
+  const precioVentaMayor = Number(
+    pick(
+      raw,
+      "precioVentaMayorActual",
+      "PrecioVentaMayorActual",
+      "precioVentaMayor",
+      "PrecioVentaMayor",
+      "precioMayor",
+      "PrecioMayor"
+    ) ?? 0
+  );
   const stockRaw = pick(raw, "stockActual", "StockActual");
   const stockActual =
     stockRaw === undefined || stockRaw === null ? null : Number(stockRaw);
@@ -58,6 +69,7 @@ export function mapCatalogoProducto(raw) {
     presentacion: pick(raw, "presentacion", "Presentacion") ?? null,
     urlImagen: pick(raw, "urlImagen", "UrlImagen", "imagen", "Imagen") ?? null,
     precio,
+    precioVentaMayor,
     costoPromedioActual,
     stockActual,
     codigo: pick(raw, "sku", "Sku") ?? "",
@@ -175,7 +187,7 @@ export function buildVentaCrearBody(carrito, pagos, { observaciones = null, idCa
         idVariante: l.idVariante,
         cantidad: l.cantidad,
         descuentoMonto: descuento > 0 ? descuento : null,
-        idUbicacion: l.idUbicacion ?? null,
+        idUbicacion: l.idUbicacion ?? 1, // Fallback a 1 para que el ticket encuentre la sucursal
       };
     });
 

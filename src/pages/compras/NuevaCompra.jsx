@@ -55,6 +55,7 @@ function mapVarianteToLinea(v) {
     cantidadSolicitada: 1,
     cantidadRecibida: 1,
     costoReal: costo,
+    stockActual: v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0,
   };
 }
 

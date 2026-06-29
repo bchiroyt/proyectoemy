@@ -357,15 +357,21 @@ const CierreCaja = () => {
           <button
             type="button"
             onClick={handleConfirmar}
-            disabled={cerrarM.isPending || ticketsPendientes > 0 || loading}
+            disabled={cerrarM.isPending || ticketsPendientes > 0 || loading || !miCajaQ.data?.data?.puedeCerrar}
             className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-(--color-rojo) px-4 py-2.5 text-sm font-bold text-(--color-blanco) hover:bg-(--color-rojo-obscuro) disabled:opacity-50"
           >
             <Lock className="size-4" />
             {cerrarM.isPending ? "Cerrando…" : "Confirmar cierre de caja"}
           </button>
-          <p className="text-center text-[10px] text-(--color-gris-letra) mt-1">
-            Requiere NIP · No podrá registrar más movimientos en este turno
-          </p>
+          {!miCajaQ.data?.data?.puedeCerrar ? (
+            <p className="text-center text-[10px] text-(--color-rojo) mt-1 font-bold">
+              No tienes permisos para cerrar esta caja.
+            </p>
+          ) : (
+            <p className="text-center text-[10px] text-(--color-gris-letra) mt-1">
+              Requiere NIP · No podrá registrar más movimientos en este turno
+            </p>
+          )}
         </footer>
       </div>
 

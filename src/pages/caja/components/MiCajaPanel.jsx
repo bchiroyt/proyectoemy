@@ -59,6 +59,7 @@ export function MiCajaPanel() {
             <Button
               className="bg-(--color-rojo) hover:bg-(--color-rojo-obscuro) text-(--color-blanco)"
               onClick={() => navigate("/pos/cierre")}
+              disabled={!caja.puedeCerrar}
             >
               Cerrar caja
             </Button>

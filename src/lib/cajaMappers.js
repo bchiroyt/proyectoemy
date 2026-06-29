@@ -37,6 +37,8 @@ export function mapCajaAbierta(raw) {
     usuarioResponsableNombre:
       pick(raw, "usuarioResponsableNombre", "UsuarioResponsableNombre") ?? "",
     esActiva: Boolean(pick(raw, "esActiva", "EsActiva")),
+    puedeIngresar: Boolean(pick(raw, "puedeIngresar", "PuedeIngresar")),
+    puedeCerrar: Boolean(pick(raw, "puedeCerrar", "PuedeCerrar")),
   };
 }
 
@@ -94,6 +96,8 @@ export function mapCajaDetalle(raw) {
     idUsuarioCierre: toNumberOrNull(pick(raw, "idUsuarioCierre", "IdUsuarioCierre")),
     usuarioCierreNombre: pick(raw, "usuarioCierreNombre", "UsuarioCierreNombre"),
     esActiva: Boolean(pick(raw, "esActiva", "EsActiva")),
+    puedeIngresar: Boolean(pick(raw, "puedeIngresar", "PuedeIngresar")),
+    puedeCerrar: Boolean(pick(raw, "puedeCerrar", "PuedeCerrar")),
     arqueos: Array.isArray(arqueosRaw) ? arqueosRaw.map(mapArqueo).filter(Boolean) : [],
   };
 }

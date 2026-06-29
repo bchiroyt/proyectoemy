@@ -130,9 +130,6 @@ export function ReembolsoLineaConfig({
       <div className="flex flex-wrap gap-2 text-[10px]">
         <EstadoBadge activo={!!item.productoRecibido} label="Recibido" />
         <EstadoBadge activo={!!item.regresaInventario} label="A inventario" />
-        {item.regresaInventario && (
-          <span className="text-(--color-pos-texto-muted)">Ubicación: ID 1 (automática)</span>
-        )}
       </div>
 
       <details className="text-xs">

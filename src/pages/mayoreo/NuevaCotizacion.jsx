@@ -272,6 +272,7 @@ export default function NuevaCotizacion() {
                       <p className="font-semibold text-sm text-(--color-negro)">{prod.nombre}</p>
                       <p className="text-xs text-(--color-gris-letra)">
                         SKU: {prod.sku} | Stock: {prod.stockActual} | Menudeo: Q {prod.precio.toFixed(2)}
+                        {prod.precioVentaMayor > 0 && ` | Mayoreo: Q ${prod.precioVentaMayor.toFixed(2)}`}
                       </p>
                     </div>
                   </div>
