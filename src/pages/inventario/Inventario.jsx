@@ -3,10 +3,14 @@ import BarraHerramientas from "./components/BarraHerramientas";
 import Modulos from "./components/Modulos";
 import TablaProductos from "./components/TablaProductos";
 import ModalNuevoProducto from "./components/ModalNuevoProducto";
-import { obtenerProductos, buscarVariantesCompra } from "@/services/productos";
+import {
+  buscarProductosInventario,
+  completarProductosConImagen,
+  obtenerProductos,
+} from "@/services/productos";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { unwrapVariantesBuscar } from "@/lib/productoUtils";
+import { unwrapProductosBuscar } from "@/lib/productoUtils";
 
 const PAGE_SIZE = 15;
 
@@ -36,8 +40,8 @@ const Inventario = () => {
       setLoadingProductos(true);
 
       if (debouncedQuery.trim() !== "") {
-        const res = await buscarVariantesCompra(debouncedQuery);
-        const listaFiltrada = unwrapVariantesBuscar(res);
+        const res = await buscarProductosInventario(debouncedQuery);
+        const listaFiltrada = await completarProductosConImagen(unwrapProductosBuscar(res));
 
         setProductos(listaFiltrada);
         setTotalRecords(listaFiltrada.length);

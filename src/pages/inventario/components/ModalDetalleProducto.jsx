@@ -13,7 +13,14 @@ import {
 } from "lucide-react";
 
 // IMPORTACIONES OFICIALES DE TU ARQUITECTURA
-import { actualizarVariante, obtenerProductoPorId, agregarVariantesAProducto, actualizarImagenProducto, actualizarProducto } from "@/services/productos";
+import {
+  actualizarVariante,
+  obtenerProductoPorId,
+  agregarVariantesAProducto,
+  actualizarImagenProducto,
+  actualizarProducto,
+  sincronizarCacheImagenProducto,
+} from "@/services/productos";
 import { obtenerTallas } from "@/services/tallas";
 import { obtenerPresentaciones } from "@/services/presentaciones";
 import { obtenerUbicaciones } from "@/services/ubicaciones";
@@ -297,10 +304,12 @@ const ModalDetalleProducto = ({
       const raw = await obtenerProductoPorId(idProducto);
       const detalle = unwrapProductoDetalleBody(raw);
       if (detalle) {
+        const imagenCache = sincronizarCacheImagenProducto(idProducto, raw, { forzarRecarga: true });
         const detalleConFallback = mergeDetalleConFuenteBusqueda(detalle, estadoProducto || producto);
         setEstadoProducto({
           ...detalleConFallback,
           idProducto: resolverIdProducto(detalleConFallback) ?? idProducto,
+          __imagenVersion: imagenCache?.version ?? Date.now(),
         });
       }
       mostrarAviso("exito", "Imagen actualizada correctamente");
@@ -750,6 +759,18 @@ const ModalDetalleProducto = ({
           }),
         };
       });
+
+      if (idProducto) {
+        const rawDetalle = await obtenerProductoPorId(idProducto);
+        const detalle = unwrapProductoDetalleBody(rawDetalle);
+        if (detalle) {
+          const detalleConFallback = mergeDetalleConFuenteBusqueda(detalle, estadoProducto || producto);
+          setEstadoProducto({
+            ...detalleConFallback,
+            idProducto: resolverIdProducto(detalleConFallback) ?? idProducto,
+          });
+        }
+      }
 
       if (onRefresh) {
         await onRefresh();

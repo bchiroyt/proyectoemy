@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { obtenerProductos, buscarVariantesCompra } from "@/services/productos";
+import { unwrapProductosBuscar } from "@/lib/productoUtils";
+import {
+  buscarProductosInventario,
+  completarProductosConImagen,
+  obtenerProductos,
+} from "@/services/productos";
 
 export const QK_PRODUCTOS = "productos";
 
@@ -10,13 +15,7 @@ function unwrapProductosPaged(data) {
     page: Number(inner.page ?? inner.Page ?? 1) || 1,
     pageSize: Number(inner.pageSize ?? inner.PageSize ?? 15) || 15,
     totalRecords:
-      Number(
-        inner.totalRecords ??
-          inner.TotalRecords ??
-          inner.totalCount ??
-          inner.TotalCount ??
-          0
-      ) || 0,
+      Number(inner.totalRecords ?? inner.TotalRecords ?? inner.totalCount ?? inner.TotalCount ?? 0) || 0,
     totalPages: Number(inner.totalPages ?? inner.TotalPages ?? 1) || 1,
   };
 }
@@ -38,12 +37,11 @@ export function useProductosBuscarQuery(criterio, options = {}) {
   return useQuery({
     queryKey: [QK_PRODUCTOS, "buscar", q],
     queryFn: async () => {
-      const raw = await buscarVariantesCompra(q);
+      const raw = await buscarProductosInventario(q);
       if (raw && raw.exito === false) {
-        throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
+        throw new Error(raw.mensaje || raw.Mensaje || "Error en busqueda");
       }
-      const lista = raw?.data ?? raw?.Data ?? raw ?? [];
-      return Array.isArray(lista) ? lista : [];
+      return completarProductosConImagen(unwrapProductosBuscar(raw));
     },
     enabled: enabled && q.length >= 1,
     ...rest,

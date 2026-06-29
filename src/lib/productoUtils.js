@@ -410,6 +410,146 @@ export function normalizarVarianteDetalle(raw) {
   };
 }
 
+function esResultadoVarianteBusqueda(raw) {
+  if (!raw || typeof raw !== "object") return false;
+  return Boolean(
+    pick(raw, "idVariante", "IdVariante", "varianteId", "VarianteId", "variante", "Variante", "productoVariante", "ProductoVariante")
+  );
+}
+
+function sumarCampoVariantes(variantes, ...keys) {
+  if (!Array.isArray(variantes) || variantes.length === 0) return null;
+  return variantes.reduce((total, variante) => {
+    const valor = toNumberOrNull(pick(variante, ...keys)) ?? 0;
+    return total + valor;
+  }, 0);
+}
+
+function obtenerPrecioVentaProducto(variantes, ...sources) {
+  const directo = toNumberOrNull(
+    pickFrom(
+      sources,
+      "precioVentaActual",
+      "PrecioVentaActual",
+      "precioVenta",
+      "PrecioVenta",
+      "precio",
+      "Precio"
+    )
+  );
+  if (directo != null) return directo;
+  if (!Array.isArray(variantes) || variantes.length === 0) return null;
+
+  let minimo = null;
+  for (const variante of variantes) {
+    const precio = toNumberOrNull(
+      pick(variante, "precioVentaActual", "PrecioVentaActual", "precioVenta", "PrecioVenta", "precio", "Precio")
+    );
+    if (precio != null && (minimo === null || precio < minimo)) {
+      minimo = precio;
+    }
+  }
+
+  return minimo;
+}
+
+export function normalizarProductoBusqueda(raw) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const producto = pick(raw, "producto", "Producto") ?? {};
+  const categoria = pick(raw, "categoria", "Categoria") ?? {};
+  const marca = pick(raw, "marca", "Marca") ?? {};
+  const sources = [raw, producto];
+  const variantesRaw =
+    pick(raw, "variantes", "Variantes") ??
+    pick(producto, "variantes", "Variantes") ??
+    [];
+  const variantes = Array.isArray(variantesRaw)
+    ? variantesRaw.map(normalizarVarianteDetalle).filter(Boolean)
+    : [];
+  const stockActual =
+    toNumberOrNull(
+      pickFrom(
+        sources,
+        "stockActual",
+        "StockActual",
+        "stockTotal",
+        "StockTotal",
+        "existenciaActual",
+        "ExistenciaActual",
+        "existencia",
+        "Existencia",
+        "cantidadExistente",
+        "CantidadExistente",
+        "stock",
+        "Stock"
+      )
+    ) ?? sumarCampoVariantes(variantes, "stockActual", "StockActual", "stock", "Stock") ?? 0;
+  const stockMinimo =
+    toNumberOrNull(
+      pickFrom(
+        sources,
+        "stockMinimo",
+        "StockMinimo",
+        "stockMinimoTotal",
+        "StockMinimoTotal",
+        "stockMin",
+        "StockMin",
+        "minimo",
+        "Minimo"
+      )
+    ) ?? sumarCampoVariantes(variantes, "stockMinimo", "StockMinimo", "stockMin", "StockMin", "minimo", "Minimo");
+  const precioVenta = obtenerPrecioVentaProducto(variantes, ...sources);
+  const numeroVariantes =
+    toNumberOrNull(pickFrom(sources, "numeroVariantes", "NumeroVariantes", "cantidadVariantes", "CantidadVariantes")) ??
+    (Array.isArray(variantes) && variantes.length > 0 ? variantes.length : 1);
+
+  return {
+    ...raw,
+    __resultadoBusquedaInventario: true,
+    idProducto: resolverIdProducto(raw),
+    nombre:
+      pickFrom(sources, "nombre", "Nombre", "productoNombre", "ProductoNombre", "nombreProducto", "NombreProducto") ||
+      "Producto",
+    productoNombre:
+      pickFrom(sources, "productoNombre", "ProductoNombre", "nombreProducto", "NombreProducto", "nombre", "Nombre") ||
+      "Producto",
+    sku: pickFrom(sources, "sku", "Sku", "SKU", "codigoPrincipal", "CodigoPrincipal", "codigo", "Codigo"),
+    codigoPrincipal: resolverCodigoPrincipal(...sources),
+    categoriaNombre:
+      pickFrom(sources, "categoriaNombre", "CategoriaNombre", "nombreCategoria", "NombreCategoria") ||
+      (typeof categoria === "string" ? categoria : "") ||
+      pick(categoria, "nombre", "Nombre"),
+    marcaNombre:
+      pickFrom(sources, "marcaNombre", "MarcaNombre", "nombreMarca", "NombreMarca") ||
+      (typeof marca === "string" ? marca : "") ||
+      pick(marca, "nombre", "Nombre"),
+    estadoCatalogo: pickFrom(sources, "estadoCatalogo", "EstadoCatalogo"),
+    estado:
+      pickFrom(sources, "productoActivo", "ProductoActivo") ??
+      pickFrom(sources, "estado", "Estado"),
+    precioVenta,
+    precioVentaActual: precioVenta,
+    stockActual,
+    stock: stockActual,
+    stockMinimo,
+    numeroVariantes,
+    urlImagen: pickFrom(
+      sources,
+      "urlImagen",
+      "UrlImagen",
+      "imagenUrl",
+      "ImagenUrl",
+      "imagen",
+      "Imagen",
+      "fotoUrl",
+      "FotoUrl"
+    ),
+    fechaCreacion: pickFrom(sources, "fechaCreacion", "FechaCreacion"),
+    variantes,
+  };
+}
+
 export function agruparVariantesEnProductos(variantes) {
   const porProducto = new Map();
 
@@ -517,6 +657,17 @@ export function normalizarProductoDetalleDesdeBusqueda(raw) {
 
 export function unwrapVariantesBuscar(raw) {
   return unwrapList(raw).map(normalizarVarianteBusqueda).filter(Boolean);
+}
+
+export function unwrapProductosBuscar(raw) {
+  const items = unwrapList(raw);
+  if (!items.length) return [];
+
+  if (items.some(esResultadoVarianteBusqueda)) {
+    return agruparVariantesEnProductos(items.map(normalizarVarianteBusqueda).filter(Boolean));
+  }
+
+  return items.map(normalizarProductoBusqueda).filter(Boolean);
 }
 
 export function unwrapProductoDetalleBody(raw) {
