@@ -49,7 +49,7 @@ export function useVentaTicketQuery(idVenta, options = {}) {
   return useQuery({
     queryKey: [QK_VENTA_CATALOGO, "ticket", id],
     queryFn: () => fetchVentaTicket(id),
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: Number.isFinite(id) && id > 0 && (options.enabled ?? true),
     retry: 1,
     ...options,
   });

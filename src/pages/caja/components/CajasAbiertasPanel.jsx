@@ -130,7 +130,7 @@ export function CajasAbiertasPanel({ searchQuery = "", page = 1, setPage }) {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={c.esActiva || actM.isPending}
+                          disabled={c.esActiva || !c.puedeIngresar || actM.isPending}
                           className="border-(--color-pagina) text-(--color-pagina) hover:bg-(--color-pagina)/10"
                           onClick={() => handleActivarClick(c.idCaja)}
                         >

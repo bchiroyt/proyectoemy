@@ -308,7 +308,7 @@ const CobroCaja = () => {
               cantidadDevuelta: l.cantidad,
               productoRecibido: Boolean(l.productoRecibido ?? true),
               regresaInventario: Boolean(l.regresaInventario ?? false),
-              idUbicacion: l.regresaInventario ? l.idUbicacion ?? null : null,
+              idUbicacion: l.regresaInventario ? l.idUbicacion ?? 1 : 1, // Fallback a 1
               montoPenalizacion: penalizacion,
               montoBaseDevolucion: base,
               montoReembolsado: montoLinea,

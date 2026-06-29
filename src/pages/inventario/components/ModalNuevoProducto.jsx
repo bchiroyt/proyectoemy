@@ -214,11 +214,11 @@ const VARIANTE_VACIA = {
   presentacion: "",
   color: "",
   precioVenta: "",
+  precioVentaMayor: "",
   precioCompra: "",
   stockMinimo: "10",
   codigoBarras: "",
   ubicacion: "",
-  preciomayoreo: "",
 };
 
 const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
@@ -336,10 +336,11 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       const tieneEspecificacion = !!v.talla || !!v.presentacion || !!v.color.trim();
       const precioInvalido = v.precioVenta !== "" && Number(v.precioVenta) < 0;
       const costoInvalido = v.precioCompra !== "" && Number(v.precioCompra) < 0;
+      const precioVentaMayorInvalido = v.precioVentaMayor !== "" && Number(v.precioVentaMayor) < 0;
       const stockMinimoInvalido =
         v.stockMinimo !== "" &&
         (!Number.isFinite(Number(v.stockMinimo)) || Number(v.stockMinimo) < 0);
-      return !tieneEspecificacion || precioInvalido || costoInvalido || stockMinimoInvalido;
+      return !tieneEspecificacion || precioInvalido || costoInvalido || stockMinimoInvalido || precioVentaMayorInvalido;
     });
 
     return tieneVariantesInvalidas;
@@ -358,7 +359,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           precioCompra: primeraVariante.precioCompra,
           stockMinimo: primeraVariante.stockMinimo,
           ubicacion: primeraVariante.ubicacion,
-          preciomayoreo: primeraVariante.preciomayoreo,
+          precioVentaMayor: primeraVariante.precioVentaMayor,
           color: "",
           codigoBarras: "",
         },
@@ -424,7 +425,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         if (v.presentacion) formData.append(`Variantes[${index}].presentacion`, Number(v.presentacion));
         if (v.color) formData.append(`Variantes[${index}].color`, v.color);
         if (v.precioVenta) formData.append(`Variantes[${index}].precioVenta`, Number(v.precioVenta));
-        if (v.preciomayoreo) formData.append(`Variantes[${index}].preciomayoreo`, Number(v.preciomayoreo));
+        if (v.precioVentaMayor) formData.append(`Variantes[${index}].precioVentaMayor`, Number(v.precioVentaMayor));
         if (v.precioCompra) formData.append(`Variantes[${index}].precioCompra`, Number(v.precioCompra));
         if (v.stockMinimo !== "") formData.append(`Variantes[${index}].stockMinimo`, Number(v.stockMinimo));
         if (v.ubicacion) formData.append(`Variantes[${index}].idUbicacionDefault`, Number(v.ubicacion));
@@ -609,7 +610,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Precio venta</label>
                           <input
@@ -626,15 +627,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                           <label className="text-xs font-semibold text-gray-600 block">Precio mayoreo</label>
                           <input
                             type="number"
-                            value={v.precioMayoreo}
-                            onChange={(e) => handleCambioVariante(index, "precioMayoreo", e.target.value)}
+                            value={v.precioVentaMayor}
+                            onChange={(e) => handleCambioVariante(index, "precioVentaMayor", e.target.value)}
                             placeholder="Precio mayoreo"
                             className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
                               }`}
                           />
                         </div>
 
-                        <div className="space-y-1">
+                        {/*<div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Precio costo</label>
                           <input
                             type="number"
@@ -644,7 +645,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioCompra !== "" && Number(v.precioCompra) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
                               }`}
                           />
-                        </div>
+                        </div>*/}
 
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Stock mínimo</label>
