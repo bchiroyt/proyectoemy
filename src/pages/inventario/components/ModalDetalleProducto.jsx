@@ -57,6 +57,21 @@ const CLASES_ETIQUETA_VARIANTE = {
   presentacion: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
+const normalizarTextoNumeroEditable = (...valores) => {
+  for (const valor of valores) {
+    if (valor === undefined || valor === null || valor === "") continue;
+
+    const numero = Number(valor);
+    if (Number.isFinite(numero)) {
+      return String(numero);
+    }
+
+    return String(valor).trim();
+  }
+
+  return "";
+};
+
 const normalizarTextoVariante = (valor) => {
   const texto = String(valor ?? "").trim();
   return texto && texto.toUpperCase() !== "N/A" ? texto : "";
@@ -537,13 +552,10 @@ const ModalDetalleProducto = ({
 
     return {
       color: variante.color || "",
-      precioVenta: String(variante.precioVentaActual !== undefined ? variante.precioVentaActual : ""),
-      precioVentaMayor: String(
-        variante.precioVentaMayorActual !== undefined
-          ? variante.precioVentaMayorActual
-          : variante.precioVentaMayor !== undefined
-          ? variante.precioVentaMayor
-          : ""
+      precioVenta: normalizarTextoNumeroEditable(variante.precioVentaActual),
+      precioVentaMayor: normalizarTextoNumeroEditable(
+        variante.precioVentaMayorActual,
+        variante.precioVentaMayor
       ),
       codigoPrincipal: variante.codigoPrincipal || "",
       talla: resolverValorCatalogoVariante(
@@ -629,6 +641,8 @@ const ModalDetalleProducto = ({
 
   const verificarCambios = (v) => {
     const valoresOriginales = obtenerValoresOriginalesVariante(v);
+    const precioVentaNormalizado = normalizarTextoNumeroEditable(precioVentaInput);
+    const precioVentaMayorNormalizado = normalizarTextoNumeroEditable(precioVentaMayorInput);
 
     const mismosSecundarios =
       valoresOriginales.codigosSecundarios.length === codigosSecundariosInput.length &&
@@ -636,8 +650,8 @@ const ModalDetalleProducto = ({
 
     return (
       colorInput !== valoresOriginales.color ||
-      String(precioVentaInput) !== valoresOriginales.precioVenta ||
-      String(precioVentaMayorInput) !== valoresOriginales.precioVentaMayor ||
+      precioVentaNormalizado !== valoresOriginales.precioVenta ||
+      precioVentaMayorNormalizado !== valoresOriginales.precioVentaMayor ||
       codigoBarrasInput !== valoresOriginales.codigoPrincipal ||
       tallaInput !== valoresOriginales.talla ||
       presentacionInput !== valoresOriginales.presentacion ||
@@ -656,7 +670,9 @@ const ModalDetalleProducto = ({
     }
 
     const valoresOriginales = obtenerValoresOriginalesVariante(v);
-    const cambioPrecioVenta = String(precioVentaInput) !== valoresOriginales.precioVenta;
+    const precioVentaNormalizado = normalizarTextoNumeroEditable(precioVentaInput);
+    const precioVentaMayorNormalizado = normalizarTextoNumeroEditable(precioVentaMayorInput);
+    const cambioPrecioVenta = precioVentaNormalizado !== valoresOriginales.precioVenta;
     const precioVenta = Number(precioVentaInput);
     if (cambioPrecioVenta && (!Number.isFinite(precioVenta) || precioVenta <= 0)) {
       const message = "El precio de venta debe ser mayor que 0.";
@@ -664,7 +680,7 @@ const ModalDetalleProducto = ({
       return;
     }
 
-    const cambioPrecioVentaMayor = String(precioVentaMayorInput) !== valoresOriginales.precioVentaMayor;
+    const cambioPrecioVentaMayor = precioVentaMayorNormalizado !== valoresOriginales.precioVentaMayor;
     const precioVentaMayor = Number(precioVentaMayorInput);
     if (
       cambioPrecioVentaMayor &&
@@ -1625,7 +1641,7 @@ const ModalDetalleProducto = ({
                                   />
                                 ) : (
                                   <p className="text-xs font-extrabold text-pink-600">
-                                    Q {Number(v.precioVentaActual || 0).toFixed(2)}
+                                    Q {Number(v.precioVentaActual ?? v.precioVenta ?? 0).toFixed(2)}
                                   </p>
                                 )}
                               </div>
@@ -1645,7 +1661,7 @@ const ModalDetalleProducto = ({
                                   />
                                 ) : (
                                   <p className="text-xs font-extrabold text-amber-600">
-                                    Q {Number(v.precioVentaMayorActual || v.precioVentaMayor || 0).toFixed(2)}
+                                    Q {Number(v.precioVentaMayorActual ?? v.precioVentaMayor ?? 0).toFixed(2)}
                                   </p>
                                 )}
                               </div>
