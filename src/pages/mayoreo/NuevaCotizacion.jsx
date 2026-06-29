@@ -105,6 +105,12 @@ export default function NuevaCotizacion() {
   const guardando = crearM.isPending || actualizarM.isPending;
 
   const handleAgregarProducto = (producto) => {
+    console.log("[Mayoreo Debug] Producto seleccionado del buscador:", {
+      idVariante: producto.idVariante,
+      nombre: producto.nombre,
+      precioMenudeo: producto.precio,
+      precioMayoreo: producto.precioVentaMayor,
+    });
     agregarProducto(producto);
     setCriterio("");
   };
