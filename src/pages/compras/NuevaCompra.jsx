@@ -43,6 +43,8 @@ function mapVarianteToLinea(v) {
     v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
   const color = v.color ?? v.Color ?? "";
   const tallaNombre = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
+  const presentacionNombre =
+    v.presentacionNombre ?? v.PresentacionNombre ?? v.presentacion ?? v.Presentacion ?? "";
   const detalle = [color, tallaNombre].filter(Boolean).join(" · ");
   const costo = resolverCostoCompraVariante(v);
   return {
@@ -50,6 +52,9 @@ function mapVarianteToLinea(v) {
     idVariante,
     sku,
     nombre,
+    color,
+    tallaNombre,
+    presentacionNombre,
     detalle,
     costoEstimado: costo,
     cantidadSolicitada: 1,
@@ -65,6 +70,8 @@ function mapDetalleToLinea(d) {
   const nombre = d.productoNombre ?? d.ProductoNombre ?? "";
   const color = d.color ?? d.Color ?? "";
   const tallaNombre = d.tallaNombre ?? d.TallaNombre ?? "";
+  const presentacionNombre =
+    d.presentacionNombre ?? d.PresentacionNombre ?? d.presentacion ?? d.Presentacion ?? "";
   const detalle = [color, tallaNombre].filter(Boolean).join(" · ");
   const cantidadSolicitada = Number(d.cantidadSolicitada ?? d.CantidadSolicitada ?? 1);
   const costoEstimado = Number(d.costoEstimado ?? d.CostoEstimado ?? 0);
@@ -73,6 +80,9 @@ function mapDetalleToLinea(d) {
     idVariante,
     sku,
     nombre,
+    color,
+    tallaNombre,
+    presentacionNombre,
     detalle,
     costoEstimado,
     cantidadSolicitada,

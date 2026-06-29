@@ -185,7 +185,49 @@ export function normalizarVarianteBusqueda(raw) {
 function normalizarCampoCatalogoVariante(raw, idKeys, nombreKeys) {
   const nombreExplicito = pick(raw, ...nombreKeys);
   const valorCrudo = pick(raw, ...idKeys);
+  const valorObjeto =
+    valorCrudo && typeof valorCrudo === "object" && !Array.isArray(valorCrudo) ? valorCrudo : null;
+  const nombreDesdeObjeto = valorObjeto
+    ? pick(
+        valorObjeto,
+        "nombre",
+        "Nombre",
+        "descripcion",
+        "Descripcion",
+        "label",
+        "Label"
+      )
+    : undefined;
+  const idDesdeObjeto = valorObjeto
+    ? toNumberOrNull(
+        pick(
+          valorObjeto,
+          "id",
+          "Id",
+          "idUbicacion",
+          "IdUbicacion",
+          "idPresentacion",
+          "IdPresentacion",
+          "idTalla",
+          "IdTalla"
+        )
+      )
+    : null;
   const idNumerico = toNumberOrNull(valorCrudo);
+
+  if (idDesdeObjeto != null && idDesdeObjeto > 0) {
+    const nombre =
+      typeof nombreDesdeObjeto === "string" && nombreDesdeObjeto.trim()
+        ? nombreDesdeObjeto.trim()
+        : typeof nombreExplicito === "string" && nombreExplicito.trim()
+        ? nombreExplicito.trim()
+        : nombreExplicito ?? null;
+    return { id: idDesdeObjeto, nombre };
+  }
+
+  if (typeof nombreDesdeObjeto === "string" && nombreDesdeObjeto.trim()) {
+    return { id: null, nombre: nombreDesdeObjeto.trim() };
+  }
 
   if (idNumerico != null && idNumerico > 0) {
     const nombre =
