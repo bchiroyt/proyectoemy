@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle, Loader2, Plus, Search, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, CreditCard, Loader2, Plus, Search, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
@@ -293,14 +293,25 @@ const Deudas = () => {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate("/contabilidad")}
-          className="flex items-center gap-2 bg-(--color-pagina-2) text-(--color-blanco) px-4 py-2 rounded-xl hover:bg-(--color-esmeralda-hover) transition-colors cursor-pointer text-sm font-medium shadow-sm"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Regresar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/pagos")}
+            className="flex items-center gap-2 bg-(--color-pagina) border border-(--color-borde-button) text-(--color-blanco) px-4 py-2 rounded-xl hover:bg-(--color-rosa-hover) hover:text-(--color-negro) transition-colors cursor-pointer text-sm font-medium shadow-sm"
+          >
+            <CreditCard className="w-4 h-4" />
+            Gestionar abonos
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/contabilidad")}
+            className="flex items-center gap-2 bg-(--color-pagina-2) text-(--color-blanco) px-4 py-2 rounded-xl hover:bg-(--color-esmeralda-hover) transition-colors cursor-pointer text-sm font-medium shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Regresar
+          </button>
+        </div>
       </div>
 
       <div className="flex justify-between items-center gap-4">
@@ -365,7 +376,7 @@ const Deudas = () => {
               <th className="p-4 text-left">Fecha vencimiento</th>
               <th className="p-4 text-center">Estado</th>
               <th className="p-4 text-right">Monto total</th>
-              <th className="p-4 text-right">Total abonos</th>
+              <th className="p-4 text-right">Total abonado</th>
               <th className="p-4 text-right">Total restante</th>
             </tr>
           </thead>

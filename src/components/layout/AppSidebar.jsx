@@ -65,20 +65,9 @@ const AppSidebar = () => {
     const logout = useAuthStore((s) => s.logout);
     const attemptNavigation = useNavigationStore((s) => s.attemptNavigation);
     const [logoutOpen, setLogoutOpen] = useState(false);
-    const inventarioItem = menuItems.find((item) => item.to === "/inventario");
-    const inventarioChildren = inventarioItem?.children ?? [];
-    const inventarioSubmenuActivo = inventarioChildren.some((item) => isRouteActive(location.pathname, item.to));
     const sidebarColapsada = !isMobile && state === "collapsed";
-    const [inventarioMenuOpen, setInventarioMenuOpen] = useState(
-        () => isRouteActive(location.pathname, "/inventario") || inventarioSubmenuActivo
-    );
+    const [inventarioMenuOpen, setInventarioMenuOpen] = useState(false);
     const [inventarioDropdownOpen, setInventarioDropdownOpen] = useState(false);
-
-    useEffect(() => {
-        if (inventarioSubmenuActivo) {
-            setInventarioMenuOpen(true);
-        }
-    }, [inventarioSubmenuActivo]);
 
     useEffect(() => {
         if (!sidebarColapsada) {
@@ -98,7 +87,6 @@ const AppSidebar = () => {
             return;
         }
 
-        setInventarioMenuOpen(true);
         if (location.pathname === item.to) return;
         if (!attemptNavigation(item.to)) return;
         navigate(item.to);
@@ -278,9 +266,9 @@ const AppSidebar = () => {
                                                 aria-expanded={inventarioMenuOpen}
                                                 onClick={handleToggleInventarioMenu}
                                                 className={cn(
-                                                    "top-1 bottom-1 right-1 w-8 aspect-auto rounded-lg px-1.5 text-(--color-gris-letra) hover:bg-(--color-pagina)/10 hover:text-(--color-pagina) focus:bg-(--color-pagina)/10 focus:text-(--color-pagina)",
+                                                    "right-1 h-8 w-8 rounded-lg border border-(--color-gris-claro-2) bg-(--color-gris-fondo-suave) px-1.5 text-(--color-gris-oscuro) shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:border-(--color-gris-borde) hover:bg-(--color-gris-fondo) hover:text-(--color-gris-oscuro) focus:bg-(--color-gris-fondo) focus:text-(--color-gris-oscuro) peer-data-[size=lg]/menu-button:top-1/2 peer-data-[size=lg]/menu-button:-translate-y-1/2",
                                                     (itemActivo || inventarioMenuOpen) &&
-                                                      "text-(--color-blanco) hover:bg-(--color-pagina) hover:text-(--color-blanco)"
+                                                      "border-(--color-gris-borde) bg-(--color-gris-fondo) text-(--color-gris-oscuro) hover:bg-(--color-gris-claro-2) hover:text-(--color-gris-oscuro)"
                                                 )}
                                             >
                                                 <ChevronDown

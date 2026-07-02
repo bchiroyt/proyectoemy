@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, Search, Loader2, X, CheckCircle, AlertCircle, Eye } from "lucide-react";
+import { ArrowLeft, Plus, Search, Loader2, X, CheckCircle, AlertCircle, Eye, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
@@ -262,14 +262,25 @@ const Pagos = () => {
           Consulta las deudas disponibles para registrar abonos y sus metodos de pago.
         </p>
 
-        <button
-          type="button"
-          onClick={() => navigate("/contabilidad")}
-          className="flex items-center gap-2 bg-(--color-pagina-2) text-(--color-blanco) px-4 py-2 rounded-xl hover:bg-(--color-esmeralda-hover) transition-colors cursor-pointer text-sm font-medium shadow-sm"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Regresar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/deudas")}
+            className="flex items-center gap-2 bg-(--color-pagina) border border-(--color-borde-button) text-(--color-blanco) px-4 py-2 rounded-xl hover:bg-(--color-rosa-hover) hover:text-(--color-negro) transition-colors cursor-pointer text-sm font-medium shadow-sm"
+          >
+            <Users className="w-4 h-4" />
+            Gestionar deudas
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/contabilidad")}
+            className="flex items-center gap-2 bg-(--color-pagina-2) text-(--color-blanco) px-4 py-2 rounded-xl hover:bg-(--color-esmeralda-hover) transition-colors cursor-pointer text-sm font-medium shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Regresar
+          </button>
+        </div>
       </div>
 
       <div className="flex justify-between items-center gap-4">
