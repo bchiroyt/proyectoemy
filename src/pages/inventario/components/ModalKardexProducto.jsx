@@ -234,6 +234,10 @@ const ModalKardexProducto = ({ open, onClose, producto }) => {
   const idVarianteSeleccionada = variantesIds.has(String(idVarianteManual))
     ? Number(idVarianteManual)
     : variantes[0]?.idVariante ?? null;
+  const varianteSeleccionada = useMemo(
+    () => variantes.find((variante) => variante.idVariante === idVarianteSeleccionada) ?? null,
+    [variantes, idVarianteSeleccionada]
+  );
 
   const cargarKardex = async ({ forceRefresh = false } = {}) => {
     if (!open || !idVarianteSeleccionada) return;
@@ -316,22 +320,34 @@ const ModalKardexProducto = ({ open, onClose, producto }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={idVarianteSeleccionada ?? ""}
-              onChange={(event) => setIdVarianteManual(event.target.value)}
-              className="h-9 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
-              disabled={cargando || variantes.length <= 1}
-            >
-              {variantes.length === 0 ? (
-                <option value="">Sin variante</option>
-              ) : (
-                variantes.map((variante) => (
-                  <option key={variante.idVariante} value={variante.idVariante}>
-                    {variante.label}
-                  </option>
-                ))
-              )}
-            </select>
+            {variantes.length > 1 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Seleccionar variante:
+                </span>
+                <select
+                  value={idVarianteSeleccionada ?? ""}
+                  onChange={(event) => setIdVarianteManual(event.target.value)}
+                  className="h-9 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                  disabled={cargando}
+                >
+                  {variantes.map((variante) => (
+                    <option key={variante.idVariante} value={variante.idVariante}>
+                      {variante.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex min-h-9 max-w-full items-center gap-2 rounded-lg border border-sky-100 bg-sky-50 px-3">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-sky-700">
+                  Atributos:
+                </span>
+                <span className="max-w-[260px] truncate rounded-full border border-sky-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-sky-800">
+                  {varianteSeleccionada?.label ?? "Sin variante"}
+                </span>
+              </div>
+            )}
 
             <select
               value={periodoKardex}

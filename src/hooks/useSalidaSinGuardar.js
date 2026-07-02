@@ -23,7 +23,7 @@ export function useSalidaSinGuardar({ enabled = true, tieneDatos, rutaFallback }
       setUnsavedChangesGuard(null);
       return;
     }
-    setUnsavedChangesGuard(() => hayDatosPendientes);
+    setUnsavedChangesGuard(hayDatosPendientes);
     return () => setUnsavedChangesGuard(null);
   }, [enabled, hayDatosPendientes, setUnsavedChangesGuard]);
 
