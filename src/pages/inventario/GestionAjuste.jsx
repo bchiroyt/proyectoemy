@@ -10,7 +10,6 @@ import { useVariantesBuscarQuery } from "@/hooks/queries/useComprasQueries";
 import { buscarVariantesCompra } from "@/services/productosService";
 import {
   elegirVariantePorCriterio,
-  consultarStockVarianteUbicacion,
   enriquecerVarianteDesdeDetalleProducto,
   invalidarCacheDetalleProductoVariantes,
   unwrapVariantesCompraBuscar,
@@ -38,14 +37,6 @@ const resolverStockLinea = (variante) =>
   ) || 0;
 
 const esTipoSalida = (tipo) => tipo?.naturaleza?.toUpperCase() === "SALIDA";
-
-const nombreUbicacion = (catalogos, idUbicacion) => {
-  const id = Number(idUbicacion);
-  if (!id) return "";
-  return (
-    catalogos?.ubicaciones?.find((u) => Number(u.idUbicacion) === id)?.nombre ?? ""
-  );
-};
 
 const GestionAjuste = () => {
   const navigate = useNavigate();
@@ -158,7 +149,6 @@ const GestionAjuste = () => {
         extra,
         stockActual,
         idTipoAjuste: primerTipo,
-        idUbicacion: null,
         cantidadAjuste: 1,
         costoUnitario: "",
         observacionDetalle: "",
@@ -239,49 +229,6 @@ const GestionAjuste = () => {
     );
   };
 
-  const handleCambioUbicacion = useCallback(async (idVariante, idUbicacion) => {
-    const idUbi = idUbicacion ? Number(idUbicacion) : null;
-    let lineaSnapshot = null;
-
-    setLineas((prev) =>
-      prev.map((l) => {
-        if (l.idVariante === idVariante) {
-          lineaSnapshot = { ...l, idUbicacion: idUbi };
-          return lineaSnapshot;
-        }
-        return l;
-      })
-    );
-
-    if (!lineaSnapshot) return;
-
-    if (!idUbi) {
-      const enriquecida = await enriquecerVarianteDesdeDetalleProducto(lineaSnapshot);
-      const stockTotal = resolverStockLinea(enriquecida);
-      setLineas((prev) =>
-        prev.map((l) =>
-          l.idVariante === idVariante ? { ...l, stockActual: stockTotal } : l
-        )
-      );
-      return;
-    }
-
-    if (!lineaSnapshot.sku) return;
-
-    const stockUbicacion = await consultarStockVarianteUbicacion(
-      idVariante,
-      idUbi,
-      lineaSnapshot.sku
-    );
-    if (stockUbicacion == null) return;
-
-    setLineas((prev) =>
-      prev.map((l) =>
-        l.idVariante === idVariante ? { ...l, stockActual: stockUbicacion } : l
-      )
-    );
-  }, []);
-
   const handleQuitarRow = (idVariante) => {
     setLineas((prev) => prev.filter((l) => l.idVariante !== idVariante));
   };
@@ -314,20 +261,8 @@ const GestionAjuste = () => {
       return;
     }
 
-    // Refrescar stock según ubicación (total inventario si no hay ubicación)
     const lineasConStock = await Promise.all(
       lineas.map(async (l) => {
-        if (l.idUbicacion && l.sku) {
-          const stockUbicacion = await consultarStockVarianteUbicacion(
-            l.idVariante,
-            l.idUbicacion,
-            l.sku
-          );
-          if (stockUbicacion != null) {
-            return { ...l, stockActual: stockUbicacion };
-          }
-        }
-
         const enriquecida = await enriquecerVarianteDesdeDetalleProducto(l);
         return { ...l, stockActual: resolverStockLinea(enriquecida) };
       })
@@ -378,7 +313,7 @@ const GestionAjuste = () => {
           return {
             idTipoAjuste: l.idTipoAjuste,
             idVariante: l.idVariante,
-            idUbicacion: l.idUbicacion ?? null,
+            idUbicacion: null,
             cantidadAjuste: esSalida ? -cantidadVal : cantidadVal,
             costoUnitario: l.costoUnitario ? Number(l.costoUnitario) : null,
             observacionDetalle: l.observacionDetalle.trim() || null,
@@ -484,7 +419,7 @@ const GestionAjuste = () => {
                 <div>
                   <h3 className="text-sm font-bold text-(--color-texto-principal)">Líneas de Ajuste</h3>
                   <p className="text-xs text-(--color-gris-letra) mt-0.5">
-                    Sin ubicación se usa el stock total (como en inventario). Si elige una ubicación, el stock y el ajuste aplican solo ahí.
+                    El stock mostrado corresponde al total del inventario.
                   </p>
                 </div>
                 {lineas.length > 0 && (
@@ -495,13 +430,12 @@ const GestionAjuste = () => {
               </div>
 
               <div className="flex-1 overflow-x-auto">
-                <table className="w-full min-w-[1050px] border-collapse text-sm">
+                <table className="w-full min-w-[900px] border-collapse text-sm">
                   <thead>
                     <tr>
-                      <th className={thClass} style={{ width: "22%" }}>Producto</th>
-                      <th className={thClass} style={{ width: "10%" }}>SKU</th>
-                      <th className={thClass} style={{ width: "14%" }}>Ubicación</th>
-                      <th className={thClass} style={{ width: "14%" }}>Tipo Ajuste</th>
+                      <th className={thClass} style={{ width: "24%" }}>Producto</th>
+                      <th className={thClass} style={{ width: "12%" }}>SKU</th>
+                      <th className={thClass} style={{ width: "16%" }}>Tipo Ajuste</th>
                       <th className={thClass} style={{ width: "8%", textAlign: "center" }}>Cantidad</th>
                       <th className={thClass} style={{ width: "10%", textAlign: "right" }}>Costo Unit.</th>
                       <th className={thClass} style={{ width: "17%" }}>Observación Línea</th>
@@ -511,7 +445,7 @@ const GestionAjuste = () => {
                   <tbody>
                     {lineas.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="p-12 text-center text-(--color-gris-claro)">
+                        <td colSpan="7" className="p-12 text-center text-(--color-gris-claro)">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Info className="size-8 text-(--color-gris-borde)" />
                             <span>No hay productos en este ajuste.</span>
@@ -524,7 +458,6 @@ const GestionAjuste = () => {
                         const tipo = catalogos?.tiposAjuste?.find((t) => t.idTipoAjuste === row.idTipoAjuste);
                         const requiereCosto = tipo?.requiereCostoUnitario === true;
                         const esSalida = esTipoSalida(tipo);
-                        const ubicacionLabel = nombreUbicacion(catalogos, row.idUbicacion);
 
                         return (
                           <tr key={row.idVariante} className="hover:bg-(--color-gris-fondo-suave)/50">
@@ -535,26 +468,12 @@ const GestionAjuste = () => {
                                   <p className="text-xs text-(--color-gris-letra) truncate mt-0.5">{row.extra}</p>
                                 )}
                                 <p className={cn("text-[10px] font-bold mt-1", row.stockActual > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
-                                  Stock{ubicacionLabel ? ` (${ubicacionLabel})` : " (total)"}: {row.stockActual}
+                                  Stock: {row.stockActual}
                                 </p>
                               </div>
                             </td>
                             <td className={cn(tdClass, "font-mono text-xs text-(--color-gris-letra)")}>
                               {row.sku}
-                            </td>
-                            <td className={tdClass}>
-                              <select
-                                value={row.idUbicacion ?? ""}
-                                onChange={(e) => void handleCambioUbicacion(row.idVariante, e.target.value)}
-                                className="w-full rounded-lg border border-(--color-gris-claro-2) p-2 text-xs outline-none bg-(--color-blanco) focus:border-(--color-gris-claro)"
-                              >
-                                <option value="">Automática (total inventario)</option>
-                                {catalogos?.ubicaciones?.map((u) => (
-                                  <option key={u.idUbicacion} value={u.idUbicacion}>
-                                    {u.nombre}
-                                  </option>
-                                ))}
-                              </select>
                             </td>
                             <td className={tdClass}>
                               <select
