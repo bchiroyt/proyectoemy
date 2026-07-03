@@ -195,6 +195,7 @@ const ModalDetalleProducto = ({
   const [precioVentaMayorInput, setPrecioVentaMayorInput] = useState("");
   const [codigoBarrasInput, setCodigoBarrasInput] = useState("");
   const [codigosSecundariosInput, setCodigosSecundariosInput] = useState([]);
+  const [codigoSecundarioPendienteInput, setCodigoSecundarioPendienteInput] = useState("");
   const [tallaInput, setTallaInput] = useState("");
   const [presentacionInput, setPresentacionInput] = useState("");
   const [ubicacionInput, setUbicacionInput] = useState("");
@@ -527,6 +528,37 @@ const ModalDetalleProducto = ({
       .filter((c) => !c.esPrincipal && c.codigo !== variante.codigoPrincipal)
       .map((c) => c.codigo);
 
+  const obtenerCodigosSecundariosEditados = () => {
+    const codigoPrincipal = codigoBarrasInput.trim();
+    const vistos = new Set();
+
+    return [...codigosSecundariosInput, codigoSecundarioPendienteInput]
+      .map((code) => String(code ?? "").trim())
+      .filter((codigoSecundario) => {
+        if (!codigoSecundario || codigoSecundario === codigoPrincipal || vistos.has(codigoSecundario)) {
+          return false;
+        }
+
+        vistos.add(codigoSecundario);
+        return true;
+      });
+  };
+
+  const agregarCodigoSecundarioPendiente = () => {
+    const codigoSecundario = codigoSecundarioPendienteInput.trim();
+    if (!codigoSecundario) return;
+
+    const codigoPrincipal = codigoBarrasInput.trim();
+    if (
+      codigoSecundario !== codigoPrincipal &&
+      !codigosSecundariosInput.some((code) => code.trim() === codigoSecundario)
+    ) {
+      setCodigosSecundariosInput((prev) => [...prev, codigoSecundario]);
+    }
+
+    setCodigoSecundarioPendienteInput("");
+  };
+
   const obtenerCodigosDesdeInputs = () => {
     const codigoPrincipal = codigoBarrasInput.trim();
     const codigos = [];
@@ -535,11 +567,8 @@ const ModalDetalleProducto = ({
       codigos.push({ codigo: codigoPrincipal, esPrincipal: true });
     }
 
-    codigosSecundariosInput.forEach((code) => {
-      const codigoSecundario = code.trim();
-      if (codigoSecundario && codigoSecundario !== codigoPrincipal) {
-        codigos.push({ codigo: codigoSecundario, esPrincipal: false });
-      }
+    obtenerCodigosSecundariosEditados().forEach((codigoSecundario) => {
+      codigos.push({ codigo: codigoSecundario, esPrincipal: false });
     });
 
     return codigos;
@@ -622,6 +651,7 @@ const ModalDetalleProducto = ({
 
     const secundarios = valores.codigosSecundarios;
     setCodigosSecundariosInput(secundarios);
+    setCodigoSecundarioPendienteInput("");
     setEditandoId(idActual);
   };
 
@@ -637,16 +667,18 @@ const ModalDetalleProducto = ({
     setUbicacionInput("");
     setStockMinimoInput("");
     setCodigosSecundariosInput([]);
+    setCodigoSecundarioPendienteInput("");
   };
 
   const verificarCambios = (v) => {
     const valoresOriginales = obtenerValoresOriginalesVariante(v);
     const precioVentaNormalizado = normalizarTextoNumeroEditable(precioVentaInput);
     const precioVentaMayorNormalizado = normalizarTextoNumeroEditable(precioVentaMayorInput);
+    const codigosSecundariosEditados = obtenerCodigosSecundariosEditados();
 
     const mismosSecundarios =
-      valoresOriginales.codigosSecundarios.length === codigosSecundariosInput.length &&
-      valoresOriginales.codigosSecundarios.every((val, idx) => val === codigosSecundariosInput[idx]);
+      valoresOriginales.codigosSecundarios.length === codigosSecundariosEditados.length &&
+      valoresOriginales.codigosSecundarios.every((val, idx) => val === codigosSecundariosEditados[idx]);
 
     return (
       colorInput !== valoresOriginales.color ||
@@ -710,9 +742,10 @@ const ModalDetalleProducto = ({
       // Filtrar códigos externos antiguos para excluir el código principal anterior
       // Combinar los códigos no principales con el nuevo código principal
       const nuevosCodigos = obtenerCodigosDesdeInputs();
+      const codigosSecundariosEditados = obtenerCodigosSecundariosEditados();
       const mismosSecundarios =
-        valoresOriginales.codigosSecundarios.length === codigosSecundariosInput.length &&
-        valoresOriginales.codigosSecundarios.every((val, idx) => val === codigosSecundariosInput[idx]);
+        valoresOriginales.codigosSecundarios.length === codigosSecundariosEditados.length &&
+        valoresOriginales.codigosSecundarios.every((val, idx) => val === codigosSecundariosEditados[idx]);
       const cambioCodigos =
         codigoBarrasInput !== valoresOriginales.codigoPrincipal || !mismosSecundarios;
 
@@ -750,6 +783,7 @@ const ModalDetalleProducto = ({
         if (ubicacionInput) {
           payload.idUbicacionDefault = Number(ubicacionInput);
         } else {
+          payload.idUbicacionDefault = null;
           payload.limpiarUbicacionDefault = true;
         }
       }
@@ -763,6 +797,7 @@ const ModalDetalleProducto = ({
       }
 
       if (Object.keys(payload).length === 0) {
+        setCodigoSecundarioPendienteInput("");
         setEditandoId(null);
         return;
       }
@@ -820,6 +855,7 @@ const ModalDetalleProducto = ({
         await onRefresh();
       }
 
+      setCodigoSecundarioPendienteInput("");
       setEditandoId(null);
     } catch (error) {
       console.error("Error al actualizar la variante:", error);
@@ -1536,32 +1572,19 @@ const ModalDetalleProducto = ({
                                         id={`input-secundario-${v.idVariante}`}
                                         placeholder="Código secundario..."
                                         className="h-7 text-[10px] flex-1 focus-visible:ring-pink-500"
+                                        value={codigoSecundarioPendienteInput}
+                                        onChange={(e) => setCodigoSecundarioPendienteInput(e.target.value)}
                                         onKeyDown={(e) => {
                                           if (e.key === "Enter") {
                                             e.preventDefault();
-                                            const code = e.target.value.trim();
-                                            if (code) {
-                                              if (!codigosSecundariosInput.includes(code) && code !== codigoBarrasInput) {
-                                                setCodigosSecundariosInput(prev => [...prev, code]);
-                                              }
-                                              e.target.value = "";
-                                            }
+                                            agregarCodigoSecundarioPendiente();
                                           }
                                         }}
                                       />
                                       <Button
                                         size="sm"
                                         type="button"
-                                        onClick={() => {
-                                          const el = document.getElementById(`input-secundario-${v.idVariante}`);
-                                          const code = el?.value?.trim();
-                                          if (code) {
-                                            if (!codigosSecundariosInput.includes(code) && code !== codigoBarrasInput) {
-                                              setCodigosSecundariosInput(prev => [...prev, code]);
-                                            }
-                                            el.value = "";
-                                          }
-                                        }}
+                                        onClick={agregarCodigoSecundarioPendiente}
                                         className="h-7 px-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 rounded"
                                       >
                                         +

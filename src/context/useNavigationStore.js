@@ -16,7 +16,7 @@ export const useNavigationStore = create((set, get) => ({
 
   attemptNavigation: (to) => {
     const guard = get().unsavedChangesGuard;
-    if (typeof guard === "function" && guard()) {
+    if (typeof guard === "function" && guard() === true) {
       set({ confirmExitOpen: true, pendingNav: to });
       return false;
     }

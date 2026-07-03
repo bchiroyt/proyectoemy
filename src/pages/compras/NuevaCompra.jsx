@@ -123,25 +123,8 @@ const NuevaCompra = () => {
 
   const formularioTieneDatos = useCallback(() => {
     if (isEdit) return false;
-    if (proveedor) return true;
-    if (documentoRef.trim() || notas.trim()) return true;
-    if (tipoComprobante !== "none") return true;
-    if (lineas.length > 0) return true;
-    if (esCredito || fechaVencimientoCredito) return true;
-    if (fechaPedido !== fechaHoy) return true;
-    return false;
-  }, [
-    isEdit,
-    proveedor,
-    documentoRef,
-    notas,
-    tipoComprobante,
-    lineas.length,
-    esCredito,
-    fechaVencimientoCredito,
-    fechaPedido,
-    fechaHoy,
-  ]);
+    return lineas.length > 0;
+  }, [isEdit, lineas.length]);
 
   const {
     confirmExitOpen,
