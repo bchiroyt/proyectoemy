@@ -16,11 +16,13 @@ import {
 } from "@/lib/compraVarianteUtils";
 import { fmtQ } from "@/lib/cajaMappers";
 import { cantidadAjusteDisplay, esEntradaAjusteDetalle } from "@/lib/ajustesMappers";
+import { buildVarianteDetallePartes } from "@/lib/varianteUtils";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { UBICACIONES_UI_HABILITADAS } from "@/lib/featureFlags";
 import Paginacion from "@/components/shared/Paginacion";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
 
@@ -135,7 +137,9 @@ const GestionAjuste = () => {
     const color = enriquecida.color ?? enriquecida.Color ?? "";
     const talla = enriquecida.tallaNombre ?? enriquecida.TallaNombre ?? enriquecida.talla ?? enriquecida.Talla ?? "";
     const presentacion = enriquecida.presentacionNombre ?? enriquecida.PresentacionNombre ?? enriquecida.presentacion ?? enriquecida.Presentacion ?? "";
-    const extra = [color, talla, presentacion].filter(Boolean).join(" · ");
+    const extra =
+      buildVarianteDetallePartes(enriquecida).join(" · ") ||
+      [color, talla, presentacion].filter(Boolean).join(" · ");
     const sku = enriquecida.sku ?? enriquecida.Sku ?? "";
     const stockActual = resolverStockLinea(enriquecida);
 
@@ -859,7 +863,9 @@ function DetalleAjusteDialog({ idAjuste, onClose }) {
                         <th className="p-3 font-bold text-(--color-gris-letra)">Producto</th>
                         <th className="p-3 font-bold text-(--color-gris-letra)">SKU</th>
                         <th className="p-3 font-bold text-(--color-gris-letra)">Movimiento</th>
+                        {UBICACIONES_UI_HABILITADAS ? (
                         <th className="p-3 font-bold text-(--color-gris-letra)">Ubicación</th>
+                        ) : null}
                         <th className="p-3 font-bold text-(--color-gris-letra) text-right">Antes</th>
                         <th className="p-3 font-bold text-(--color-gris-letra) text-right">Ajuste</th>
                         <th className="p-3 font-bold text-(--color-gris-letra) text-right">Después</th>
@@ -883,6 +889,7 @@ function DetalleAjusteDialog({ idAjuste, onClose }) {
                                 {det.tipoAjusteNombre}
                               </span>
                             </td>
+                            {UBICACIONES_UI_HABILITADAS ? (
                             <td className="p-3 text-(--color-texto-secundario)">
                               {det.ubicacionNombre ? (
                                 <span className="flex items-center gap-1">
@@ -891,6 +898,7 @@ function DetalleAjusteDialog({ idAjuste, onClose }) {
                                 </span>
                               ) : "—"}
                             </td>
+                            ) : null}
                             <td className="p-3 text-right font-mono tabular-nums text-(--color-texto-terciario)">{det.stockSistema}</td>
                             <td className={cn(
                               "p-3 text-right font-bold font-mono tabular-nums",

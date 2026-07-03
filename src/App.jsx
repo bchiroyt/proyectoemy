@@ -23,6 +23,7 @@ import { useAuthStore } from "./context/useAuthStore";
 import GestionCategorias from "./pages/inventario/GestionCategoria";// --- Importaciones de la versión antigua ---
 import GestionMarcas from "./pages/inventario/GestionMarca";
 import Gestionubicaciones from "./pages/inventario/GestionUbicacion";
+import { UBICACIONES_UI_HABILITADAS } from "./lib/featureFlags";
 import Gestiontallas from "./pages/inventario/GestionTalla";
 import Gestionpresentaciones from "./pages/inventario/GestionPresentacion";
 import ReporteStock from "./pages/inventario/ReporteStock";
@@ -218,11 +219,15 @@ function App() {
         <Route
           path="/inventario/ubicaciones"
           element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Gestionubicaciones />
-              </MainLayout>
-            </ProtectedRoute>
+            UBICACIONES_UI_HABILITADAS ? (
+              <ProtectedRoute>
+                <MainLayout>
+                  <Gestionubicaciones />
+                </MainLayout>
+              </ProtectedRoute>
+            ) : (
+              <Navigate to="/inventario" replace />
+            )
           }
         />
         <Route

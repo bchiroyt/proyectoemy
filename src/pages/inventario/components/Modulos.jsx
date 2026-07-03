@@ -1,10 +1,13 @@
 import { Tag, Boxes, MapPin, Ruler, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { UBICACIONES_UI_HABILITADAS } from "@/lib/featureFlags";
 
 const items = [
   { nombre: "Marcas", icono: Tag, ruta: "/inventario/marcas" },
   { nombre: "Categorías", icono: Boxes, ruta: "/inventario/categorias" },
-  { nombre: "Ubicaciones", icono: MapPin, ruta: "/inventario/ubicaciones" },
+  ...(UBICACIONES_UI_HABILITADAS
+    ? [{ nombre: "Ubicaciones", icono: MapPin, ruta: "/inventario/ubicaciones" }]
+    : []),
   { nombre: "Tallas", icono: Ruler, ruta: "/inventario/tallas" },
   { nombre: "Presentación", icono: Package, ruta: "/inventario/presentaciones" },
 ];

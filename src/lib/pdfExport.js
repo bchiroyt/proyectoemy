@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoImg from "@/assets/tran1.png";
+import { buildVarianteDetalleTexto } from "@/lib/varianteUtils";
 
 const GRAY_LIGHT = [156, 163, 175];
 const GRAY_TEXT = [107, 114, 128];
@@ -30,12 +31,7 @@ const formatearFechaReporte = (valor) => {
   });
 };
 
-const buildVarianteReporte = (item) => {
-  const talla = String(item?.talla ?? "").trim();
-  const color = String(item?.color ?? "").trim();
-  const presentacion = String(item?.presentacion ?? "").trim();
-  return [talla || presentacion, color].filter(Boolean).join(" / ") || "Sin variante";
-};
+const buildVarianteReporte = (item) => buildVarianteDetalleTexto(item, "Sin variante");
 
 export const generarInformeNivelStockPdf = async ({ fecha, items }) => {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });

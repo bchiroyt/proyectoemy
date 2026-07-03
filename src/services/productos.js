@@ -73,8 +73,8 @@ export const actualizarImagenProducto = async (idProducto, formData) => {
 };
 
 // ACTUALIZAR VARIANTE DE PRODUCTO
-export const actualizarVariante = async (idVariante, data) => {
-  const res = await apiClient.patch(`/api/Productos/variantes/${idVariante}`, data);
+export const actualizarVariante = async (idProducto, idVariante, data) => {
+  const res = await apiClient.patch(`/api/Productos/${idProducto}/variantes/${idVariante}`, data);
   return res.data;
 };
 

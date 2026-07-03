@@ -50,6 +50,8 @@ const CAMPOS_CATALOGO_LINEA = [
   "sku",
   "nombre",
   "nombreProducto",
+  "nombreVariante",
+  "atributosAdicionales",
   "descripcion",
   "marca",
   "categoria",

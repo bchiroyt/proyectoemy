@@ -23,6 +23,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import {
+  CLASES_ETIQUETA_VARIANTE,
+  obtenerEtiquetasVariante,
+} from "@/lib/varianteUtils";
 
 const fmtQ = (n) =>
   new Intl.NumberFormat("es-GT", {
@@ -39,12 +43,6 @@ const tdClass = "py-1 px-2 align-middle";
 const inputNumClass =
   "h-7 tabular-nums text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]";
 
-const CLASES_ETIQUETA_VARIANTE = {
-  color: "border-sky-200 bg-sky-50 text-sky-700",
-  talla: "border-amber-200 bg-amber-50 text-amber-700",
-  presentacion: "border-emerald-200 bg-emerald-50 text-emerald-700",
-};
-
 function resolverStockVariante(v) {
   const stock =
     v.stockActual ??
@@ -60,20 +58,6 @@ function resolverStockVariante(v) {
     0;
   const n = Number(stock);
   return Number.isFinite(n) ? n : 0;
-}
-
-function obtenerEtiquetasVariante(v) {
-  const color = String(v.color ?? v.Color ?? "").trim();
-  const talla = String(v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "").trim();
-  const presentacion = String(
-    v.presentacionNombre ?? v.PresentacionNombre ?? v.presentacion ?? v.Presentacion ?? ""
-  ).trim();
-
-  return [
-    color ? { key: "color", value: color } : null,
-    talla ? { key: "talla", value: talla } : null,
-    presentacion ? { key: "presentacion", value: presentacion } : null,
-  ].filter(Boolean);
 }
 
 function EtiquetasVarianteCompactas({ item, className = "" }) {

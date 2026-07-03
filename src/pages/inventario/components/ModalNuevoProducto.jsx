@@ -10,6 +10,18 @@ import { obtenerTallas, crearTalla } from "@/services/tallas";
 import { obtenerUbicaciones, crearUbicacion } from "@/services/ubicaciones";
 
 import { crearProducto } from "@/services/productos";
+import { formatearAtributosAdicionales, parsearAtributosAdicionalesDesdeTexto } from "@/lib/varianteUtils";
+import { UBICACIONES_PRODUCTO_UI_HABILITADAS } from "@/lib/featureFlags";
+
+function atributosAdicionalesSonValidos(texto) {
+  if (!String(texto ?? "").trim()) return true;
+  try {
+    parsearAtributosAdicionalesDesdeTexto(texto);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Componente utilitario para simular classNames alternos si es necesario
 const cn = (...classes) => classes.filter(Boolean).join(" ");
@@ -214,6 +226,8 @@ const VARIANTE_VACIA = {
   talla: "",
   presentacion: "",
   color: "",
+  nombreVariante: "",
+  atributosAdicionales: "",
   precioVenta: "",
   precioVentaMayor: "",
   precioCompra: "",
@@ -317,7 +331,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       return true;
     }
     const algunaVarianteModificada = variantes.some((v) =>
-      v.talla || v.presentacion || v.color.trim() || v.precioVenta || v.precioCompra || v.stockMinimo || v.codigoBarras || v.ubicacion
+      v.talla || v.presentacion || v.color.trim() || v.nombreVariante.trim() || v.atributosAdicionales.trim() || v.precioVenta || v.precioCompra || v.stockMinimo || v.codigoBarras || v.ubicacion
     );
     return algunaVarianteModificada || variantes.length > 1;
   };
@@ -336,7 +350,20 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     }
 
     const tieneVariantesInvalidas = variantes.some((v) => {
-      const tieneEspecificacion = !!v.talla || !!v.presentacion || !!v.color.trim();
+      let atributosValidos = true;
+      if (v.atributosAdicionales.trim()) {
+        try {
+          parsearAtributosAdicionalesDesdeTexto(v.atributosAdicionales);
+        } catch {
+          atributosValidos = false;
+        }
+      }
+      const tieneEspecificacion =
+        !!v.talla ||
+        !!v.presentacion ||
+        !!v.color.trim() ||
+        !!v.nombreVariante.trim() ||
+        !!v.atributosAdicionales.trim();
       const precioInvalido = v.precioVenta !== "" && Number(v.precioVenta) < 0;
       const costoInvalido = v.precioCompra !== "" && Number(v.precioCompra) < 0;
       const precioVentaMayorInvalido = v.precioVentaMayor !== "" && Number(v.precioVentaMayor) < 0;
@@ -344,7 +371,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         v.stockMinimo !== "" &&
         (!Number.isFinite(Number(v.stockMinimo)) || Number(v.stockMinimo) < 0);
 
-      return !tieneEspecificacion || precioInvalido || costoInvalido || stockMinimoInvalido || precioVentaMayorInvalido;
+      return !tieneEspecificacion || !atributosValidos || precioInvalido || costoInvalido || stockMinimoInvalido || precioVentaMayorInvalido;
     });
 
     return tieneVariantesInvalidas;
@@ -427,6 +454,13 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         if (v.talla) formData.append(`Variantes[${index}].talla`, Number(v.talla));
         if (v.presentacion) formData.append(`Variantes[${index}].presentacion`, Number(v.presentacion));
         if (v.color) formData.append(`Variantes[${index}].color`, v.color);
+        if (v.nombreVariante.trim()) {
+          formData.append(`Variantes[${index}].nombreVariante`, v.nombreVariante.trim());
+        }
+        if (v.atributosAdicionales.trim()) {
+          const atributos = parsearAtributosAdicionalesDesdeTexto(v.atributosAdicionales);
+          formData.append(`Variantes[${index}].atributosAdicionales`, JSON.stringify(atributos));
+        }
         if (v.precioVenta) formData.append(`Variantes[${index}].precioVenta`, Number(v.precioVenta));
         if (v.precioVentaMayor) formData.append(`Variantes[${index}].precioVentaMayor`, Number(v.precioVentaMayor));
         if (v.precioCompra) formData.append(`Variantes[${index}].precioCompra`, Number(v.precioCompra));
@@ -616,51 +650,59 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
                       <div className="text-xs font-bold text-gray-500 uppercase cursor-default flex justify-between">
                         <span>Variante #{index + 1}</span>
-                        {(!v.talla && !v.presentacion && !v.color.trim()) && (
+                        {(!v.talla && !v.presentacion && !v.color.trim() && !v.nombreVariante.trim() && !v.atributosAdicionales.trim()) && (
                           <span className="text-(--color-rojo) normal-case font-normal text-xs animate-pulse">
-                            * Requiere al menos Talla, Presentación o Color
+                            * Requiere Talla, Presentación, Color, Nombre variante o Atributos
                           </span>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-600 block">Precio venta</label>
+                      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem_6.5rem] gap-3">
+                        <div className="space-y-1 md:min-w-0">
+                          <label className="text-xs font-semibold text-gray-600 block">Nombre variante</label>
+                          <input
+                            value={v.nombreVariante}
+                            onChange={(e) => handleCambioVariante(index, "nombreVariante", e.target.value)}
+                            placeholder="Ej. Edición limitada"
+                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                          />
+                        </div>
+
+                        <div className="space-y-1 md:w-[6.5rem] md:shrink-0">
+                          <label className="text-xs font-semibold text-gray-600 block leading-tight">Precio venta</label>
                           <input
                             type="number"
                             value={v.precioVenta}
                             onChange={(e) => handleCambioVariante(index, "precioVenta", e.target.value)}
-                            placeholder="Precio venta"
-                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ?
-                              "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                            placeholder="0.00"
+                            className={`w-full border px-2 py-3 rounded-lg bg-(--color-blanco) outline-none transition-colors text-sm tabular-nums ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
                               }`}
                           />
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-600 block">Precio mayoreo</label>
+                        <div className="space-y-1 md:w-[6.5rem] md:shrink-0">
+                          <label className="text-xs font-semibold text-gray-600 block leading-tight">Precio mayoreo</label>
                           <input
                             type="number"
                             value={v.precioVentaMayor}
                             onChange={(e) => handleCambioVariante(index, "precioVentaMayor", e.target.value)}
-                            placeholder="Precio mayoreo"
-                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ?
-                              "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                            placeholder="0.00"
+                            className={`w-full border px-2 py-3 rounded-lg bg-(--color-blanco) outline-none transition-colors text-sm tabular-nums ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
                               }`}
                           />
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-600 block">Stock mínimo</label>
+                        <div className="space-y-1 md:w-[6.5rem] md:shrink-0">
+                          <label className="text-xs font-semibold text-gray-600 block leading-tight">Stock mínimo</label>
                           <input
                             type="number"
                             min="0"
                             step="1"
                             value={v.stockMinimo}
                             onChange={(e) => handleCambioVariante(index, "stockMinimo", e.target.value)}
-                            placeholder="Opcional"
+                            placeholder="10"
                             title="Unidades mínimas antes de alerta de bajo stock"
-                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.stockMinimo !== "" &&
+                            className={`w-full border px-2 py-3 rounded-lg bg-(--color-blanco) outline-none transition-colors text-sm tabular-nums ${v.stockMinimo !== "" &&
                               (!Number.isFinite(Number(v.stockMinimo)) || Number(v.stockMinimo) < 0)
                               ? "border-red-400 bg-red-50"
                               : "focus:border-gray-400 hover:border-gray-300"
@@ -669,17 +711,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-600 block">Código de barras</label>
-                          <input
-                            value={v.codigoBarras}
-                            onChange={(e) => handleCambioVariante(index, "codigoBarras", e.target.value)}
-                            placeholder="Código de barras"
-                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
-                          />
-                        </div>
-
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Presentación</label>
                           <BuscadorCombo
@@ -697,9 +729,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             limit={3}
                           />
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Talla</label>
                           <BuscadorCombo
@@ -727,7 +756,30 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
                           />
                         </div>
+                      </div>
 
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-600 block">Código de barras</label>
+                          <input
+                            value={v.codigoBarras}
+                            onChange={(e) => handleCambioVariante(index, "codigoBarras", e.target.value)}
+                            placeholder="Código de barras"
+                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                          />
+                        </div>
+
+                        <div className={`space-y-1 ${UBICACIONES_PRODUCTO_UI_HABILITADAS ? "" : "md:col-span-2"}`}>
+                          <label className="text-xs font-semibold text-gray-600 block">Atributos adicionales</label>
+                          <input
+                            value={v.atributosAdicionales}
+                            onChange={(e) => handleCambioVariante(index, "atributosAdicionales", e.target.value)}
+                            placeholder="Ej. Algodón, costuras reforzadas"
+                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                          />
+                        </div>
+
+                        {UBICACIONES_PRODUCTO_UI_HABILITADAS ? (
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Ubicación</label>
                           <BuscadorCombo
@@ -745,6 +797,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             limit={3}
                           />
                         </div>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -922,6 +975,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         nombrePlaceholder="Nombre (Ej: M, L, XL)"
       />
 
+      {UBICACIONES_PRODUCTO_UI_HABILITADAS ? (
       <ModalCatalogoInventario
         open={openUbicacionModal}
         onClose={() => setOpenUbicacionModal(false)}
@@ -954,6 +1008,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         }}
         tituloNuevo="Nueva Ubicación"
       />
+      ) : null}
     </div>
   );
 };

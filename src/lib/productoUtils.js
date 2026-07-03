@@ -1,4 +1,10 @@
 import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
+import {
+  atributosAdicionalesATexto,
+  buildVarianteDetalleTexto,
+  normalizarAtributosAdicionales,
+  pickNombreVariante,
+} from "@/lib/varianteUtils";
 
 const pickFrom = (sources, ...keys) => {
   for (const source of sources) {
@@ -193,6 +199,11 @@ export function normalizarVarianteBusqueda(raw) {
       "fotoUrl",
       "FotoUrl"
     ),
+    nombreVariante: pickNombreVariante(raw) ?? pickNombreVariante(variante) ?? pickNombreVariante(producto),
+    atributosAdicionales:
+      normalizarAtributosAdicionales(raw) ??
+      normalizarAtributosAdicionales(variante) ??
+      normalizarAtributosAdicionales(producto),
     fechaCreacion: pickFrom(sources, "fechaCreacion", "FechaCreacion"),
   };
 }
@@ -265,11 +276,7 @@ function normalizarCampoCatalogoVariante(raw, idKeys, nombreKeys) {
 }
 
 export function formatearEspecificacionVariante(variante) {
-  if (!variante) return "—";
-  const partes = [];
-  if (variante.presentacionNombre) partes.push(variante.presentacionNombre);
-  if (variante.tallaNombre) partes.push(variante.tallaNombre);
-  return partes.length > 0 ? partes.join(" • ") : "—";
+  return buildVarianteDetalleTexto(variante, "—");
 }
 
 export function resolverIdCatalogoPorNombre(catalogo, idField, nombre) {
@@ -286,6 +293,8 @@ export const FORM_NUEVA_VARIANTE_VACIO = {
   talla: "",
   presentacion: "",
   color: "",
+  nombreVariante: "",
+  atributosAdicionales: "",
   precioVenta: "",
   precioVentaMayor: "",
   precioCompra: "",
@@ -329,11 +338,17 @@ export function crearFormNuevaVarianteDesdeReferencia(variantes = [], catalogos 
     "PrecioVentaMayor"
   );
   const stockMinimo = pick(referencia, "stockMinimo", "StockMinimo");
+  const nombreVariante = pickNombreVariante(referencia) ?? "";
+  const atributosAdicionales = atributosAdicionalesATexto(
+    normalizarAtributosAdicionales(referencia)
+  );
 
   return {
     ...FORM_NUEVA_VARIANTE_VACIO,
     presentacion,
     talla,
+    nombreVariante,
+    atributosAdicionales,
     precioVenta:
       precioVenta != null && precioVenta !== "" ? String(precioVenta) : "",
     precioVentaMayor:
@@ -405,6 +420,8 @@ export function normalizarVarianteDetalle(raw) {
       toNumberOrNull(pick(raw, "id", "Id")),
     sku: pickFrom(sources, "sku", "Sku", "SKU", "codigo", "Codigo"),
     color: pickFrom(sources, "color", "Color"),
+    nombreVariante: pickNombreVariante(varianteBase),
+    atributosAdicionales: normalizarAtributosAdicionales(varianteBase),
     presentacion: presentacion.id,
     presentacionNombre: presentacion.nombre,
     talla: talla.id,
