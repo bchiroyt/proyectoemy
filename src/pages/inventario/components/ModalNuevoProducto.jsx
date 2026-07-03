@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { X, ArrowLeft, Plus, Trash2, CheckCircle, AlertCircle } from "lucide-react";
-
+import { useState, useEffect, useMemo, useRef } from "react";
+import { X, ArrowLeft, Plus, Trash2, CheckCircle, AlertCircle, ChevronDown } from "lucide-react";
 import ModalCatalogoInventario from "./ModalCatalogoInventario";
 import BuscadorCombo from "./BuscadorCombo";
 
@@ -11,6 +10,9 @@ import { obtenerTallas, crearTalla } from "@/services/tallas";
 import { obtenerUbicaciones, crearUbicacion } from "@/services/ubicaciones";
 
 import { crearProducto } from "@/services/productos";
+
+// Componente utilitario para simular classNames alternos si es necesario
+const cn = (...classes) => classes.filter(Boolean).join(" ");
 
 function BuscadorComboLocal({
   placeholder,
@@ -46,7 +48,6 @@ function BuscadorComboLocal({
     latestState.current = { inputValor, selectedName, onChange };
   });
 
-  // Cerrar el menú al hacer click fuera
   useEffect(() => {
     const clickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -174,7 +175,7 @@ function BuscadorComboLocal({
         <div className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
           {matches.length === 0 ? (
             <div className="px-3 py-2 text-xs text-gray-400 italic">
-              Sin coincidencias
+              Sin開incidencias
             </div>
           ) : (
             <div className="py-1">
@@ -227,10 +228,8 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
   // Estado para avisos flotantes de éxito/error
   const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
-
   // Estado para controlar la apertura del modal personalizado de confirmación de salida
   const [openConfirmarSalida, setOpenConfirmarSalida] = useState(false);
-
   // Datos del formulario
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -238,14 +237,11 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
   const [marcaSeleccionada, setMarcaSeleccionada] = useState("");
 
-
-
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [presentaciones, setPresentaciones] = useState([]);
   const [tallas, setTallas] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
-
   const [variantes, setVariantes] = useState([{ ...VARIANTE_VACIA }]);
 
   const [openMarcaModal, setOpenMarcaModal] = useState(false);
@@ -340,6 +336,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       const stockMinimoInvalido =
         v.stockMinimo !== "" &&
         (!Number.isFinite(Number(v.stockMinimo)) || Number(v.stockMinimo) < 0);
+
       return !tieneEspecificacion || precioInvalido || costoInvalido || stockMinimoInvalido || precioVentaMayorInvalido;
     });
 
@@ -405,7 +402,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
   const handleRegistrar = async () => {
     if (formularioInvalido()) return;
-
     try {
       setLoading(true);
 
@@ -439,7 +435,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       await crearProducto(formData);
 
       mostrarAviso("exito", "¡Producto creado correctamente en el catálogo!");
-
       if (onSuccess) {
         setTimeout(() => onSuccess(), 1500);
       }
@@ -453,8 +448,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       setLoading(false);
     }
   };
-
-
 
   if (!open) return null;
 
@@ -489,12 +482,26 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           </button>
         </div>
 
-        <div className="flex justify-center gap-4 py-4 bg-gray-50 border-b">
-          <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 1 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>1</div>
-          <div className="w-16 h-1 bg-gray-200 self-center rounded">
-            <div className={`h-1 transition-all duration-300 ${step === 2 ? "bg-(--color-pagina) w-full" : "bg-(--color-pagina) w-1/2"}`} />
+        {/* CONTENEDOR DE PASOS CORREGIDO: Ahora incluye de manera fija el botón de Añadir Variante */}
+        <div className="relative flex justify-center items-center py-4 bg-gray-50 border-b px-6">
+          <div className="flex gap-4 items-center">
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 1 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>1</div>
+            <div className="w-16 h-1 bg-gray-200 self-center rounded">
+              <div className={`h-1 transition-all duration-300 ${step === 2 ? "bg-(--color-pagina) w-full" : "bg-(--color-pagina) w-1/2"}`} />
+            </div>
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 2 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>2</div>
           </div>
-          <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${step === 2 ? "bg-(--color-pagina) text-white" : "bg-gray-200 text-gray-600"}`}>2</div>
+
+          {/* Botón flotante a la derecha de la barra de pasos (Solo visible en paso 2) */}
+          {step === 2 && (
+            <button
+              type="button"
+              onClick={handleAgregarVariante}
+              className="absolute right-6 flex items-center gap-1 bg-(--color-pagina-2) text-white px-4 py-2 rounded-lg text-sm font-semibold hover:brightness-90 active:scale-95 transition-all cursor-pointer shadow-sm animate-in fade-in zoom-in duration-200"
+            >
+              <Plus className="w-4 h-4" /> Añadir variante
+            </button>
+          )}
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
@@ -575,17 +582,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
           {step === 2 && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-semibold text-gray-700">Detalles y Variantes</h3>
-                <button
-                  type="button"
-                  onClick={handleAgregarVariante}
-                  className="flex items-center gap-1 bg-(--color-pagina-2) text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:brightness-90 active:scale-95 transition-all cursor-pointer shadow-sm"
-                >
-                  <Plus className="w-4 h-4" /> Añadir variante
-                </button>
-              </div>
-
+              {/* Removido el sub-header antiguo que contenía el botón de añadir variante anterior */}
               <div className="space-y-6">
                 {variantes.map((v, index) => {
                   return (
@@ -618,7 +615,8 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             value={v.precioVenta}
                             onChange={(e) => handleCambioVariante(index, "precioVenta", e.target.value)}
                             placeholder="Precio venta"
-                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ?
+                              "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
                               }`}
                           />
                         </div>
@@ -630,22 +628,11 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             value={v.precioVentaMayor}
                             onChange={(e) => handleCambioVariante(index, "precioVentaMayor", e.target.value)}
                             placeholder="Precio mayoreo"
-                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
+                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioVenta !== "" && Number(v.precioVenta) < 0 ?
+                              "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
                               }`}
                           />
                         </div>
-
-                        {/*<div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-600 block">Precio costo</label>
-                          <input
-                            type="number"
-                            value={v.precioCompra}
-                            onChange={(e) => handleCambioVariante(index, "precioCompra", e.target.value)}
-                            placeholder="Precio costo"
-                            className={`w-full border p-3 rounded-lg bg-(--color-blanco) outline-none transition-colors ${v.precioCompra !== "" && Number(v.precioCompra) < 0 ? "border-red-400 bg-red-50" : "focus:border-gray-400 hover:border-gray-300"
-                              }`}
-                          />
-                        </div>*/}
 
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-600 block">Stock mínimo</label>
@@ -697,7 +684,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
                         <div className="space-y-1 relative">
                           <label className="text-xs font-semibold text-gray-600 block">Talla</label>
                           <BuscadorCombo
@@ -805,21 +791,18 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         onSave={async (form) => {
           try {
             await crearMarca(form);
-
             const marcasData = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
             const listaActualizada = marcasData?.items || [];
             setMarcas(listaActualizada);
-
             const marcaReciente = listaActualizada.find(
               (m) => m?.nombre?.toLowerCase() === form.nombre.trim().toLowerCase()
             );
-
             if (marcaReciente) {
               setMarcaSeleccionada(marcaReciente.idMarca);
             }
           } catch (error) {
             console.error("Error al guardar marca:", error);
-          } finally {
+          } {
             setOpenMarcaModal(false);
           }
         }}
@@ -836,18 +819,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
               descripcion: form.descripcion,
               estado: form.activo,
             };
-
             const respuestaApi = await crearCategoria(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
             const idFinal = dataReal?.idCategoria || dataReal?.id || Date.now();
-
             const categoriaFormateada = {
               idCategoria: idFinal,
               nombre: form.nombre,
               descripcion: form.descripcion,
               estado: form.activo,
             };
-
             setCategorias((prev) => [...prev, categoriaFormateada]);
             setCategoriaSeleccionada(idFinal);
           } catch (error) {
@@ -872,11 +852,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             const respuestaApi = await crearPresentacion(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
             const idFinal = dataReal?.idPresentacion || dataReal?.id;
-
             const res = await obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 });
             const listaActualizada = res?.items || [];
             setPresentaciones(listaActualizada);
-
             if (idFinal) {
               const deLista = listaActualizada.find(p => Number(p.idPresentacion) === Number(idFinal));
               if (deLista && activeVariantIndex !== null) {
@@ -907,11 +885,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             const respuestaApi = await crearTalla(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
             const idFinal = dataReal?.idTalla || dataReal?.id;
-
             const res = await obtenerTallas({ Activo: true, Page: 1, PageSize: 500 });
             const listaActualizada = res?.items || [];
             setTallas(listaActualizada);
-
             if (idFinal) {
               const deLista = listaActualizada.find(t => Number(t.idTalla) === Number(idFinal));
               if (deLista && activeVariantIndex !== null) {
@@ -943,11 +919,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             const respuestaApi = await crearUbicacion(payload);
             const dataReal = respuestaApi?.data || respuestaApi;
             const idFinal = dataReal?.idUbicacion || dataReal?.id;
-
             const res = await obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 });
             const listaActualizada = res?.items || [];
             setUbicaciones(listaActualizada);
-
             if (idFinal) {
               const deLista = listaActualizada.find(u => Number(u.idUbicacion) === Number(idFinal));
               if (deLista && activeVariantIndex !== null) {
