@@ -221,6 +221,13 @@ const VARIANTE_VACIA = {
   ubicacion: "",
 };
 
+const formatFileSize = (bytes) => {
+  const size = Number(bytes ?? 0);
+  if (!Number.isFinite(size) || size <= 0) return "0 KB";
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -518,9 +525,18 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setImagen(e.target.files[0])}
+                  onChange={(e) => setImagen(e.target.files?.[0] ?? null)}
                   className="w-full border p-2 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors text-sm"
                 />
+                {imagen ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                    <span className="font-semibold">Imagen seleccionada:</span>
+                    <span className="max-w-full truncate font-medium">{imagen.name}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-emerald-700">
+                      {formatFileSize(imagen.size)}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
