@@ -424,12 +424,9 @@ export function CompraLineasProductos({
                       <p className="text-xs font-medium leading-tight text-(--color-negro)">{row.nombre}</p>
                       <EtiquetasVarianteCompactas item={row} />
                       <div className="flex flex-wrap items-center gap-x-2 text-[10px]">
-                        {row.detalle ? (
-                          <span className="text-(--color-gris-letra)">{row.detalle}</span>
-                        ) : null}
                         {row.stockActual !== undefined && row.stockActual !== null ? (
                           <span className={cn("font-bold", row.stockActual > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
-                            {row.detalle ? " · " : ""}Stock: {row.stockActual}
+                            Stock: {row.stockActual}
                           </span>
                         ) : null}
                       </div>

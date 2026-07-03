@@ -22,7 +22,6 @@ import RecibirCompraDialog from "./components/RecibirCompraDialog";
 import {
   ChevronDown,
   ClipboardList,
-  Download,
   Eye,
   PackageCheck,
   Pencil,
@@ -154,9 +153,6 @@ const Compras = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="icon" type="button" aria-label="Exportar">
-            <Download className="size-5 text-(--color-gris-letra)" />
-          </Button>
         </div>
 
         <div className="flex flex-1 justify-center px-4">
