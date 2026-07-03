@@ -1,4 +1,9 @@
 import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
+import {
+  buildVarianteDetallePartes,
+  normalizarAtributosAdicionales,
+  pickNombreVariante,
+} from "@/lib/varianteUtils";
 
 const pickFrom = (sources, ...keys) => {
   for (const source of sources) {
@@ -17,16 +22,9 @@ export const normalizarEstadoStock = (estado) =>
 
 export function buildVarianteStockDetalle(item) {
   const sku = String(item?.sku ?? "").trim();
-  const talla = String(item?.talla ?? "").trim();
-  const color = String(item?.color ?? "").trim();
-  const presentacion = String(item?.presentacion ?? "").trim();
-  const tallaOPresentacion = talla || presentacion;
+  const detalle = buildVarianteDetallePartes(item);
 
-  return [
-    `SKU ${sku || "sin registrar"}`,
-    tallaOPresentacion,
-    color,
-  ].filter(Boolean);
+  return [`SKU ${sku || "sin registrar"}`, ...detalle].filter(Boolean);
 }
 
 export function mapNivelStock(raw, index = 0) {
@@ -66,6 +64,9 @@ export function mapNivelStock(raw, index = 0) {
       ) ?? "Producto",
     talla: pickFrom(sources, "talla", "Talla", "nombreTalla", "NombreTalla") ?? "",
     color: pickFrom(sources, "color", "Color", "nombreColor", "NombreColor") ?? "",
+    nombreVariante: pickNombreVariante(raw) ?? pickNombreVariante(variante) ?? "",
+    atributosAdicionales:
+      normalizarAtributosAdicionales(raw) ?? normalizarAtributosAdicionales(variante),
     presentacion:
       pickFrom(
         sources,

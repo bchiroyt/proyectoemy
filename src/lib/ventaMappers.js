@@ -3,18 +3,15 @@ import {
   TICKET_NEGOCIO_DIRECCION,
   TICKET_NEGOCIO_NOMBRE,
 } from "@/constants/ticketConfig";
+import {
+  buildNombreDisplayConVariante,
+  normalizarAtributosAdicionales,
+  pickNombreVariante,
+} from "@/lib/varianteUtils";
 
 /** Etiqueta legible para tarjetas y carrito (nombre + variantes) */
 export function buildNombreDisplay(raw) {
-  const base = pick(raw, "nombreProducto", "NombreProducto") ?? "";
-  const extras = [
-    pick(raw, "talla", "Talla"),
-    pick(raw, "color", "Color"),
-    pick(raw, "presentacion", "Presentacion"),
-  ].filter(Boolean);
-  if (!base) return extras.join(" · ") || "Producto";
-  if (extras.length === 0) return base;
-  return `${base} · ${extras.join(" · ")}`;
+  return buildNombreDisplayConVariante(raw);
 }
 
 export function slugCategoria(nombre) {
@@ -60,6 +57,8 @@ export function mapCatalogoProducto(raw) {
     sku: pick(raw, "sku", "Sku") ?? "",
     nombre: buildNombreDisplay(raw),
     nombreProducto: pick(raw, "nombreProducto", "NombreProducto") ?? "",
+    nombreVariante: pickNombreVariante(raw),
+    atributosAdicionales: normalizarAtributosAdicionales(raw),
     descripcion: pick(raw, "descripcion", "Descripcion") ?? "",
     marca: pick(raw, "marca", "Marca") ?? "",
     categoria,

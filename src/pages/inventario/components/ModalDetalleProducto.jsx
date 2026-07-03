@@ -24,6 +24,7 @@ import {
 import { obtenerTallas } from "@/services/tallas";
 import { obtenerPresentaciones } from "@/services/presentaciones";
 import { obtenerUbicaciones } from "@/services/ubicaciones";
+import { UBICACIONES_PRODUCTO_UI_HABILITADAS } from "@/lib/featureFlags";
 import { obtenerCategorias } from "@/services/categorias";
 import { obtenerMarcas } from "@/services/marcas";
 import BuscadorCombo from "./BuscadorCombo";
@@ -38,6 +39,12 @@ import {
   formatearEspecificacionVariante,
   resolverIdCatalogoPorNombre,
 } from "@/lib/productoUtils";
+import {
+  atributosAdicionalesATexto,
+  CLASES_ETIQUETA_VARIANTE,
+  obtenerEtiquetasVariante,
+  parsearAtributosAdicionalesDesdeTexto,
+} from "@/lib/varianteUtils";
 
 import {
   Dialog,
@@ -51,11 +58,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const CLASES_ETIQUETA_VARIANTE = {
-  color: "border-sky-200 bg-sky-50 text-sky-700",
-  talla: "border-amber-200 bg-amber-50 text-amber-700",
-  presentacion: "border-emerald-200 bg-emerald-50 text-emerald-700",
-};
+const CLASES_ETIQUETA_VARIANTE_LOCAL = CLASES_ETIQUETA_VARIANTE;
 
 const normalizarTextoNumeroEditable = (...valores) => {
   for (const valor of valores) {
@@ -89,25 +92,6 @@ const obtenerUbicacionVariante = (variante) =>
       variante?.UbicacionDefaultNombre
   );
 
-const obtenerEtiquetasVariante = (variante) => {
-  const color = normalizarTextoVariante(variante?.color ?? variante?.Color);
-  const talla = normalizarTextoVariante(
-    variante?.tallaNombre ?? variante?.nombreTalla ?? variante?.TallaNombre ?? variante?.NombreTalla
-  );
-  const presentacion = normalizarTextoVariante(
-    variante?.presentacionNombre ??
-      variante?.nombrePresentacion ??
-      variante?.PresentacionNombre ??
-      variante?.NombrePresentacion
-  );
-
-  return [
-    presentacion ? { key: "presentacion", value: presentacion } : null,
-    talla ? { key: "talla", value: talla } : null,
-    color ? { key: "color", value: color } : null,
-  ].filter(Boolean);
-};
-
 function EtiquetasVariante({ variante, keys, className = "" }) {
   const permitidas = new Set(keys);
   const etiquetas = obtenerEtiquetasVariante(variante).filter((etiqueta) =>
@@ -121,7 +105,7 @@ function EtiquetasVariante({ variante, keys, className = "" }) {
       {etiquetas.map((etiqueta) => (
         <span
           key={etiqueta.key}
-          className={`min-w-0 max-w-full truncate rounded border px-1.5 py-px text-[10px] leading-none font-medium ${CLASES_ETIQUETA_VARIANTE[etiqueta.key]}`}
+          className={`min-w-0 max-w-full truncate rounded border px-1.5 py-px text-[10px] leading-none font-medium ${CLASES_ETIQUETA_VARIANTE_LOCAL[etiqueta.key]}`}
           title={etiqueta.value}
         >
           {etiqueta.value}
@@ -132,6 +116,8 @@ function EtiquetasVariante({ variante, keys, className = "" }) {
 }
 
 function EtiquetaUbicacionVariante({ variante }) {
+  if (!UBICACIONES_PRODUCTO_UI_HABILITADAS) return null;
+
   const ubicacion = obtenerUbicacionVariante(variante);
   if (!ubicacion) return null;
 
@@ -191,6 +177,8 @@ const ModalDetalleProducto = ({
 }) => {
   const [editandoId, setEditandoId] = useState(null);
   const [colorInput, setColorInput] = useState("");
+  const [nombreVarianteInput, setNombreVarianteInput] = useState("");
+  const [atributosAdicionalesInput, setAtributosAdicionalesInput] = useState("");
   const [precioVentaInput, setPrecioVentaInput] = useState("");
   const [precioVentaMayorInput, setPrecioVentaMayorInput] = useState("");
   const [codigoBarrasInput, setCodigoBarrasInput] = useState("");
@@ -367,21 +355,28 @@ const ModalDetalleProducto = ({
 
   // Cargar catálogos al mostrar el formulario de nueva variante o editar variante
   useEffect(() => {
+    const faltaCatalogoUbicacion = UBICACIONES_PRODUCTO_UI_HABILITADAS && ubicaciones.length === 0;
     if (
       (mostrandoNuevaVariante || editandoId !== null) &&
-      (tallas.length === 0 || presentaciones.length === 0 || ubicaciones.length === 0)
+      (tallas.length === 0 || presentaciones.length === 0 || faltaCatalogoUbicacion)
     ) {
       const cargarCatalogos = async () => {
         setCargandoCatalogos(true);
         try {
-          const [resTallas, resPres, resUbicaciones] = await Promise.all([
+          const promesas = [
             obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
             obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
-            obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }),
-          ]);
-          setTallas(resTallas.items || []);
-          setPresentaciones(resPres.items || []);
-          setUbicaciones(resUbicaciones.items || []);
+          ];
+          if (UBICACIONES_PRODUCTO_UI_HABILITADAS) {
+            promesas.push(obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }));
+          }
+
+          const resultados = await Promise.all(promesas);
+          setTallas(resultados[0].items || []);
+          setPresentaciones(resultados[1].items || []);
+          if (UBICACIONES_PRODUCTO_UI_HABILITADAS) {
+            setUbicaciones(resultados[2].items || []);
+          }
         } catch (error) {
           console.error("Error al cargar catálogos:", error);
         } finally {
@@ -395,14 +390,18 @@ const ModalDetalleProducto = ({
   const cargarCatalogosVariante = async () => {
     setCargandoCatalogos(true);
     try {
-      const [resTallas, resPres, resUbicaciones] = await Promise.all([
+      const promesas = [
         obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
         obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
-        obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }),
-      ]);
-      const itemsTallas = resTallas.items || [];
-      const itemsPresentaciones = resPres.items || [];
-      const itemsUbicaciones = resUbicaciones.items || [];
+      ];
+      if (UBICACIONES_PRODUCTO_UI_HABILITADAS) {
+        promesas.push(obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }));
+      }
+
+      const resultados = await Promise.all(promesas);
+      const itemsTallas = resultados[0].items || [];
+      const itemsPresentaciones = resultados[1].items || [];
+      const itemsUbicaciones = UBICACIONES_PRODUCTO_UI_HABILITADAS ? (resultados[2].items || []) : [];
       setTallas(itemsTallas);
       setPresentaciones(itemsPresentaciones);
       setUbicaciones(itemsUbicaciones);
@@ -428,6 +427,8 @@ const ModalDetalleProducto = ({
       formNuevaVariante.talla !== formNuevaVarianteInicial.talla ||
       formNuevaVariante.presentacion !== formNuevaVarianteInicial.presentacion ||
       formNuevaVariante.color !== formNuevaVarianteInicial.color ||
+      formNuevaVariante.nombreVariante !== formNuevaVarianteInicial.nombreVariante ||
+      formNuevaVariante.atributosAdicionales !== formNuevaVarianteInicial.atributosAdicionales ||
       formNuevaVariante.precioVenta !== formNuevaVarianteInicial.precioVenta ||
       formNuevaVariante.precioCompra !== formNuevaVarianteInicial.precioCompra ||
       formNuevaVariante.stockMinimo !== formNuevaVarianteInicial.stockMinimo ||
@@ -552,6 +553,8 @@ const ModalDetalleProducto = ({
 
     return {
       color: variante.color || "",
+      nombreVariante: variante.nombreVariante || "",
+      atributosAdicionales: atributosAdicionalesATexto(variante.atributosAdicionales),
       precioVenta: normalizarTextoNumeroEditable(variante.precioVentaActual),
       precioVentaMayor: normalizarTextoNumeroEditable(
         variante.precioVentaMayorActual,
@@ -606,12 +609,15 @@ const ModalDetalleProducto = ({
   const iniciarEdicion = async (v, idActual) => {
     setErrorEdicion("");
     let catalogos = { tallas, presentaciones, ubicaciones };
-    if (tallas.length === 0 || presentaciones.length === 0 || ubicaciones.length === 0) {
+    const faltaCatalogoUbicacion = UBICACIONES_PRODUCTO_UI_HABILITADAS && ubicaciones.length === 0;
+    if (tallas.length === 0 || presentaciones.length === 0 || faltaCatalogoUbicacion) {
       catalogos = await cargarCatalogosVariante();
     }
 
     const valores = obtenerValoresOriginalesVariante(v, catalogos);
     setColorInput(valores.color);
+    setNombreVarianteInput(valores.nombreVariante);
+    setAtributosAdicionalesInput(valores.atributosAdicionales);
     setPrecioVentaInput(valores.precioVenta);
     setPrecioVentaMayorInput(valores.precioVentaMayor);
     setCodigoBarrasInput(valores.codigoPrincipal);
@@ -629,6 +635,8 @@ const ModalDetalleProducto = ({
     setEditandoId(null);
     setErrorEdicion("");
     setColorInput("");
+    setNombreVarianteInput("");
+    setAtributosAdicionalesInput("");
     setPrecioVentaInput("");
     setPrecioVentaMayorInput("");
     setCodigoBarrasInput("");
@@ -650,12 +658,14 @@ const ModalDetalleProducto = ({
 
     return (
       colorInput !== valoresOriginales.color ||
+      nombreVarianteInput !== valoresOriginales.nombreVariante ||
+      atributosAdicionalesInput !== valoresOriginales.atributosAdicionales ||
       precioVentaNormalizado !== valoresOriginales.precioVenta ||
       precioVentaMayorNormalizado !== valoresOriginales.precioVentaMayor ||
       codigoBarrasInput !== valoresOriginales.codigoPrincipal ||
       tallaInput !== valoresOriginales.talla ||
       presentacionInput !== valoresOriginales.presentacion ||
-      ubicacionInput !== valoresOriginales.ubicacion ||
+      (UBICACIONES_PRODUCTO_UI_HABILITADAS && ubicacionInput !== valoresOriginales.ubicacion) ||
       stockMinimoInput !== valoresOriginales.stockMinimo ||
       !mismosSecundarios
     );
@@ -666,6 +676,11 @@ const ModalDetalleProducto = ({
     if (!Number.isFinite(idNumerico) || idNumerico <= 0) {
       const message = "No se puede actualizar esta variante porque no trae un ID valido.";
       setErrorEdicion(message);
+      return;
+    }
+
+    if (!idProducto) {
+      setErrorEdicion("No se puede actualizar la variante sin el ID del producto.");
       return;
     }
 
@@ -703,6 +718,18 @@ const ModalDetalleProducto = ({
       return;
     }
 
+    let atributosParsed = null;
+    if (atributosAdicionalesInput !== valoresOriginales.atributosAdicionales) {
+      try {
+        atributosParsed = atributosAdicionalesInput.trim()
+          ? parsearAtributosAdicionalesDesdeTexto(atributosAdicionalesInput)
+          : null;
+      } catch (error) {
+        setErrorEdicion(error.message || "Los atributos adicionales no son un JSON válido.");
+        return;
+      }
+    }
+
     try {
       setCargando(true);
       setErrorEdicion("");
@@ -720,6 +747,18 @@ const ModalDetalleProducto = ({
 
       if (colorInput !== valoresOriginales.color) {
         payload.color = colorInput.trim() || null;
+      }
+
+      if (nombreVarianteInput !== valoresOriginales.nombreVariante) {
+        payload.nombreVariante = nombreVarianteInput.trim() || null;
+      }
+
+      if (atributosAdicionalesInput !== valoresOriginales.atributosAdicionales) {
+        if (atributosParsed) {
+          payload.atributosAdicionales = atributosParsed;
+        } else {
+          payload.limpiarAtributosAdicionales = true;
+        }
       }
 
       if (cambioPrecioVenta) {
@@ -746,7 +785,7 @@ const ModalDetalleProducto = ({
         }
       }
 
-      if (ubicacionInput !== valoresOriginales.ubicacion) {
+      if (UBICACIONES_PRODUCTO_UI_HABILITADAS && ubicacionInput !== valoresOriginales.ubicacion) {
         if (ubicacionInput) {
           payload.idUbicacionDefault = Number(ubicacionInput);
         } else {
@@ -767,7 +806,7 @@ const ModalDetalleProducto = ({
         return;
       }
 
-      const respuesta = await actualizarVariante(idNumerico, payload);
+      const respuesta = await actualizarVariante(idProducto, idNumerico, payload);
       throwIfEnvelopeFailed(respuesta, "No se pudo actualizar la variante.");
 
       setEstadoProducto((prev) => {
@@ -785,6 +824,11 @@ const ModalDetalleProducto = ({
               return {
                 ...variante,
                 color: colorInput,
+                nombreVariante: nombreVarianteInput.trim() || null,
+                atributosAdicionales:
+                  atributosAdicionalesInput !== valoresOriginales.atributosAdicionales
+                    ? atributosParsed
+                    : variante.atributosAdicionales,
                 precioVentaActual: Number(precioVentaInput),
                 precioVentaMayorActual: precioVentaMayorInput !== "" ? Number(precioVentaMayorInput) : null,
                 codigoPrincipal: codigoBarrasInput,
@@ -835,7 +879,9 @@ const ModalDetalleProducto = ({
     const tieneEspecificacion =
       formNuevaVariante.talla ||
       formNuevaVariante.presentacion ||
-      formNuevaVariante.color.trim();
+      formNuevaVariante.color.trim() ||
+      formNuevaVariante.nombreVariante.trim() ||
+      formNuevaVariante.atributosAdicionales.trim();
     const precioVenta = Number(formNuevaVariante.precioVenta);
     const stockMinimo = formNuevaVariante.stockMinimo;
     const stockMinimoInvalido =
@@ -845,8 +891,17 @@ const ModalDetalleProducto = ({
     const precioVentaMayorInvalido =
       precioVentaMayor !== "" &&
       (!Number.isFinite(Number(precioVentaMayor)) || Number(precioVentaMayor) < 0);
+    let atributosValidos = true;
+    if (formNuevaVariante.atributosAdicionales.trim()) {
+      try {
+        parsearAtributosAdicionalesDesdeTexto(formNuevaVariante.atributosAdicionales);
+      } catch {
+        atributosValidos = false;
+      }
+    }
     return (
       tieneEspecificacion &&
+      atributosValidos &&
       Number.isFinite(precioVenta) &&
       precioVenta > 0 &&
       !stockMinimoInvalido &&
@@ -857,7 +912,7 @@ const ModalDetalleProducto = ({
   const handleGuardarNuevaVariante = async () => {
     if (!nuevaVarianteValida()) {
       setErrorNuevaVariante(
-        "Indica al menos talla, presentación o color, y un precio de venta mayor que 0."
+        "Indica al menos talla, presentación, color, nombre variante o atributos, y un precio de venta mayor que 0."
       );
       return;
     }
@@ -865,11 +920,17 @@ const ModalDetalleProducto = ({
     try {
       setGuardandoNuevaVariante(true);
       setErrorNuevaVariante("");
+
+      const atributosAdicionales = formNuevaVariante.atributosAdicionales.trim()
+        ? parsearAtributosAdicionalesDesdeTexto(formNuevaVariante.atributosAdicionales)
+        : null;
       
       const payload = [{
         talla: formNuevaVariante.talla ? Number(formNuevaVariante.talla) : null,
         presentacion: formNuevaVariante.presentacion ? Number(formNuevaVariante.presentacion) : null,
         color: formNuevaVariante.color.trim() || null,
+        nombreVariante: formNuevaVariante.nombreVariante.trim() || null,
+        atributosAdicionales,
         precioVenta: Number(formNuevaVariante.precioVenta),
         precioVentaMayor: formNuevaVariante.precioVentaMayor !== "" ? Number(formNuevaVariante.precioVentaMayor) : null,
         stockMinimo: formNuevaVariante.stockMinimo !== "" ? Number(formNuevaVariante.stockMinimo) : null,
@@ -1316,6 +1377,24 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, color: e.target.value })}
                               />
                             </div>
+                            <div className="lg:col-span-2">
+                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Nombre variante</label>
+                              <Input
+                                className="h-8 text-xs"
+                                placeholder="Ej. Edición limitada"
+                                value={formNuevaVariante.nombreVariante}
+                                onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, nombreVariante: e.target.value })}
+                              />
+                            </div>
+                            <div className="lg:col-span-2">
+                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Atributos adicionales</label>
+                              <Input
+                                className="h-8 text-xs focus-visible:ring-pink-500"
+                                placeholder="Ej. Algodón, costuras reforzadas"
+                                value={formNuevaVariante.atributosAdicionales}
+                                onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, atributosAdicionales: e.target.value })}
+                              />
+                            </div>
                             <div className="lg:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Cód. Barras</label>
                               <Input
@@ -1417,10 +1496,42 @@ const ModalDetalleProducto = ({
                                 </p>
                               </div>
 
+                              {/* NOMBRE / ATRIBUTOS */}
+                              <div className="lg:col-span-2">
+                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                  Nombre / Atributos
+                                </p>
+                                {esModoEdicion ? (
+                                  <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5">
+                                    <Input
+                                      className="h-8 text-xs focus-visible:ring-pink-500"
+                                      placeholder="Nombre variante"
+                                      value={nombreVarianteInput}
+                                      onChange={(e) => setNombreVarianteInput(e.target.value)}
+                                    />
+                                    <Input
+                                      className="h-8 text-xs focus-visible:ring-pink-500"
+                                      placeholder="Atributos adicionales (Ej. Algodón)"
+                                      value={atributosAdicionalesInput}
+                                      onChange={(e) => setAtributosAdicionalesInput(e.target.value)}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    <EtiquetasVariante variante={v} keys={["nombreVariante", "atributos"]} />
+                                    {!v.nombreVariante && !v.atributosAdicionales ? (
+                                      <p className="text-xs text-slate-500">—</p>
+                                    ) : null}
+                                  </div>
+                                )}
+                              </div>
+
                               {/* ESPECIFICACIONES */}
                               <div className="lg:col-span-2">
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  Presentación / Talla / Ubicación
+                                  {UBICACIONES_PRODUCTO_UI_HABILITADAS
+                                    ? "Presentación / Talla / Ubicación"
+                                    : "Presentación / Talla"}
                                 </p>
                                 {esModoEdicion ? (
                                   <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5">
@@ -1446,6 +1557,7 @@ const ModalDetalleProducto = ({
                                         <option key={`talla-${t.idTalla ?? "sin-id"}-${index}`} value={t.idTalla}>{t.nombre}</option>
                                       ))}
                                     </select>
+                                    {UBICACIONES_PRODUCTO_UI_HABILITADAS ? (
                                     <select
                                       className="w-full h-8 text-[11px] rounded-md border border-slate-300 bg-white p-1 shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                       value={ubicacionInput}
@@ -1457,6 +1569,7 @@ const ModalDetalleProducto = ({
                                         <option key={`ubicacion-${u.idUbicacion ?? "sin-id"}-${index}`} value={u.idUbicacion}>{u.nombre}</option>
                                       ))}
                                     </select>
+                                    ) : null}
                                   </div>
                                 ) : (
                                   <div className="space-y-1.5">

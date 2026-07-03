@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { formatearAtributosAdicionales } from "@/lib/varianteUtils";
 
 const obtenerEstado = (stock) => {
   if (stock <= 0) {
@@ -43,6 +44,7 @@ const ModalVariantesProducto = ({ open, onClose, producto }) => {
               <tr>
                 <th className="p-4 text-left">No.</th>
                 <th className="p-4 text-left">Código</th>
+                <th className="p-4 text-left">Nombre variante</th>
                 <th className="p-4 text-left">Color</th>
                 <th className="p-4 text-left">Talla</th>
                 <th className="p-4 text-left">Costo Prom.</th>
@@ -62,6 +64,10 @@ const ModalVariantesProducto = ({ open, onClose, producto }) => {
 
                     <td className="p-4">
                       {v.codigoPrincipal || "Sin código"}
+                    </td>
+
+                    <td className="p-4">
+                      {v.nombreVariante || formatearAtributosAdicionales(v.atributosAdicionales) || "-"}
                     </td>
 
                     <td className="p-4">{v.color || "-"}</td>

@@ -2,6 +2,7 @@ import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
 import { mapCompraApiToListRow } from "@/lib/comprasMappers";
 import { mapMovimientoCaja, mapResumenCierre } from "@/lib/cajaMappers";
 import { mapVentaResumen } from "@/lib/ventaMappers";
+import { normalizarAtributosAdicionales, pickNombreVariante } from "@/lib/varianteUtils";
 
 export function mapNivelStockItem(raw) {
   if (!raw) return null;
@@ -13,6 +14,8 @@ export function mapNivelStockItem(raw) {
     sku: pick(raw, "sku", "Sku") ?? "",
     color: pick(raw, "color", "Color") ?? "",
     talla: pick(raw, "talla", "Talla") ?? "",
+    nombreVariante: pickNombreVariante(raw) ?? "",
+    atributosAdicionales: normalizarAtributosAdicionales(raw),
     categoria: pick(raw, "categoria", "Categoria") ?? "",
     marca: pick(raw, "marca", "Marca") ?? "",
     stockActual: Number(pick(raw, "stockActual", "StockActual") ?? 0),
