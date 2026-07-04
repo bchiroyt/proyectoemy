@@ -5,6 +5,7 @@ import {
 } from "@/constants/ticketConfig";
 import {
   buildNombreDisplayConVariante,
+  buildNombreTicket,
   normalizarAtributosAdicionales,
   pickNombreVariante,
 } from "@/lib/varianteUtils";
@@ -56,6 +57,7 @@ export function mapCatalogoProducto(raw) {
     idVariante,
     sku: pick(raw, "sku", "Sku") ?? "",
     nombre: buildNombreDisplay(raw),
+    nombreTicket: buildNombreTicket(raw),
     nombreProducto: pick(raw, "nombreProducto", "NombreProducto") ?? "",
     nombreVariante: pickNombreVariante(raw),
     atributosAdicionales: normalizarAtributosAdicionales(raw),
@@ -306,7 +308,7 @@ export function mapVentaTicket(raw) {
 /** Construye ticket desde datos locales tras el cobro (si GET ticket no está disponible). */
 export function buildTicketDesdeCobro({ ventaCreada, lineas, pagos, cajeroNombre }) {
   const detalles = (lineas ?? []).map((l) => ({
-    nombre: l.nombre,
+    nombre: l.nombreTicket ?? l.nombre,
     cantidad: l.cantidad,
     precio: l.precio,
     descuento: descuentoMontoLinea(l),
