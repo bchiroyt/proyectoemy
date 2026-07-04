@@ -3,6 +3,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import HomePage from "./pages/dashboard/HomePage";
 import MainLayout from "./components/layout/MainLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PublicRoute from "./components/auth/PublicRoute";
 import PanelControl from "./pages/dashboard/PanelControl";
 import Usuarios from "./pages/usuarios/usuarios";
 import Inventario from "./pages/inventario/Inventario";
@@ -45,7 +46,14 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Ruta Pública */}
-        <Route path="/login" element={<LoginPage />} />
+        <Route 
+          path="/login" 
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          } 
+        />
 
         {/* Rutas Protegidas con Layout */}
         <Route

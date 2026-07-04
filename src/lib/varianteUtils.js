@@ -149,20 +149,36 @@ export function obtenerEtiquetasVariante(variante) {
 /** Nombre legible para POS, tickets y carrito. */
 export function buildNombreDisplayConVariante(raw) {
   const base = pick(raw, "nombreProducto", "NombreProducto", "productoNombre", "ProductoNombre", "nombre", "Nombre") ?? "";
-  const nombreVariante = pickNombreVariante(raw);
-
-  if (nombreVariante) {
-    return base ? `${base} · ${nombreVariante}` : nombreVariante;
-  }
-
-  const extras = buildVarianteDetallePartes({
-    ...raw,
-    nombreVariante: null,
-  });
+  
+  const extras = buildVarianteDetallePartes(raw);
 
   if (!base) return extras.join(" · ") || "Producto";
   if (extras.length === 0) return base;
   return `${base} · ${extras.join(" · ")}`;
+}
+
+/** Nombre ultra-resumido exclusivo para tickets físicos (ahorro de papel) */
+export function buildNombreTicket(raw) {
+  const nombreVariante = pickNombreVariante(raw);
+  const nombreProducto = pick(raw, "nombreProducto", "NombreProducto", "productoNombre", "ProductoNombre", "nombre", "Nombre") ?? "";
+  
+  const base = nombreVariante ? nombreVariante : nombreProducto;
+  if (!base) return "Producto";
+
+  const color = normalizarTextoVariante(raw.color ?? raw.Color);
+  if (color) return `${base} · ${color}`;
+
+  const talla = normalizarTextoVariante(
+    raw.tallaNombre ?? raw.TallaNombre ?? raw.talla ?? raw.Talla
+  );
+  if (talla) return `${base} · ${talla}`;
+
+  const marca = normalizarTextoVariante(
+    raw.marcaNombre ?? raw.MarcaNombre ?? raw.marca ?? raw.Marca
+  );
+  if (marca) return `${base} · ${marca}`;
+
+  return base;
 }
 
 export const CLASES_ETIQUETA_VARIANTE = {

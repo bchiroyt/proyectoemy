@@ -30,3 +30,13 @@ export const useAuthStore = create(
         }
     )
 );
+
+// Sincronización entre múltiples pestañas
+if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event) => {
+        // Cuando otra pestaña cambia el estado guardado, forzamos a Zustand a rehidratarse
+        if (event.key === 'auth-storage') {
+            useAuthStore.persist.rehydrate();
+        }
+    });
+}
