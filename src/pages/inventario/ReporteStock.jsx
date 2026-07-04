@@ -88,14 +88,15 @@ const ReporteStock = () => {
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [exportError, setExportError] = useState("");
   const [toast, setToast] = useState({ open: false, message: "", type: "warning" });
-  const nivelesStockQ = useNivelesStockQuery();
+  const nivelesStockQ = useNivelesStockQuery({ page, pageSize: PAGE_SIZE });
   const tablaLoading = nivelesStockQ.isLoading || nivelesStockQ.isFetching;
 
   useEffect(() => {
     setTitulo("Niveles de Stock");
   }, [setTitulo]);
 
-  const nivelesStock = nivelesStockQ.data ?? [];
+  const nivelesStockResp = nivelesStockQ.data ?? {};
+  const nivelesStock = nivelesStockResp.items ?? [];
   const nivelesConPolitica = useMemo(
     () => nivelesStock.filter((item) => !esSinPoliticaStock(item)),
     [nivelesStock]
@@ -106,7 +107,7 @@ const ReporteStock = () => {
   );
   const data = useMemo(
     () =>
-      (estadoFiltro === "sin-politica" ? nivelesSinPolitica : nivelesConPolitica).filter((item) => {
+      (estadoFiltro === "sin-politica" ? nivelesSinPolitica : nivelesStock).filter((item) => {
         const coincideProveedor =
           proveedorFiltro === "todos" || item.proveedor === proveedorFiltro;
         const coincideEstado =
@@ -115,19 +116,21 @@ const ReporteStock = () => {
           normalizarEstadoStock(item.nivelStock) === estadoFiltro;
         return coincideProveedor && coincideEstado;
       }),
-    [nivelesConPolitica, nivelesSinPolitica, proveedorFiltro, estadoFiltro]
+    [nivelesSinPolitica, nivelesStock, proveedorFiltro, estadoFiltro]
   );
-  const totalRecords = data.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const from = totalRecords === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
-  const dataPaginada = useMemo(
-    () => data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [data, currentPage]
+  const pageSize = nivelesStockResp.pageSize ?? PAGE_SIZE;
+  const totalRecords = nivelesStockResp.totalRecords ?? data.length;
+  const totalPages = Math.max(
+    1,
+    nivelesStockResp.totalPages ?? Math.ceil(totalRecords / pageSize)
   );
+  const from = totalRecords === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(from + pageSize - 1, totalRecords);
+  const sinRegistrosParaReporte = data.length === 0;
 
   const generarPDF = async () => {
+    if (sinRegistrosParaReporte) return;
+
     setExportandoPdf(true);
     setExportError("");
 
@@ -193,7 +196,7 @@ const ReporteStock = () => {
 
           <button
             onClick={generarPDF}
-            disabled={tablaLoading || exportandoPdf}
+            disabled={tablaLoading || exportandoPdf || sinRegistrosParaReporte}
             className="flex items-center gap-2 bg-(--color-pagina-2) text-white px-5 py-2 rounded-xl hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <FileDown className="w-4 h-4" />
@@ -247,10 +250,10 @@ const ReporteStock = () => {
             from={from}
             to={to}
             total={totalRecords}
-            onPrev={() => setPage((p) => Math.max(1, Math.min(p, totalPages) - 1))}
-            onNext={() => setPage((p) => Math.min(totalPages, Math.min(p, totalPages) + 1))}
-            disablePrev={currentPage <= 1}
-            disableNext={currentPage >= totalPages}
+            onPrev={() => setPage((p) => Math.max(1, p - 1))}
+            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disablePrev={page <= 1}
+            disableNext={page >= totalPages}
             isLoading={tablaLoading}
           />
 
@@ -283,7 +286,7 @@ const ReporteStock = () => {
           <p className="mt-1 text-xs text-slate-500">
             {estadoFiltro === "sin-politica"
               ? "Productos sin politica registrada de stock minimo."
-              : "Solo se muestran productos con politica de stock registrada."}
+              : "Se muestran todos los productos de la pagina actual, incluso los que no tienen politica de stock."}
           </p>
         </div>
 
@@ -342,7 +345,7 @@ const ReporteStock = () => {
                   No hay productos para los filtros seleccionados.
                 </td>
               </tr>
-            ) : dataPaginada.map((item) => (
+            ) : data.map((item) => (
               <tr key={item.id} className={`border-t border-slate-100 ${getEstadoStockVisual(item).row}`}>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">

@@ -118,7 +118,29 @@ export function unwrapNivelesStock(resp) {
   const data = pick(resp, "data", "Data") ?? resp;
   const resultados = pick(data, "resultados", "Resultados") ?? data;
   const items = pick(resultados, "items", "Items") ?? unwrapList(resp);
-  return (Array.isArray(items) ? items : []).map(mapNivelStock).filter(Boolean);
+  const mappedItems = (Array.isArray(items) ? items : []).map(mapNivelStock).filter(Boolean);
+  return {
+    items: mappedItems,
+    page: toNumberOrNull(pick(resultados, "page", "Page", "pagina", "Pagina")) ?? 1,
+    pageSize:
+      toNumberOrNull(
+        pick(resultados, "pageSize", "PageSize", "tamanoPagina", "TamanoPagina")
+      ) ?? mappedItems.length,
+    totalPages:
+      toNumberOrNull(pick(resultados, "totalPages", "TotalPages", "paginasTotales", "PaginasTotales")) ?? 1,
+    totalRecords:
+      toNumberOrNull(
+        pick(
+          resultados,
+          "totalRecords",
+          "TotalRecords",
+          "totalRegistros",
+          "TotalRegistros",
+          "totalCount",
+          "TotalCount"
+        )
+      ) ?? mappedItems.length,
+  };
 }
 
 export function unwrapNivelesStockExportar(resp) {
