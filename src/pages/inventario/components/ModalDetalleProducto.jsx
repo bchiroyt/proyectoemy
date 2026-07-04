@@ -1517,9 +1517,31 @@ const ModalDetalleProducto = ({
                         (etiqueta) => etiqueta.key === "presentacion" || etiqueta.key === "talla"
                       );
 
+                      const nombreVarianteMostrar = normalizarTextoVariante(
+                        esModoEdicion ? nombreVarianteInput : (v.nombreVariante ?? v.NombreVariante)
+                      );
+
                       return (
                         <Card key={keyVariante} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
                           <CardContent className="p-4">
+                            <div className="mb-3 min-w-0">
+                              {esModoEdicion ? (
+                                <Input
+                                  className="h-8 max-w-xl border-0 border-b border-transparent bg-transparent px-0 text-sm font-semibold text-slate-800 shadow-none focus-visible:border-slate-300 focus-visible:ring-0"
+                                  placeholder="Nombre variante"
+                                  value={nombreVarianteInput}
+                                  onChange={(e) => setNombreVarianteInput(e.target.value)}
+                                />
+                              ) : (
+                                <p
+                                  className="truncate text-sm font-semibold text-slate-800"
+                                  title={nombreVarianteMostrar || undefined}
+                                >
+                                  {nombreVarianteMostrar || "Sin nombre de variante"}
+                                </p>
+                              )}
+                            </div>
+
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
                               
                               {/* SKU */}
@@ -1532,30 +1554,22 @@ const ModalDetalleProducto = ({
                                 </p>
                               </div>
 
-                              {/* NOMBRE / ATRIBUTOS */}
+                              {/* ATRIBUTOS */}
                               <div className="lg:col-span-2">
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  Nombre / Atributos
+                                  Atributos
                                 </p>
                                 {esModoEdicion ? (
-                                  <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5">
-                                    <Input
-                                      className="h-8 text-xs focus-visible:ring-pink-500"
-                                      placeholder="Nombre variante"
-                                      value={nombreVarianteInput}
-                                      onChange={(e) => setNombreVarianteInput(e.target.value)}
-                                    />
-                                    <Input
-                                      className="h-8 text-xs focus-visible:ring-pink-500"
-                                      placeholder="Atributos adicionales (Ej. Algodón)"
-                                      value={atributosAdicionalesInput}
-                                      onChange={(e) => setAtributosAdicionalesInput(e.target.value)}
-                                    />
-                                  </div>
+                                  <Input
+                                    className="h-8 text-xs focus-visible:ring-pink-500"
+                                    placeholder="Atributos adicionales (Ej. Algodón)"
+                                    value={atributosAdicionalesInput}
+                                    onChange={(e) => setAtributosAdicionalesInput(e.target.value)}
+                                  />
                                 ) : (
                                   <div className="space-y-1.5">
-                                    <EtiquetasVariante variante={v} keys={["nombreVariante", "atributos"]} />
-                                    {!v.nombreVariante && !v.atributosAdicionales ? (
+                                    <EtiquetasVariante variante={v} keys={["atributos"]} />
+                                    {!v.atributosAdicionales ? (
                                       <p className="text-xs text-slate-500">—</p>
                                     ) : null}
                                   </div>
