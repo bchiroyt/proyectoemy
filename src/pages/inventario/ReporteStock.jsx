@@ -11,6 +11,7 @@ import {
   buildVarianteStockDetalle,
   normalizarEstadoStock,
 } from "@/lib/nivelesStockMappers";
+import Paginacion from "@/components/shared/Paginacion";
 import { Skeleton } from "@/components/ui/skeleton";
 import Toast from "@/components/ui/Toast";
 import { generarInformeNivelStockPdf } from "@/lib/pdfExport";
@@ -19,6 +20,7 @@ const PRODUCT_IMAGE_PLACEHOLDER =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 const SIDEBAR_COLOR_HEX = "#E8307E";
+const PAGE_SIZE = 15;
 
 
 const esSinPoliticaStock = (item) => {
@@ -82,6 +84,7 @@ const ReporteStock = () => {
   const setTitulo = useNavigationStore((s) => s.setTitulo);
   const [proveedorFiltro, setProveedorFiltro] = useState("todos");
   const [estadoFiltro, setEstadoFiltro] = useState("todos");
+  const [page, setPage] = useState(1);
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [exportError, setExportError] = useState("");
   const [toast, setToast] = useState({ open: false, message: "", type: "warning" });
@@ -113,6 +116,15 @@ const ReporteStock = () => {
         return coincideProveedor && coincideEstado;
       }),
     [nivelesConPolitica, nivelesSinPolitica, proveedorFiltro, estadoFiltro]
+  );
+  const totalRecords = data.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const from = totalRecords === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
+  const dataPaginada = useMemo(
+    () => data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [data, currentPage]
   );
 
   const generarPDF = async () => {
@@ -156,6 +168,7 @@ const ReporteStock = () => {
 
   const handleEstadoFiltroChange = (value) => {
     setEstadoFiltro(value);
+    setPage(1);
 
     if (value === "sin-politica") {
       setToast({
@@ -206,7 +219,10 @@ const ReporteStock = () => {
 
           <select
             value={proveedorFiltro}
-            onChange={(e) => setProveedorFiltro(e.target.value)}
+            onChange={(e) => {
+              setProveedorFiltro(e.target.value);
+              setPage(1);
+            }}
             className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
           >
             <option value="todos">Por proveedor</option>
@@ -226,6 +242,17 @@ const ReporteStock = () => {
             <option value="normal">Normal</option>
             <option value="sin-politica">Sin politica</option>
           </select>
+
+          <Paginacion
+            from={from}
+            to={to}
+            total={totalRecords}
+            onPrev={() => setPage((p) => Math.max(1, Math.min(p, totalPages) - 1))}
+            onNext={() => setPage((p) => Math.min(totalPages, Math.min(p, totalPages) + 1))}
+            disablePrev={currentPage <= 1}
+            disableNext={currentPage >= totalPages}
+            isLoading={tablaLoading}
+          />
 
           {estadoFiltro === "sin-politica" && (
             <button
@@ -315,7 +342,7 @@ const ReporteStock = () => {
                   No hay productos para los filtros seleccionados.
                 </td>
               </tr>
-            ) : data.map((item) => (
+            ) : dataPaginada.map((item) => (
               <tr key={item.id} className={`border-t border-slate-100 ${getEstadoStockVisual(item).row}`}>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
