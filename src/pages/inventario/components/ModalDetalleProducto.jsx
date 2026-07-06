@@ -27,6 +27,10 @@ import { obtenerUbicaciones } from "@/services/ubicaciones";
 import { UBICACIONES_PRODUCTO_UI_HABILITADAS } from "@/lib/featureFlags";
 import { obtenerCategorias } from "@/services/categorias";
 import { obtenerMarcas } from "@/services/marcas";
+import {
+  MODOS_EDICION_DETALLE_PRODUCTO,
+  useDetalleProductoEdicionStore,
+} from "@/context/useDetalleProductoEdicionStore";
 import BuscadorCombo from "./BuscadorCombo";
 import { throwIfEnvelopeFailed } from "@/lib/apiNormalizer";
 import { getApiErrorMessage, API_BASE_URL } from "@/lib/apiClient";
@@ -223,6 +227,16 @@ const ModalDetalleProducto = ({
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [catalogosCabeceraCargados, setCatalogosCabeceraCargados] = useState(false);
+  const modoEdicionActivo = useDetalleProductoEdicionStore((state) => state.modoActivo);
+  const iniciarModoEdicion = useDetalleProductoEdicionStore((state) => state.iniciarModo);
+  const finalizarModoEdicion = useDetalleProductoEdicionStore((state) => state.finalizarModo);
+  const resetModoEdicion = useDetalleProductoEdicionStore((state) => state.reset);
+  const detalleProductoBloqueado =
+    modoEdicionActivo !== null && modoEdicionActivo !== MODOS_EDICION_DETALLE_PRODUCTO.DETALLES;
+  const nuevaVarianteBloqueada =
+    (modoEdicionActivo !== null && modoEdicionActivo !== MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE) ||
+    (modoEdicionActivo === MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE && !mostrandoNuevaVariante);
+  const editarVarianteBloqueado = modoEdicionActivo !== null || editandoId !== null;
 
   // NOTIFICACIÓN FLOTANTE (Toast)
   const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
@@ -243,6 +257,8 @@ const ModalDetalleProducto = ({
   );
   const nombreBloqueadoPorActivo =
     estadoCatalogoNormalizado === "ACTIVO" || (!estadoCatalogoNormalizado && productoTieneStock);
+
+  useEffect(() => () => resetModoEdicion(), [resetModoEdicion]);
 
   // EFECTO: Consulta al servidor al abrirse el modal
   useEffect(() => {
@@ -351,8 +367,9 @@ const ModalDetalleProducto = ({
       setUbicacionInput("");
       setStockMinimoInput("");
       setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
+      resetModoEdicion();
     }
-  }, [open]);
+  }, [open, resetModoEdicion]);
 
   // Cargar catálogos al mostrar el formulario de nueva variante o editar variante
   useEffect(() => {
@@ -438,13 +455,19 @@ const ModalDetalleProducto = ({
   };
 
   const hayEdicionPendiente = () =>
-    editandoId !== null || (mostrandoNuevaVariante && hayCambiosNuevaVariante());
+    editandoCabecera || editandoId !== null || (mostrandoNuevaVariante && hayCambiosNuevaVariante());
 
   const cancelarNuevaVarianteForm = () => {
     setMostrandoNuevaVariante(false);
     setFormNuevaVariante({ ...FORM_NUEVA_VARIANTE_VACIO });
     setFormNuevaVarianteInicial({ ...FORM_NUEVA_VARIANTE_VACIO });
     setErrorNuevaVariante("");
+    finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE);
+  };
+
+  const cancelarEdicionCabecera = () => {
+    setEditandoCabecera(false);
+    finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.DETALLES);
   };
 
   const handleToggleNuevaVariante = async () => {
@@ -457,6 +480,9 @@ const ModalDetalleProducto = ({
       cancelarNuevaVarianteForm();
       return;
     }
+
+    const pudoIniciar = iniciarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE);
+    if (!pudoIniciar) return;
 
     let catalogos = { tallas, presentaciones };
     if (tallas.length === 0 || presentaciones.length === 0) {
@@ -483,6 +509,7 @@ const ModalDetalleProducto = ({
     const accion = accionSalidaPendiente;
     cancelarEdicion();
     cancelarNuevaVarianteForm();
+    cancelarEdicionCabecera();
     setOpenConfirmarSalida(false);
     setAccionSalidaPendiente(null);
     if (accion === "cerrarModal") {
@@ -636,6 +663,11 @@ const ModalDetalleProducto = ({
   };
 
   const iniciarEdicion = async (v, idActual) => {
+    const pudoIniciar = iniciarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE, {
+      idVariante: idActual,
+    });
+    if (!pudoIniciar) return;
+
     setErrorEdicion("");
     let catalogos = { tallas, presentaciones, ubicaciones };
     const faltaCatalogoUbicacion = UBICACIONES_PRODUCTO_UI_HABILITADAS && ubicaciones.length === 0;
@@ -676,6 +708,7 @@ const ModalDetalleProducto = ({
     setStockMinimoInput("");
     setCodigosSecundariosInput([]);
     setCodigoSecundarioPendienteInput("");
+    finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE);
   };
 
   const verificarCambios = (v) => {
@@ -838,6 +871,7 @@ const ModalDetalleProducto = ({
       if (Object.keys(payload).length === 0) {
         setCodigoSecundarioPendienteInput("");
         setEditandoId(null);
+        finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE);
         return;
       }
 
@@ -901,6 +935,7 @@ const ModalDetalleProducto = ({
 
       setCodigoSecundarioPendienteInput("");
       setEditandoId(null);
+      finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE);
     } catch (error) {
       console.error("Error al actualizar la variante:", error);
       const message = getApiErrorMessage(error, "No se pudo actualizar la variante.");
@@ -1000,6 +1035,9 @@ const ModalDetalleProducto = ({
   };
 
   const iniciarEdicionCabecera = async () => {
+    const pudoIniciar = iniciarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.DETALLES);
+    if (!pudoIniciar) return;
+
     setNombreCabecera(estadoProducto?.nombre || "");
     setDescripcionCabecera(estadoProducto?.descripcion || "");
     setEditandoCabecera(true);
@@ -1066,6 +1104,7 @@ const ModalDetalleProducto = ({
       await actualizarProducto(idProducto, payload);
 
       setEditandoCabecera(false);
+      finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.DETALLES);
       mostrarAviso("exito", "Detalles principales actualizados correctamente");
 
       // Recargar producto
@@ -1199,6 +1238,7 @@ const ModalDetalleProducto = ({
                     variant="ghost"
                     size="sm"
                     onClick={iniciarEdicionCabecera}
+                    disabled={detalleProductoBloqueado}
                     className="h-8 px-2 text-xs text-slate-500 hover:text-slate-900"
                   >
                     <Edit2 className="w-3.5 h-3.5 mr-1" />
@@ -1293,7 +1333,7 @@ const ModalDetalleProducto = ({
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setEditandoCabecera(false)}
+                        onClick={cancelarEdicionCabecera}
                         disabled={cargandoCabecera}
                         className="h-8 text-xs"
                       >
@@ -1363,6 +1403,7 @@ const ModalDetalleProducto = ({
                   <Button
                     size="sm"
                     onClick={handleToggleNuevaVariante}
+                    disabled={nuevaVarianteBloqueada}
                     className="h-8 px-3 text-xs bg-slate-800 hover:bg-slate-900 text-white rounded-lg"
                   >
                     {mostrandoNuevaVariante ? <X className="w-3.5 h-3.5 mr-1" /> : <PlusCircle className="w-3.5 h-3.5 mr-1" />}
@@ -1848,7 +1889,7 @@ const ModalDetalleProducto = ({
                                     variant="outline"
                                     className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
                                     onClick={() => iniciarEdicion(v, idActual)}
-                                    disabled={editandoId !== null || !idVarianteValido}
+                                    disabled={editarVarianteBloqueado || !idVarianteValido}
                                   >
                                     <Edit2 className="w-3 h-3 mr-1" />
                                     Editar
