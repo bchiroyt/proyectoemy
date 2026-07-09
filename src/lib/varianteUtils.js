@@ -8,27 +8,115 @@ export function pickNombreVariante(raw) {
 }
 
 /** Normaliza atributosAdicionales desde API (objeto o string JSON). */
-export function normalizarAtributosAdicionales(raw) {
-  const fuente = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  const valor =
-    pick(fuente, "atributosAdicionales", "AtributosAdicionales") ??
-    (typeof raw === "string" || (raw && !Array.isArray(raw) && !("atributosAdicionales" in raw) && !("AtributosAdicionales" in raw))
-      ? raw
-      : undefined);
+const CLAVES_ENTIDAD_ATRIBUTOS = new Set([
+  "id",
+  "Id",
+  "idVariante",
+  "IdVariante",
+  "idProducto",
+  "IdProducto",
+  "idVentaDetalle",
+  "IdVentaDetalle",
+  "idVenta",
+  "IdVenta",
+  "idVentaOrigen",
+  "IdVentaOrigen",
+  "idUbicacion",
+  "IdUbicacion",
+  "idCaja",
+  "IdCaja",
+  "nombre",
+  "Nombre",
+  "nombreProducto",
+  "NombreProducto",
+  "productoNombre",
+  "ProductoNombre",
+  "nombreVariante",
+  "NombreVariante",
+  "sku",
+  "Sku",
+  "SKU",
+  "precio",
+  "Precio",
+  "precioNetoUnitario",
+  "PrecioNetoUnitario",
+  "precioUnitario",
+  "PrecioUnitario",
+  "cantidad",
+  "Cantidad",
+  "cantidadVendida",
+  "CantidadVendida",
+  "cantidadYaDevuelta",
+  "CantidadYaDevuelta",
+  "cantidadDisponible",
+  "CantidadDisponible",
+  "maxCantidad",
+  "MaxCantidad",
+  "subtotalLineaSnapshot",
+  "SubtotalLineaSnapshot",
+  "esReembolso",
+  "productoRecibido",
+  "regresaInventario",
+  "puedeReintegrarInventario",
+  "descuentoTipo",
+  "descuentoValor",
+  "montoPenalizacion",
+  "motivoPenalizacion",
+  "observacionDetalle",
+  "notaLinea",
+  "talla",
+  "Talla",
+  "tallaNombre",
+  "TallaNombre",
+  "color",
+  "Color",
+  "presentacion",
+  "Presentacion",
+  "presentacionNombre",
+  "PresentacionNombre",
+  "atributosAdicionales",
+  "AtributosAdicionales",
+  "imagen",
+  "Imagen",
+  "stock",
+  "Stock",
+]);
 
-  if (valor == null) return null;
-  if (typeof valor === "object" && !Array.isArray(valor)) return valor;
+function esObjetoAtributosPlano(obj) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return false;
+  return !keys.some((k) => CLAVES_ENTIDAD_ATRIBUTOS.has(k));
+}
 
-  if (typeof valor === "string") {
-    const trimmed = valor.trim();
-    if (!trimmed) return null;
-    try {
-      const parsed = JSON.parse(trimmed);
-      return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
+function parsearAtributosDesdeString(valor) {
+  const trimmed = String(valor ?? "").trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
+}
+
+export function normalizarAtributosAdicionales(raw) {
+  if (raw == null) return null;
+
+  if (typeof raw === "string") {
+    return parsearAtributosDesdeString(raw);
+  }
+
+  if (typeof raw !== "object" || Array.isArray(raw)) return null;
+
+  const valor = pick(raw, "atributosAdicionales", "AtributosAdicionales");
+  if (valor != null) {
+    if (typeof valor === "object" && !Array.isArray(valor)) return valor;
+    if (typeof valor === "string") return parsearAtributosDesdeString(valor);
+    return null;
+  }
+
+  if (esObjetoAtributosPlano(raw)) return raw;
 
   return null;
 }
@@ -157,28 +245,41 @@ export function buildNombreDisplayConVariante(raw) {
   return `${base} · ${extras.join(" · ")}`;
 }
 
+/**
+ * Nombre para la tarjeta del catálogo POS.
+ * Muestra el nombreVariante como base si existe (junto a los demás atributos),
+ * o el nombre del producto si no existe. Nunca ambos a la vez.
+ */
+export function buildNombreCatalogoPos(raw) {
+  const nombreVariante = pickNombreVariante(raw);
+  const nombreProducto =
+    pick(raw, "nombreProducto", "NombreProducto", "productoNombre", "ProductoNombre", "nombre", "Nombre") ?? "";
+
+  const base = nombreVariante || nombreProducto;
+
+  const presentacion = normalizarTextoVariante(
+    raw.presentacionNombre ?? raw.PresentacionNombre ?? raw.presentacion ?? raw.Presentacion
+  );
+  const talla = normalizarTextoVariante(
+    raw.tallaNombre ?? raw.TallaNombre ?? raw.talla ?? raw.Talla
+  );
+  const color = normalizarTextoVariante(raw.color ?? raw.Color);
+  const atributosTexto = formatearAtributosAdicionales(normalizarAtributosAdicionales(raw));
+
+  const extras = [presentacion, talla, color, atributosTexto].filter(Boolean);
+
+  if (!base) return extras.join(" · ") || "Producto";
+  if (extras.length === 0) return base;
+  return `${base} · ${extras.join(" · ")}`;
+}
+
 /** Nombre ultra-resumido exclusivo para tickets físicos (ahorro de papel) */
 export function buildNombreTicket(raw) {
   const nombreVariante = pickNombreVariante(raw);
   const nombreProducto = pick(raw, "nombreProducto", "NombreProducto", "productoNombre", "ProductoNombre", "nombre", "Nombre") ?? "";
-  
+
   const base = nombreVariante ? nombreVariante : nombreProducto;
-  if (!base) return "Producto";
-
-  const color = normalizarTextoVariante(raw.color ?? raw.Color);
-  if (color) return `${base} · ${color}`;
-
-  const talla = normalizarTextoVariante(
-    raw.tallaNombre ?? raw.TallaNombre ?? raw.talla ?? raw.Talla
-  );
-  if (talla) return `${base} · ${talla}`;
-
-  const marca = normalizarTextoVariante(
-    raw.marcaNombre ?? raw.MarcaNombre ?? raw.marca ?? raw.Marca
-  );
-  if (marca) return `${base} · ${marca}`;
-
-  return base;
+  return base || "Producto";
 }
 
 export const CLASES_ETIQUETA_VARIANTE = {

@@ -41,3 +41,17 @@ export function mergeTiposMovimiento(configTipos, movimientos = []) {
   }
   return [...map.values()];
 }
+
+/** Tipos permitidos al registrar gasto/entrada manual desde POS (no ventas ni reembolsos). */
+export function esTipoMovimientoManualPermitido(tipo) {
+  const nombre = String(tipo?.nombre ?? "").trim().toLowerCase();
+  return (
+    nombre.includes("entrada manual") ||
+    nombre.includes("gastos caja") ||
+    nombre.includes("gasto caja")
+  );
+}
+
+export function filtrarTiposMovimientoManual(tipos = []) {
+  return tipos.filter(esTipoMovimientoManualPermitido);
+}

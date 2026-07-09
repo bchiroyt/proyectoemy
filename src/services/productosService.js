@@ -1,7 +1,7 @@
 import { apiClient } from "@/lib/apiClient";
 
 /**
- * Busca variantes por nombre, SKU o código (coincide con PruebasDB / backend).
+ * Busca variantes por nombre / nombreVariante (coincide con backend).
  * @param {string} criterio
  * @param {{ idUbicacion?: number|null }} [opciones]
  */

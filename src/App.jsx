@@ -3,6 +3,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import HomePage from "./pages/dashboard/HomePage";
 import MainLayout from "./components/layout/MainLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import AdminRoute from "./components/auth/AdminRoute";
 import PublicRoute from "./components/auth/PublicRoute";
 import PanelControl from "./pages/dashboard/PanelControl";
 import Usuarios from "./pages/usuarios/usuarios";
@@ -59,11 +60,11 @@ function App() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <MainLayout>
                 <HomePage />
               </MainLayout>
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route

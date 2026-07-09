@@ -46,6 +46,34 @@ export function mapCotizacionList(payload) {
   return unwrapList(payload).map(mapCotizacion).filter(Boolean);
 }
 
+/** Historial paginado — GET /api/Cotizaciones/historial (PagedResponse) */
+export function unwrapCotizacionesHistorialPaged(resp) {
+  const exito = pick(resp, "exito", "Exito") !== false;
+  const mensaje = pick(resp, "mensaje", "Mensaje") ?? "";
+  const inner = pick(resp, "data", "Data") ?? resp;
+  const itemsRaw = pick(inner, "items", "Items") ?? inner;
+  const items = unwrapList(itemsRaw).map(mapCotizacion).filter(Boolean);
+  const pageSource = inner ?? resp;
+  const page = Number(pick(pageSource, "page", "Page") ?? 1) || 1;
+  const pageSize = Number(pick(pageSource, "pageSize", "PageSize") ?? 10) || 10;
+  const totalCount =
+    Number(
+      pick(
+        pageSource,
+        "totalCount",
+        "TotalCount",
+        "totalRecords",
+        "TotalRecords"
+      ) ?? items.length
+    ) || 0;
+  const totalPages =
+    Number(
+      pick(pageSource, "totalPages", "TotalPages") ??
+        Math.max(1, Math.ceil(totalCount / Math.max(pageSize, 1)))
+    ) || 1;
+  return { exito, mensaje, items, page, pageSize, totalCount, totalPages };
+}
+
 function buildCotizacionDetallesPayload(carrito) {
   return carrito
     .filter((l) => l.cantidad > 0)

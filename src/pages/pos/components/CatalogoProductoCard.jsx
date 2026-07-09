@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/apiClient";
+import { pick } from "@/lib/apiNormalizer";
+import {
+  buildNombreCatalogoPos,
+  CLASES_ETIQUETA_VARIANTE,
+  obtenerEtiquetasVariante,
+  pickNombreVariante,
+} from "@/lib/varianteUtils";
 
 /**
  * Tarjeta cuadrada del catálogo POS.
@@ -9,6 +16,22 @@ import { API_BASE_URL } from "@/lib/apiClient";
 export function CatalogoProductoCard({ producto, onAgregar, className }) {
   const sinStock = producto.stockActual != null && producto.stockActual <= 0;
   const [imgError, setImgError] = useState(false);
+  const nombreCompleto = buildNombreCatalogoPos(producto);
+  const nombreBase =
+    pickNombreVariante(producto) ||
+    pick(
+      producto,
+      "nombreProducto",
+      "NombreProducto",
+      "productoNombre",
+      "ProductoNombre",
+      "nombre",
+      "Nombre"
+    ) ||
+    "Producto";
+  const etiquetas = obtenerEtiquetasVariante(producto).filter(
+    (etiqueta) => etiqueta.key !== "nombreVariante"
+  );
 
   return (
     <button
@@ -25,7 +48,7 @@ export function CatalogoProductoCard({ producto, onAgregar, className }) {
         {producto.urlImagen && !imgError ? (
           <img
             src={`${API_BASE_URL}${producto.urlImagen}`}
-            alt={producto.nombre}
+            alt={nombreCompleto}
             className="w-full h-full object-cover"
             onError={() => setImgError(true)}
           />
@@ -37,7 +60,25 @@ export function CatalogoProductoCard({ producto, onAgregar, className }) {
           />
         )}
       </div>
-      <p className="text-sm font-semibold leading-snug line-clamp-2 flex-1">{producto.nombre}</p>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-normal leading-snug line-clamp-2">{nombreBase}</p>
+        {etiquetas.length > 0 ? (
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+            {etiquetas.map((etiqueta) => (
+              <span
+                key={etiqueta.key}
+                className={cn(
+                  "min-w-0 max-w-full truncate rounded border px-1.5 py-px text-[10px] leading-none font-medium",
+                  CLASES_ETIQUETA_VARIANTE[etiqueta.key]
+                )}
+                title={etiqueta.value}
+              >
+                {etiqueta.value}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
       <p className="text-sm text-(--color-pos-texto-muted) mt-1 tabular-nums">
         Q {producto.precio.toFixed(2)}
       </p>

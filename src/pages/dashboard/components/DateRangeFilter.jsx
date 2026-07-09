@@ -5,6 +5,15 @@ import { rangoFechasMesActual } from "@/lib/reportesMappers";
 
 const fmtIso = (d) => d.toISOString().slice(0, 10);
 
+/** Rango amplio para comparar con capital / ver historial completo. */
+export function rangoFechasHistorico() {
+  const hoy = new Date();
+  return {
+    fechaDesde: "2000-01-01",
+    fechaHasta: fmtIso(hoy),
+  };
+}
+
 const presets = [
   {
     id: "hoy",
@@ -28,6 +37,22 @@ const presets = [
     id: "mes",
     label: "Este mes",
     getRange: () => rangoFechasMesActual(),
+  },
+  {
+    id: "anio",
+    label: "Este año",
+    getRange: () => {
+      const hoy = new Date();
+      return {
+        fechaDesde: `${hoy.getFullYear()}-01-01`,
+        fechaHasta: fmtIso(hoy),
+      };
+    },
+  },
+  {
+    id: "historico",
+    label: "Todo el historial",
+    getRange: () => rangoFechasHistorico(),
   },
 ];
 

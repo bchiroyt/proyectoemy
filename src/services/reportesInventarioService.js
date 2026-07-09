@@ -4,6 +4,8 @@ import {
   downloadArchivoBase64,
   mapNivelStockResumen,
   unwrapInventarioReporte,
+  unwrapInventarioValorizacion,
+  unwrapInventarioValorizacionVariantesPaged,
 } from "@/lib/reportesMappers";
 
 function buildQuery(params) {
@@ -65,5 +67,72 @@ export async function exportarReporteInventario({ criterio, idProveedor, estadoS
     return { exito: true, mensaje: data?.mensaje ?? data?.Mensaje ?? "Exportación completada." };
   } catch (err) {
     throw new Error(getApiErrorMessage(err, "No se pudo exportar el reporte de inventario."));
+  }
+}
+
+/**
+ * GET /api/reportes/inventario/valorizacion
+ * Capital a costo (FIFO + promedio) + potencial de venta.
+ */
+export async function fetchInventarioValorizacion() {
+  try {
+    const { data } = await apiClient.get("/api/reportes/inventario/valorizacion");
+    throwIfEnvelopeFailed(data, "No se pudo cargar la valorización de inventario.");
+    return { exito: true, ...unwrapInventarioValorizacion(data) };
+  } catch (err) {
+    if (err.response?.status === 403) {
+      throw new Error(
+        getApiErrorMessage(
+          err,
+          "Sin permiso para ver valorización (asigne PRODUCTOS · Leer al rol)."
+        )
+      );
+    }
+    throw new Error(
+      getApiErrorMessage(err, "No se pudo cargar la valorización de inventario.")
+    );
+  }
+}
+
+/**
+ * GET /api/reportes/inventario/valorizacion/variantes
+ */
+export async function fetchInventarioValorizacionVariantes({
+  page = 1,
+  pageSize = 20,
+  criterio,
+  idCategoria,
+  idMarca,
+  soloSinCosto,
+  soloConStock,
+  ordenarPor,
+} = {}) {
+  try {
+    const { data } = await apiClient.get(
+      `/api/reportes/inventario/valorizacion/variantes${buildQuery({
+        page,
+        pageSize,
+        criterio,
+        idCategoria,
+        idMarca,
+        soloSinCosto,
+        soloConStock,
+        ordenarPor,
+      })}`
+    );
+    throwIfEnvelopeFailed(data, "No se pudo cargar el listado valorizado.");
+    return { exito: true, ...unwrapInventarioValorizacionVariantesPaged(data) };
+  } catch (err) {
+    if (err.response?.status === 403) {
+      throw new Error(
+        getApiErrorMessage(
+          err,
+          "Sin permiso para ver valorización (asigne PRODUCTOS · Leer al rol)."
+        )
+      );
+    }
+    throw new Error(
+      getApiErrorMessage(err, "No se pudo cargar el listado valorizado.")
+    );
   }
 }

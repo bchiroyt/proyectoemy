@@ -137,12 +137,6 @@ export default function NuevaCotizacion() {
   };
 
   const handleAgregarProducto = (producto) => {
-    console.log("[Mayoreo Debug] Producto seleccionado del buscador:", {
-      idVariante: producto.idVariante,
-      nombre: producto.nombre,
-      precioMenudeo: producto.precio,
-      precioMayoreo: producto.precioVentaMayor,
-    });
     agregarProducto(producto);
     setCriterio("");
   };
@@ -305,27 +299,65 @@ export default function NuevaCotizacion() {
             <BuscadorPrincipal
               value={criterio}
               onChange={(e) => setCriterio(e.target.value)}
-              placeholder="Buscar por nombre, código o SKU..."
+              placeholder="Busque por nombre de variante — clic para agregar"
               className="w-full"
               autoFocus={!esEdicion}
             />
-            {criterio && catalogoQ.data?.items?.length > 0 && (
+            {criterio.trim() && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-(--color-blanco) border border-(--color-pos-borde-suave) shadow-lg rounded-lg max-h-60 overflow-y-auto z-10">
-                {catalogoQ.data.items.map((prod) => (
-                  <div
-                    key={prod.idVariante}
-                    className="flex items-center justify-between p-3 hover:bg-(--color-pagina-3) cursor-pointer border-b border-(--color-pos-borde-suave) last:border-0"
-                    onClick={() => handleAgregarProducto(prod)}
-                  >
-                    <div>
-                      <p className="font-semibold text-sm text-(--color-negro)">{prod.nombre}</p>
-                      <p className="text-xs text-(--color-gris-letra)">
-                        SKU: {prod.sku} | Stock: {prod.stockActual} | Menudeo: Q {prod.precio.toFixed(2)}
-                        {prod.precioVentaMayor > 0 && ` | Mayoreo: Q ${prod.precioVentaMayor.toFixed(2)}`}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                {catalogoQ.isFetching && !(catalogoQ.data?.items?.length > 0) ? (
+                  <p className="p-3 text-xs text-(--color-gris-letra)">Buscando variantes...</p>
+                ) : !(catalogoQ.data?.items?.length > 0) ? (
+                  <p className="p-3 text-xs text-(--color-gris-letra)">
+                    Sin resultados para «{criterio.trim()}»
+                  </p>
+                ) : (
+                  catalogoQ.data.items.map((prod) => {
+                    const nombreVariante = prod.nombreVariante || "Sin variante";
+                    const nombreProducto = prod.nombreProducto || "—";
+                    const extras = [prod.color, prod.talla].filter(Boolean).join(" · ");
+                    const stock = prod.stockActual ?? 0;
+
+                    return (
+                      <button
+                        key={prod.idVariante}
+                        type="button"
+                        onClick={() => handleAgregarProducto(prod)}
+                        className="w-full text-left flex items-center justify-between gap-3 p-3 hover:bg-(--color-pagina-3) cursor-pointer border-b border-(--color-pos-borde-suave) last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-(--color-negro) truncate">
+                            {nombreVariante}
+                          </p>
+                          {extras ? (
+                            <p className="text-[10px] text-(--color-gris-letra) mt-0.5 truncate">
+                              {extras}
+                            </p>
+                          ) : null}
+                          <p className="text-[10px] text-(--color-gris-letra) mt-0.5">
+                            Menudeo: Q {Number(prod.precio || 0).toFixed(2)}
+                            {Number(prod.precioVentaMayor) > 0
+                              ? ` · Mayoreo: Q ${Number(prod.precioVentaMayor).toFixed(2)}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end shrink-0 gap-1">
+                          <span className="text-xs font-medium text-(--color-gris-letra) text-right">
+                            {nombreProducto}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-[10px] font-bold",
+                              stock > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)"
+                            )}
+                          >
+                            Stock: {stock}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>

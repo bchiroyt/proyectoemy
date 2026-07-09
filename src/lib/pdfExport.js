@@ -262,3 +262,481 @@ export const generarDetalleCompraPdf = async (compra) => {
 
   doc.save(`detalle_compra_${compra.id}.pdf`);
 };
+
+const fmtQPdf = (n) =>
+  new Intl.NumberFormat("es-GT", {
+    style: "currency",
+    currency: "GTQ",
+    minimumFractionDigits: 2,
+  }).format(Number(n) || 0);
+
+const fechaArchivoDesde = (fecha) => {
+  const d = fecha instanceof Date ? fecha : new Date(fecha);
+  if (Number.isNaN(d.getTime())) return "sin-fecha";
+  return d.toISOString().slice(0, 10);
+};
+
+const dibujarEncabezadoInformeInventario = async (doc, { titulo, fechaTexto }) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+
+  try {
+    const logoDataUrl = await cargarImagenComoDataUrl(logoImg);
+    doc.addImage(logoDataUrl, "PNG", marginX, 10, 28, 20);
+  } catch (error) {
+    console.warn("[pdfExport] No se pudo insertar el logo en el PDF:", error);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(17, 24, 39);
+  doc.text("MODA Y VARIEDADES EMY", 47, 17);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...GRAY_TEXT);
+  doc.text("Sistema de Gestion de inventario", 47, 24);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(17, 24, 39);
+  doc.text(titulo, pageWidth - marginX, 17, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY_LIGHT);
+  doc.text(fechaTexto, pageWidth - marginX, 24, { align: "right" });
+
+  doc.setDrawColor(...SIDEBAR_COLOR);
+  doc.setLineWidth(1);
+  doc.line(marginX, 32, pageWidth - marginX, 32);
+};
+
+/**
+ * Resumen de capital en inventario (KPIs + top variantes).
+ * Sin el detalle completo por variante.
+ */
+export const generarInformeValorizacionInventarioPdf = async ({
+  fecha = new Date(),
+  resumen = {},
+  topVariantes = [],
+} = {}) => {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  const fechaTexto = formatearFechaReporte(fecha);
+  const fechaArchivo = fechaArchivoDesde(fecha);
+
+  await dibujarEncabezadoInformeInventario(doc, {
+    titulo: "INFORME DE CAPITAL EN INVENTARIO",
+    fechaTexto,
+  });
+
+  if (resumen.metodoValuacion) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRAY_TEXT);
+    doc.text(`Metodo de calculo: ${resumen.metodoValuacion}`, marginX, 38);
+  }
+
+  autoTable(doc, {
+    startY: 42,
+    margin: { left: marginX, right: marginX },
+    head: [["INDICADOR", "VALOR"]],
+    body: [
+      ["Capital a costo (mercancia)", fmtQPdf(resumen.valorCostoTotal)],
+      ["Valor potencial menudeo", fmtQPdf(resumen.valorVentaMenudeoTotal)],
+      ["Valor potencial mayoreo", fmtQPdf(resumen.valorVentaMayoreoTotal)],
+      ["Margen potencial", fmtQPdf(resumen.margenPotencial)],
+      [
+        "Unidades en stock",
+        Number(resumen.unidadesTotales ?? 0).toLocaleString("es-GT"),
+      ],
+      [
+        "Variantes con stock",
+        Number(resumen.variantesConStock ?? 0).toLocaleString("es-GT"),
+      ],
+      [
+        "Sin costo (con stock)",
+        Number(resumen.variantesSinCosto ?? 0).toLocaleString("es-GT"),
+      ],
+      [
+        "Sin precio (con stock)",
+        Number(resumen.variantesSinPrecio ?? 0).toLocaleString("es-GT"),
+      ],
+    ],
+    styles: {
+      font: "helvetica",
+      fontSize: 8,
+      cellPadding: 2.2,
+      textColor: [31, 41, 55],
+      lineColor: [229, 231, 235],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SIDEBAR_COLOR,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 70, fontStyle: "bold" },
+      1: { cellWidth: 50, halign: "right" },
+    },
+    tableWidth: 120,
+  });
+
+  const afterKpisY = (doc.lastAutoTable?.finalY ?? 42) + 8;
+  const top = Array.isArray(topVariantes) ? topVariantes.slice(0, 15) : [];
+
+  if (top.length > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(17, 24, 39);
+    doc.text("Productos con mayor capital (Top 15)", marginX, afterKpisY);
+
+    autoTable(doc, {
+      startY: afterKpisY + 3,
+      margin: { left: marginX, right: marginX },
+      head: [
+        [
+          "#",
+          "PRODUCTO",
+          "VARIANTE",
+          "SKU",
+          "STOCK",
+          "COSTO U.",
+          "CAPITAL",
+          "VENTA POT.",
+        ],
+      ],
+      body: top.map((row, idx) => [
+        String(idx + 1),
+        row.productoNombre || "—",
+        row.varianteNombre || "—",
+        row.sku || "—",
+        Number(row.stockTotal ?? 0).toLocaleString("es-GT"),
+        fmtQPdf(row.costoUnitarioValuado),
+        fmtQPdf(row.valorCostoTotal),
+        fmtQPdf(row.valorVentaTotal),
+      ]),
+      styles: {
+        font: "helvetica",
+        fontSize: 7.5,
+        cellPadding: 1.8,
+        overflow: "linebreak",
+        textColor: [31, 41, 55],
+        lineColor: [229, 231, 235],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: SIDEBAR_COLOR,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        halign: "center",
+      },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+      columnStyles: {
+        0: { cellWidth: 8, halign: "center" },
+        1: { cellWidth: 48 },
+        2: { cellWidth: 36 },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 18, halign: "right" },
+        5: { cellWidth: 28, halign: "right" },
+        6: { cellWidth: 30, halign: "right" },
+        7: { cellWidth: 30, halign: "right" },
+      },
+      didDrawPage: () => {
+        doc.setFontSize(7);
+        doc.setTextColor(...GRAY_LIGHT);
+        doc.text(
+          `Pagina ${doc.internal.getNumberOfPages()} · Informe de capital ${fechaArchivo}`,
+          pageWidth - marginX,
+          doc.internal.pageSize.getHeight() - 8,
+          { align: "right" }
+        );
+      },
+    });
+  } else {
+    doc.setFontSize(7);
+    doc.setTextColor(...GRAY_LIGHT);
+    doc.text(
+      `Pagina ${doc.internal.getNumberOfPages()} · Informe de capital ${fechaArchivo}`,
+      pageWidth - marginX,
+      doc.internal.pageSize.getHeight() - 8,
+      { align: "right" }
+    );
+  }
+
+  doc.save(`informe_capital_inventario_${fechaArchivo}.pdf`);
+};
+
+/**
+ * Detalle completo del capital por variante (PDF aparte).
+ */
+export const generarInformeDetalleValorizadoVariantesPdf = async ({
+  fecha = new Date(),
+  variantes = [],
+} = {}) => {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  const fechaTexto = formatearFechaReporte(fecha);
+  const fechaArchivo = fechaArchivoDesde(fecha);
+  const detalle = Array.isArray(variantes) ? variantes : [];
+
+  await dibujarEncabezadoInformeInventario(doc, {
+    titulo: "DETALLE DE CAPITAL POR PRODUCTO",
+    fechaTexto,
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY_TEXT);
+  doc.text(
+    `Listado de variantes con existencia · ${detalle.length.toLocaleString("es-GT")} registro(s)`,
+    marginX,
+    38
+  );
+
+  if (detalle.length === 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...GRAY_TEXT);
+    doc.text("No hay variantes con stock para mostrar.", marginX, 50);
+    doc.save(`detalle_capital_por_producto_${fechaArchivo}.pdf`);
+    return;
+  }
+
+  autoTable(doc, {
+    startY: 42,
+    margin: { left: marginX, right: marginX },
+    head: [
+      [
+        "PRODUCTO",
+        "VARIANTE",
+        "SKU",
+        "CATEGORIA",
+        "STOCK",
+        "COSTO U.",
+        "CAPITAL",
+        "VENTA POT.",
+        "MARGEN",
+      ],
+    ],
+    body: detalle.map((row) => [
+      row.productoNombre || "—",
+      row.varianteNombre || "—",
+      row.sku || "—",
+      row.categoriaNombre || "—",
+      Number(row.stockTotal ?? 0).toLocaleString("es-GT"),
+      fmtQPdf(row.costoUnitarioValuado),
+      fmtQPdf(row.valorCostoTotal),
+      fmtQPdf(row.valorVentaTotal),
+      fmtQPdf(row.margenPotencial),
+    ]),
+    styles: {
+      font: "helvetica",
+      fontSize: 7,
+      cellPadding: 1.6,
+      overflow: "linebreak",
+      textColor: [31, 41, 55],
+      lineColor: [229, 231, 235],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SIDEBAR_COLOR,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 7,
+      halign: "center",
+    },
+    alternateRowStyles: { fillColor: [249, 250, 251] },
+    columnStyles: {
+      0: { cellWidth: 40 },
+      1: { cellWidth: 30 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 28 },
+      4: { cellWidth: 16, halign: "right" },
+      5: { cellWidth: 24, halign: "right" },
+      6: { cellWidth: 26, halign: "right" },
+      7: { cellWidth: 26, halign: "right" },
+      8: { cellWidth: 24, halign: "right" },
+    },
+    didDrawPage: () => {
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY_LIGHT);
+      doc.text(
+        `Pagina ${doc.internal.getNumberOfPages()} · Detalle de capital ${fechaArchivo}`,
+        pageWidth - marginX,
+        doc.internal.pageSize.getHeight() - 8,
+        { align: "right" }
+      );
+    },
+  });
+
+  doc.save(`detalle_capital_por_producto_${fechaArchivo}.pdf`);
+};
+
+const formatearFechaSolo = (valor) => {
+  if (!valor) return "—";
+  const s = String(valor).slice(0, 10);
+  const d = new Date(`${s}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString("es-GT", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+/**
+ * Informe de operaciones de caja del período (sumas/restas).
+ * Sin listado de sesiones/cajas.
+ */
+export const generarInformeCajaPeriodoPdf = async ({
+  fechaDesde,
+  fechaHasta,
+  resumen = {},
+} = {}) => {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  const generadoTexto = formatearFechaReporte(new Date());
+  const desdeTxt = formatearFechaSolo(fechaDesde ?? resumen.fechaDesde);
+  const hastaTxt = formatearFechaSolo(fechaHasta ?? resumen.fechaHasta);
+  const rangoArchivo = `${String(fechaDesde ?? resumen.fechaDesde ?? "sin").slice(0, 10)}_${String(fechaHasta ?? resumen.fechaHasta ?? "sin").slice(0, 10)}`;
+
+  const ventas = Number(resumen.ventasEfectivo ?? 0);
+  const ingresos = Number(resumen.ingresosManuales ?? 0);
+  const reembolsos = Number(resumen.reembolsosEfectivo ?? 0);
+  const egresos = Number(resumen.egresosManuales ?? 0);
+  const totalEntradas = ventas + ingresos;
+  const totalSalidas = reembolsos + egresos;
+  const balanceNeto = totalEntradas - totalSalidas;
+  const aperturas = Number(resumen.totalAperturas ?? 0);
+  const cierres = Number(resumen.totalCierresReales ?? 0);
+  const diferencia = Number(resumen.totalDiferencia ?? 0);
+  const sesiones = Number(resumen.totalSesiones ?? 0);
+
+  await dibujarEncabezadoInformeInventario(doc, {
+    titulo: "INFORME DE CAJA",
+    fechaTexto: generadoTexto,
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...GRAY_TEXT);
+  doc.text(`Periodo: ${desdeTxt} - ${hastaTxt}`, marginX, 38);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(17, 24, 39);
+  doc.text("Desglose de operaciones", marginX, 46);
+
+  autoTable(doc, {
+    startY: 49,
+    margin: { left: marginX, right: marginX },
+    head: [["OPERACION", "SIGNO", "MONTO"]],
+    body: [
+      ["Ventas en efectivo", "+", fmtQPdf(ventas)],
+      ["Ingresos manuales", "+", fmtQPdf(ingresos)],
+      ["Total entradas", "=", fmtQPdf(totalEntradas)],
+      ["Reembolsos en efectivo", "-", fmtQPdf(reembolsos)],
+      ["Egresos manuales", "-", fmtQPdf(egresos)],
+      ["Total salidas", "=", fmtQPdf(totalSalidas)],
+      ["Balance neto (entradas - salidas)", "=", fmtQPdf(balanceNeto)],
+    ],
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      cellPadding: 2.4,
+      textColor: [31, 41, 55],
+      lineColor: [229, 231, 235],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SIDEBAR_COLOR,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 110 },
+      1: { cellWidth: 18, halign: "center", fontStyle: "bold" },
+      2: { cellWidth: 40, halign: "right" },
+    },
+    didParseCell: (data) => {
+      if (data.section !== "body") return;
+      const label = String(data.row.raw?.[0] ?? "");
+      if (
+        label.startsWith("Total ") ||
+        label.startsWith("Balance neto")
+      ) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [249, 250, 251];
+      }
+      if (data.column.index === 1) {
+        const signo = String(data.cell.raw ?? "");
+        if (signo === "+") data.cell.styles.textColor = [5, 150, 105];
+        if (signo === "-") data.cell.styles.textColor = [220, 38, 38];
+      }
+    },
+  });
+
+  const afterOpsY = (doc.lastAutoTable?.finalY ?? 49) + 10;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(17, 24, 39);
+  doc.text("Conciliacion de aperturas y cierres", marginX, afterOpsY);
+
+  autoTable(doc, {
+    startY: afterOpsY + 3,
+    margin: { left: marginX, right: marginX },
+    head: [["CONCEPTO", "VALOR"]],
+    body: [
+      ["Sesiones del periodo", sesiones.toLocaleString("es-GT")],
+      ["Total aperturas", fmtQPdf(aperturas)],
+      ["Total cierres reales", fmtQPdf(cierres)],
+      ["Diferencia neta (cierres)", fmtQPdf(diferencia)],
+    ],
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      cellPadding: 2.4,
+      textColor: [31, 41, 55],
+      lineColor: [229, 231, 235],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SIDEBAR_COLOR,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 110, fontStyle: "bold" },
+      1: { cellWidth: 58, halign: "right" },
+    },
+    tableWidth: 168,
+  });
+
+  const afterConcY = (doc.lastAutoTable?.finalY ?? afterOpsY) + 8;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY_TEXT);
+  const nota = doc.splitTextToSize(
+    "Balance neto = (ventas en efectivo + ingresos manuales) - (reembolsos en efectivo + egresos manuales). Este informe no incluye el listado de sesiones de caja.",
+    pageWidth - marginX * 2
+  );
+  doc.text(nota, marginX, afterConcY);
+
+  doc.setFontSize(7);
+  doc.setTextColor(...GRAY_LIGHT);
+  doc.text(
+    `Pagina ${doc.internal.getNumberOfPages()} - Informe de caja ${rangoArchivo}`,
+    pageWidth - marginX,
+    doc.internal.pageSize.getHeight() - 8,
+    { align: "right" }
+  );
+
+  doc.save(`informe_caja_${rangoArchivo}.pdf`);
+};

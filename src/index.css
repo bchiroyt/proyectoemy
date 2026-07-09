@@ -238,6 +238,24 @@
   }
 }
 
+@layer components {
+  .ticket-print-area .ticket-summary-label,
+  .ticket-print-area .ticket-summary-value {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.375rem;
+    color: var(--color-negro);
+  }
+
+  .ticket-print-area .ticket-summary-cambio {
+    color: var(--color-pagina);
+  }
+
+  .ticket-print-area .ticket-discount-row {
+    color: var(--color-pagina);
+  }
+}
+
 /* Ticket de venta — impresión térmica 80 mm (Epson TM-T20IV, etc.) */
 @page {
   size: 80mm auto;
@@ -403,5 +421,24 @@
     padding-bottom: 1mm !important;
     margin-bottom: 2mm !important;
     display: block !important;
+  }
+
+  .ticket-print-area .ticket-summary-label,
+  .ticket-print-area .ticket-summary-value {
+    font-size: 10pt !important;
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+    color: #000000 !important;
+  }
+
+  .ticket-print-area .ticket-summary-cambio {
+    color: #000000 !important;
+  }
+
+  .ticket-print-area .ticket-discount-row {
+    display: flex !important;
+    font-size: 9pt !important;
+    font-weight: 700 !important;
+    color: #000000 !important;
   }
 }

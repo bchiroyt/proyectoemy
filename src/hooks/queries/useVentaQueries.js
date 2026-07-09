@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { crearVenta, fetchVentaCatalogo, fetchVentaTicket, fetchVentas } from "@/services/ventaService";
+import { crearVenta, fetchVentaCatalogo, fetchVentaTicket } from "@/services/ventaService";
+import { fetchHistorialTransacciones } from "@/services/historialTransaccionesService";
 
 export const QK_VENTA_CATALOGO = "ventas";
 export const QK_VENTA_CATEGORIAS = "ventas-categorias";
@@ -65,7 +66,7 @@ export function useVentasHistorialQuery(
   return useQuery({
     queryKey: [QK_VENTAS_HISTORIAL, { page, pageSize, idCaja: idCajaNorm }],
     queryFn: () =>
-      fetchVentas({
+      fetchHistorialTransacciones({
         page,
         pageSize,
         idCaja: idCajaNorm,

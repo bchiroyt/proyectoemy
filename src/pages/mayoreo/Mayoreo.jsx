@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Briefcase, Loader2, Ban, BadgeCheck, RefreshCw, Pencil, Search } from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
@@ -12,8 +12,14 @@ import { getApiErrorMessage } from "@/lib/apiClient";
 import Toast from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import ModalConfirmacion from "@/pages/inventario/components/ModalConfirmacion";
-import { useState } from "react";
 import Paginacion from "@/components/shared/Paginacion";
+
+/** Tabs de Mayoreo → estado del API (o sin filtro). */
+function estadoApiDesdeFiltro(filtroEstado) {
+  if (filtroEstado === "ANULADOS") return "ANULADA";
+  if (filtroEstado === "COTIZACIONES") return "PENDIENTE";
+  return undefined;
+}
 
 function formatearFecha(iso) {
   if (!iso) return "—";
@@ -43,15 +49,32 @@ export default function Mayoreo() {
   const [cotizacionAAnular, setCotizacionAAnular] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState("TODOS");
   const [busqueda, setBusqueda] = useState("");
+  const [criterioDebounced, setCriterioDebounced] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  const cotizacionesQ = useCotizacionesHistorialQuery();
+  const cotizacionesQ = useCotizacionesHistorialQuery({
+    page,
+    pageSize: PAGE_SIZE,
+    estado: estadoApiDesdeFiltro(filtroEstado),
+    criterio: criterioDebounced || undefined,
+  });
   const anularM = useAnularCotizacionMutation();
 
   useEffect(() => {
     setTitulo("Mayoreo y Cotizaciones");
   }, [setTitulo]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setCriterioDebounced(String(busqueda ?? "").trim());
+    }, 350);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [criterioDebounced]);
 
   const handleAnularClick = (cotizacion) => {
     setCotizacionAAnular(cotizacion);
@@ -79,35 +102,13 @@ export default function Mayoreo() {
 
   const handleBusquedaChange = (e) => {
     setBusqueda(e.target.value);
-    setPage(1);
   };
 
   const items = cotizacionesQ.data?.items ?? [];
-
-  const itemsFiltrados = items.filter((c) => {
-    const estadoUpper = String(c.estado ?? "").toUpperCase();
-    if (filtroEstado === "COTIZACIONES") {
-      if (estadoUpper === "ANULADA") return false;
-    } else if (filtroEstado === "ANULADOS") {
-      if (estadoUpper !== "ANULADA") return false;
-    }
-
-    if (busqueda.trim() !== "") {
-      const query = busqueda.toLowerCase();
-      const nombreCliente = String(c.nombreCliente ?? "").toLowerCase();
-      const noCotizacion = String(c.idCotizacion ?? "").toLowerCase();
-      return nombreCliente.includes(query) || noCotizacion.includes(query);
-    }
-
-    return true;
-  });
-
-  const totalRecords = itemsFiltrados.length;
-  const totalPages = Math.ceil(totalRecords / PAGE_SIZE) || 1;
+  const totalRecords = cotizacionesQ.data?.totalCount ?? 0;
+  const totalPages = Math.max(1, cotizacionesQ.data?.totalPages ?? 1);
   const from = totalRecords === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
-
-  const paginatedItems = itemsFiltrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const to = Math.min(page * PAGE_SIZE, totalRecords);
 
   return (
     <div className="flex flex-col h-full bg-(--color-pos-fondo) p-4 md:p-6 gap-6">
@@ -151,7 +152,7 @@ export default function Mayoreo() {
               : "text-(--color-gris-letra) hover:bg-(--color-pagina-4)"
               }`}
           >
-            Cotizaciones
+            Pendientes
           </button>
           <button
             onClick={() => handleFiltroEstadoChange("ANULADOS")}
@@ -164,12 +165,12 @@ export default function Mayoreo() {
           </button>
         </div>
 
-        {/* Buscador de Cliente */}
+        {/* Buscador de Cliente / vendedor */}
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-2.5 size-4 text-(--color-gris-letra)" />
           <input
             type="text"
-            placeholder="Buscar por cliente o No. cotización..."
+            placeholder="Buscar por cliente o vendedor..."
             value={busqueda}
             onChange={handleBusquedaChange}
             className="w-full h-9 pl-9 pr-3 text-xs bg-(--color-pos-fondo) border border-(--color-pos-borde-suave) rounded-lg focus:outline-none focus:ring-2 focus:ring-(--color-pagina) text-(--color-negro)"
@@ -189,15 +190,15 @@ export default function Mayoreo() {
               {cotizacionesQ.error?.message || "No se pudo cargar el historial de cotizaciones"}
             </p>
           </div>
-        ) : itemsFiltrados.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 py-16 text-(--color-gris-letra)">
             <Briefcase className="size-12 mb-3 opacity-20" />
             <p className="text-sm font-medium">
-              {items.length === 0
+              {totalRecords === 0 && !criterioDebounced && filtroEstado === "TODOS"
                 ? "No hay cotizaciones registradas"
                 : "No se encontraron cotizaciones con los filtros actuales"}
             </p>
-            {items.length === 0 && (
+            {totalRecords === 0 && !criterioDebounced && filtroEstado === "TODOS" && (
               <Button asChild className="mt-4 bg-(--color-pagina) text-(--color-blanco)">
                 <Link to="/mayoreo/nueva">Crear primera cotización</Link>
               </Button>
@@ -219,9 +220,9 @@ export default function Mayoreo() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-(--color-pos-borde-suave)">
-                  {paginatedItems.map((c, index) => (
+                  {items.map((c) => (
                     <tr key={c.idCotizacion} className="hover:bg-(--color-pagina-4)/50">
-                      <td className="px-4 py-3 font-semibold">{(page - 1) * PAGE_SIZE + index + 1}</td>
+                      <td className="px-4 py-3 font-semibold">#{c.idCotizacion}</td>
                       <td className="px-4 py-3">{c.nombreCliente || "—"}</td>
                       <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaEmision)}</td>
                       <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaVencimiento)}</td>

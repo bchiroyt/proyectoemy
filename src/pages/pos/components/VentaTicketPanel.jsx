@@ -3,7 +3,7 @@ import { Printer } from "lucide-react";
 import { useAuthStore } from "@/context/useAuthStore";
 import { usePosVentaStore } from "@/context/usePosVentaStore";
 import { useVentaTicketQuery } from "@/hooks/queries/useVentaQueries";
-import { buildTicketDesdeCobro, enriquecerTicketEncabezado } from "@/lib/ventaMappers";
+import { buildTicketDesdeCobro, enriquecerTicketDescuentosDesdeLineas, enriquecerTicketEncabezado } from "@/lib/ventaMappers";
 import { imprimirTicket } from "@/lib/printTicket";
 import { TicketVentaPreview } from "@/pages/pos/components/TicketVentaPreview";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +36,7 @@ export function VentaTicketPanel({ onNuevaVenta, className }) {
         cajeroNombre: nombreMostrar,
       });
     }
+    base = enriquecerTicketDescuentosDesdeLineas(base, ultimaVenta?.lineas);
     return enriquecerTicketEncabezado(base, { cajeroFallback: nombreMostrar });
   }, [ticketQ.data, ultimaVenta, nombreMostrar]);
 

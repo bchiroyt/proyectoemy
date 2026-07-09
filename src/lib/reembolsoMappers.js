@@ -117,6 +117,121 @@ export function montoBaseLineaReembolso(item) {
   return roundVenta(Math.abs(Number(item?.precio) || 0) * qty);
 }
 
+/** Total reembolsado desde campos directos o sumando pagos/detalles anidados. */
+function resolverTotalReembolso(raw, { negativo = false } = {}) {
+  if (!raw) return 0;
+
+  const totalReembolsadoRaw = pick(
+    raw,
+    "totalReembolsado",
+    "TotalReembolsado",
+    "totalReembolso",
+    "TotalReembolso",
+    "montoReembolsado",
+    "MontoReembolsado",
+    "montoTotalReembolsado",
+    "MontoTotalReembolsado",
+    "montoTotal",
+    "MontoTotal",
+    "montoDevuelto",
+    "MontoDevuelto",
+    "importeTotal",
+    "ImporteTotal",
+    "importe",
+    "Importe",
+    "total",
+    "Total",
+    "monto",
+    "Monto"
+  );
+
+  let total = 0;
+  if (totalReembolsadoRaw != null && totalReembolsadoRaw !== "") {
+    const n = Number(totalReembolsadoRaw);
+    if (Number.isFinite(n)) total = roundVenta(n);
+  }
+
+  if (total === 0) {
+    const detalles = unwrapList(
+      pick(raw, "detalles", "Detalles", "lineas", "Lineas") ?? []
+    );
+    const pagos = unwrapList(pick(raw, "pagos", "Pagos") ?? []);
+
+    const fromPagos = pagos.reduce((acc, p) => {
+      const m = Number(
+        pick(p, "montoAplicado", "MontoAplicado", "monto", "Monto") ?? 0
+      );
+      return acc + (Number.isFinite(m) ? m : 0);
+    }, 0);
+
+    const fromDetalles = detalles.reduce((acc, d) => {
+      const m = Number(
+        pick(
+          d,
+          "montoReembolsado",
+          "MontoReembolsado",
+          "subtotal",
+          "Subtotal",
+          "monto",
+          "Monto"
+        ) ?? 0
+      );
+      return acc + (Number.isFinite(m) ? m : 0);
+    }, 0);
+
+    total = roundVenta(fromPagos || fromDetalles);
+  }
+
+  if (total === 0) return 0;
+  if (negativo) return total > 0 ? -roundVenta(total) : roundVenta(total);
+  return roundVenta(Math.abs(total));
+}
+
+function pickCantidadDevuelta(raw) {
+  const n = pick(
+    raw,
+    "cantidad",
+    "Cantidad",
+    "cantidadDevuelta",
+    "CantidadDevuelta",
+    "cantidadReembolsada",
+    "CantidadReembolsada",
+    "cantidadRetornada",
+    "CantidadRetornada",
+    "unidadesDevueltas",
+    "UnidadesDevueltas"
+  );
+  const qty = Number(n ?? 0);
+  return Number.isFinite(qty) ? qty : 0;
+}
+
+/** Unidades devueltas desde campo directo o sumando detalles/lineas anidados. */
+function resolverCantidadTotalDevuelta(raw) {
+  if (!raw) return 0;
+
+  const direct = pick(
+    raw,
+    "cantidadTotalDevuelta",
+    "CantidadTotalDevuelta",
+    "totalUnidadesDevueltas",
+    "TotalUnidadesDevueltas",
+    "cantidadDevueltaTotal",
+    "CantidadDevueltaTotal",
+    "cantidadDevuelta",
+    "CantidadDevuelta"
+  );
+  if (direct != null && direct !== "") {
+    const n = Number(direct);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+
+  const detalles = unwrapList(
+    pick(raw, "detalles", "Detalles", "lineas", "Lineas") ?? []
+  );
+  if (!detalles.length) return 0;
+  return detalles.reduce((acc, d) => acc + pickCantidadDevuelta(d), 0);
+}
+
 /**
  * Construye el ticket de reembolso a partir del snapshot local del cobro.
  * No depende de un endpoint GET de ticket: usa las líneas y pagos ya conocidos
@@ -205,4 +320,184 @@ export function mapReembolsoPrevisualizacion(raw) {
         );
       }),
   };
+}
+
+export function mapReembolsoHistorial(raw) {
+  if (!raw) return null;
+  const idReembolso = toNumberOrNull(
+    pick(raw, "idReembolso", "IdReembolso", "id", "Id")
+  );
+  if (idReembolso == null) return null;
+
+  const total = resolverTotalReembolso(raw, { negativo: true });
+  const cantidadDevuelta = resolverCantidadTotalDevuelta(raw);
+
+  const numeroReembolso =
+    pick(raw, "numeroReembolso", "NumeroReembolso", "numeroDocumento", "NumeroDocumento") ??
+    null;
+  const numeroTicketOrigen =
+    pick(
+      raw,
+      "numeroTicketOrigen",
+      "NumeroTicketOrigen",
+      "numeroTicket",
+      "NumeroTicket"
+    ) ?? null;
+
+  return {
+    tipo: "reembolso",
+    id: `reembolso-${idReembolso}`,
+    idReembolso,
+    idVenta: toNumberOrNull(
+      pick(raw, "idVenta", "IdVenta", "idVentaOriginal", "IdVentaOriginal")
+    ),
+    idCaja: toNumberOrNull(pick(raw, "idCaja", "IdCaja")),
+    numeroTicket: numeroReembolso ?? `R-${idReembolso}`,
+    numeroTicketOrigen: numeroTicketOrigen || null,
+    motivo: String(pick(raw, "motivo", "Motivo") ?? "").trim(),
+    estado: String(pick(raw, "estado", "Estado") ?? "").trim(),
+    fechaHora:
+      pick(
+        raw,
+        "fechaHora",
+        "FechaHora",
+        "fechaReembolso",
+        "FechaReembolso",
+        "fecha",
+        "Fecha",
+        "createdAt",
+        "CreatedAt"
+      ) ?? null,
+    usuarioNombre:
+      pick(
+        raw,
+        "usuarioNombre",
+        "UsuarioNombre",
+        "cajero",
+        "Cajero",
+        "cajeroNombre",
+        "CajeroNombre"
+      ) ?? "",
+    estadoVenta: "REEMBOLSO",
+    cantidadDevuelta,
+    total:
+      toNumberOrNull(
+        pick(raw, "totalReembolsado", "TotalReembolsado", "totalReembolso", "TotalReembolso")
+      ) != null
+        ? -Math.abs(
+            Number(
+              pick(
+                raw,
+                "totalReembolsado",
+                "TotalReembolsado",
+                "totalReembolso",
+                "TotalReembolso"
+              )
+            )
+          )
+        : total,
+  };
+}
+
+export function unwrapReembolsosHistorialPaged(resp) {
+  const exito = pick(resp, "exito", "Exito") !== false;
+  const mensaje = pick(resp, "mensaje", "Mensaje") ?? "";
+  const inner = pick(resp, "data", "Data") ?? resp;
+  const itemsRaw =
+    pick(inner, "items", "Items", "reembolsos", "Reembolsos") ?? inner;
+  const items = unwrapList(itemsRaw).map(mapReembolsoHistorial).filter(Boolean);
+  const pageSource = inner ?? resp;
+  const page = Number(pick(pageSource, "page", "Page") ?? 1) || 1;
+  const pageSize = Number(pick(pageSource, "pageSize", "PageSize") ?? 10) || 10;
+  const totalCount =
+    Number(
+      pick(
+        pageSource,
+        "totalCount",
+        "TotalCount",
+        "totalRecords",
+        "TotalRecords"
+      ) ?? items.length
+    ) || 0;
+  const totalPages =
+    Number(
+      pick(pageSource, "totalPages", "TotalPages") ??
+        Math.max(1, Math.ceil(totalCount / pageSize))
+    ) || 1;
+  return { exito, mensaje, items, page, pageSize, totalCount, totalPages };
+}
+
+function mapReembolsoComprobanteDetalle(raw) {
+  if (!raw) return null;
+  const cantidad = pickCantidadDevuelta(raw);
+  const montoBase = Number(
+    pick(raw, "montoBase", "MontoBase", "montoBaseDevolucion", "MontoBaseDevolucion") ?? 0
+  );
+  const penalizacion = Number(
+    pick(raw, "penalizacion", "Penalizacion", "montoPenalizacion", "MontoPenalizacion") ?? 0
+  );
+  const montoReembolsadoRaw = pick(
+    raw,
+    "montoReembolsado",
+    "MontoReembolsado",
+    "subtotal",
+    "Subtotal"
+  );
+  const montoReembolsado =
+    montoReembolsadoRaw != null
+      ? roundVenta(Number(montoReembolsadoRaw))
+      : roundVenta(Math.max(0, montoBase - penalizacion));
+
+  return {
+    nombre: pick(raw, "nombre", "Nombre", "nombreItemSnapshot", "NombreItemSnapshot") ?? "Producto",
+    cantidad,
+    montoBase: roundVenta(montoBase || montoReembolsado + penalizacion),
+    penalizacion: roundVenta(penalizacion),
+    montoReembolsado,
+  };
+}
+
+function mapReembolsoComprobantePago(raw) {
+  if (!raw) return null;
+  return {
+    metodoPago: pick(raw, "metodoPago", "MetodoPago") ?? "",
+    montoAplicado: roundVenta(Number(pick(raw, "montoAplicado", "MontoAplicado") ?? 0)),
+  };
+}
+
+/** Comprobante de reembolso desde GET /api/reembolsos/{id}/comprobante */
+export function mapReembolsoComprobante(raw) {
+  const data = pick(raw, "data", "Data") ?? raw;
+  const detallesRaw = pick(data, "detalles", "Detalles", "lineas", "Lineas") ?? [];
+  const pagosRaw = pick(data, "pagos", "Pagos") ?? [];
+
+  const detalles = unwrapList(detallesRaw).map(mapReembolsoComprobanteDetalle).filter(Boolean);
+  const pagos = unwrapList(pagosRaw).map(mapReembolsoComprobantePago).filter(Boolean);
+  const totalReembolsado = resolverTotalReembolso(data);
+
+  return enriquecerTicketEncabezado(
+    {
+      tipo: "reembolso",
+      nombreNegocio: pick(data, "nombreNegocio", "NombreNegocio") ?? "",
+      direccion: pick(data, "direccion", "Direccion") ?? "",
+      cajero: pick(data, "cajero", "Cajero") ?? "",
+      numeroDocumento:
+        pick(
+          data,
+          "numeroDocumento",
+          "NumeroDocumento",
+          "numeroReembolso",
+          "NumeroReembolso"
+        ) ?? "",
+      numeroVenta:
+        pick(data, "numeroVenta", "NumeroVenta", "numeroTicket", "NumeroTicket") ?? "",
+      fechaHora: pick(data, "fechaHora", "FechaHora") ?? null,
+      motivo: pick(data, "motivo", "Motivo") ?? "",
+      observacion: pick(data, "observacion", "Observacion") ?? "",
+      detalles,
+      totalReembolsado,
+      pagos,
+    },
+    { cajeroFallback: pick(data, "cajero", "Cajero") ?? "" }
+  );
 }

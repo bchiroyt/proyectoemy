@@ -1,10 +1,12 @@
 import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
-import { throwIfEnvelopeFailed } from "@/lib/apiNormalizer";
+import { throwIfEnvelopeFailed, pick } from "@/lib/apiNormalizer";
 import {
   mapReembolsoCatalogos,
   mapReembolsoPrevisualizacion,
   mapReembolsoPreparacion,
+  mapReembolsoComprobante,
   unwrapReembolsoVentasDisponibles,
+  unwrapReembolsosHistorialPaged,
 } from "@/lib/reembolsoMappers";
 
 export async function fetchReembolsoVentasDisponibles({
@@ -87,6 +89,65 @@ export async function aplicarReembolso(body) {
           ? errores.slice(0, 4).join(" · ")
           : payload?.mensaje ?? payload?.Mensaje ?? "No se pudo aplicar el reembolso.";
       throw new Error(msg);
+    }
+    throw err;
+  }
+}
+
+/** GET /api/reembolsos — historial paginado de reembolsos aplicados. */
+export async function fetchReembolsosHistorial({
+  page = 1,
+  pageSize = 10,
+  idCaja,
+  fechaDesde,
+  fechaHasta,
+  idUsuario,
+  criterio,
+} = {}) {
+  const params = { page, pageSize };
+  const q = String(criterio ?? "").trim();
+  if (q) params.criterio = q;
+  if (idCaja != null && idCaja !== "") params.idCaja = idCaja;
+  if (fechaDesde) params.fechaDesde = fechaDesde;
+  if (fechaHasta) params.fechaHasta = fechaHasta;
+  if (idUsuario != null && idUsuario !== "") params.idUsuario = idUsuario;
+
+  try {
+    const { data } = await apiClient.get("/api/reembolsos", { params });
+    throwIfEnvelopeFailed(data, "No se pudo cargar el historial de reembolsos.");
+    return unwrapReembolsosHistorialPaged(data);
+  } catch (err) {
+    if (err.response?.status === 403) {
+      throw new Error(
+        getApiErrorMessage(err, "Sin permiso para ver el historial de reembolsos.")
+      );
+    }
+    throw err;
+  }
+}
+
+/** GET /api/reembolsos/{idReembolso}/comprobante */
+export async function fetchReembolsoComprobante(idReembolso, { idCaja } = {}) {
+  const id = Number(idReembolso);
+  if (!Number.isFinite(id) || id <= 0) throw new Error("Id de reembolso inválido.");
+
+  const params = {};
+  const caja = Number(idCaja);
+  if (Number.isFinite(caja) && caja > 0) params.idCaja = caja;
+
+  try {
+    const { data } = await apiClient.get(`/api/reembolsos/${id}/comprobante`, { params });
+    throwIfEnvelopeFailed(data, "No se pudo cargar el comprobante de reembolso.");
+    return {
+      exito: true,
+      mensaje: pick(data, "mensaje", "Mensaje") ?? "",
+      data: mapReembolsoComprobante(data),
+    };
+  } catch (err) {
+    if (err.response?.status === 403) {
+      throw new Error(
+        getApiErrorMessage(err, "Sin permiso para ver el comprobante de reembolso.")
+      );
     }
     throw err;
   }

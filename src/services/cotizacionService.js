@@ -5,6 +5,7 @@ import {
   mapCotizacion,
   mapCotizacionConvertida,
   mapCotizacionList,
+  unwrapCotizacionesHistorialPaged,
 } from "@/lib/cotizacionMappers";
 
 function pickMensaje(data) {
@@ -36,17 +37,30 @@ export async function fetchCotizacionesPendientes() {
   }
 }
 
-/** GET /api/Cotizaciones/historial — todos los registros de mayoreo */
-export async function fetchCotizacionesHistorial() {
+/**
+ * GET /api/Cotizaciones/historial — historial paginado de mayoreo.
+ * Filtros: page, pageSize, fechaDesde, fechaHasta, estado, criterio.
+ */
+export async function fetchCotizacionesHistorial({
+  page = 1,
+  pageSize = 10,
+  fechaDesde,
+  fechaHasta,
+  estado,
+  criterio,
+} = {}) {
+  const params = { page, pageSize };
+  const q = String(criterio ?? "").trim();
+  if (q) params.criterio = q;
+  if (fechaDesde) params.fechaDesde = fechaDesde;
+  if (fechaHasta) params.fechaHasta = fechaHasta;
+  const estadoNorm = String(estado ?? "").trim();
+  if (estadoNorm) params.estado = estadoNorm;
+
   try {
-    const { data } = await apiClient.get("/api/Cotizaciones/historial");
+    const { data } = await apiClient.get("/api/Cotizaciones/historial", { params });
     throwIfEnvelopeFailed(data, "No se pudo cargar el historial de cotizaciones.");
-    const inner = pick(data, "data", "Data") ?? data;
-    return {
-      exito: true,
-      mensaje: pickMensaje(data),
-      items: mapCotizacionList(inner),
-    };
+    return unwrapCotizacionesHistorialPaged(data);
   } catch (err) {
     if (err.response?.status === 403) {
       throw new Error(

@@ -1,7 +1,31 @@
 import { Tag } from "lucide-react";
 import { fmtQ } from "@/lib/cajaMappers";
+import { roundVenta } from "@/lib/ventaMappers";
 import { cn } from "@/lib/utils";
 import { TicketEncabezadoImagen } from "@/pages/pos/components/TicketEncabezadoImagen";
+
+function normalizarDetalleTicket(item) {
+  const cantidad = Number(item.cantidad) || 0;
+  const precio = Number(item.precio) || 0;
+  const bruto = roundVenta(cantidad * precio);
+  const subtotal =
+    item.subtotal != null ? roundVenta(Number(item.subtotal)) : bruto;
+  const descuento =
+    Number(item.descuento) > 0
+      ? roundVenta(Number(item.descuento))
+      : bruto > subtotal
+        ? roundVenta(bruto - subtotal)
+        : 0;
+
+  return {
+    ...item,
+    cantidad,
+    precio,
+    bruto,
+    subtotal: roundVenta(subtotal || Math.max(0, bruto - descuento)),
+    descuento,
+  };
+}
 
 function fmtFechaTicket(valor) {
   if (!valor) return "";
@@ -17,9 +41,12 @@ function fmtFechaTicket(valor) {
 export function TicketVentaPreview({ ticket, className, ...rest }) {
   if (!ticket) return null;
 
-  const totalDescuento = ticket.detalles.reduce(
-    (sum, item) => sum + (Number(item.descuento) || 0),
-    0
+  const detalles = ticket.detalles.map(normalizarDetalleTicket);
+  const totalDescuento = roundVenta(
+    detalles.reduce((sum, item) => sum + (Number(item.descuento) || 0), 0)
+  );
+  const subtotalBruto = roundVenta(
+    detalles.reduce((sum, item) => sum + (Number(item.bruto) || 0), 0)
   );
 
   return (
@@ -45,7 +72,7 @@ export function TicketVentaPreview({ ticket, className, ...rest }) {
       </header>
 
       <ul className="space-y-2 mb-4">
-        {ticket.detalles.map((item, idx) => {
+        {detalles.map((item, idx) => {
           const tieneDescuento = item.descuento > 0;
           return (
             <li
@@ -61,7 +88,7 @@ export function TicketVentaPreview({ ticket, className, ...rest }) {
                 </span>
               </div>
               {tieneDescuento && (
-                <div className="flex justify-between items-baseline text-xs font-semibold text-(--color-pagina) mt-1 pl-2 w-full">
+                <div className="ticket-discount-row flex justify-between items-baseline text-xs font-semibold text-(--color-pagina) mt-1 pl-2 w-full">
                   <span>Descuento</span>
                   <span className="tabular-nums">- {fmtQ(item.descuento)}</span>
                 </div>
@@ -73,27 +100,37 @@ export function TicketVentaPreview({ ticket, className, ...rest }) {
 
       <div className="space-y-2 border-t border-dashed border-(--color-gris-claro) pt-4">
         {totalDescuento > 0 && (
-          <div className="flex justify-between items-baseline text-sm font-bold text-(--color-pagina)">
-            <span>Total Descuento</span>
-            <span className="tabular-nums">- {fmtQ(totalDescuento)}</span>
-          </div>
+          <>
+            <div className="flex justify-between items-baseline text-sm font-semibold">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{fmtQ(subtotalBruto)}</span>
+            </div>
+            <div className="ticket-discount-row flex justify-between items-baseline text-sm font-bold text-(--color-pagina)">
+              <span>Total Descuento</span>
+              <span className="tabular-nums">- {fmtQ(totalDescuento)}</span>
+            </div>
+          </>
         )}
 
-        <div className="flex justify-between items-baseline">
-          <span className="text-lg font-black">Total</span>
-          <span className="text-2xl font-black tabular-nums">{fmtQ(ticket.total)}</span>
+        <div className="ticket-total-row flex justify-between items-baseline">
+          <span className="ticket-summary-label">Total</span>
+          <span className="ticket-summary-value tabular-nums">{fmtQ(ticket.total)}</span>
         </div>
 
-        {ticket.pagos.map((p, idx) => (
-          <div key={`${p.metodoPago}-${idx}`} className="flex justify-between text-sm font-semibold">
-            <span>{p.metodoPago}</span>
-            <span className="tabular-nums">{fmtQ(p.montoAplicado)}</span>
-          </div>
-        ))}
+        {ticket.pagos.map((p, idx) => {
+          const montoMostrado =
+            Number(p.montoRecibido) > 0 ? Number(p.montoRecibido) : Number(p.montoAplicado);
+          return (
+            <div key={`${p.metodoPago}-${idx}`} className="flex justify-between text-sm font-semibold">
+              <span>{p.metodoPago}</span>
+              <span className="tabular-nums">{fmtQ(montoMostrado)}</span>
+            </div>
+          );
+        })}
 
-        <div className="flex justify-between items-baseline pt-2">
-          <span className="text-lg font-black">Cambio</span>
-          <span className="text-2xl font-black text-(--color-pagina) tabular-nums">
+        <div className="ticket-cambio-row flex justify-between items-baseline pt-2">
+          <span className="ticket-summary-label">Cambio</span>
+          <span className="ticket-summary-value ticket-summary-cambio tabular-nums">
             {fmtQ(ticket.cambio)}
           </span>
         </div>

@@ -1,8 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Package, Calculator, ShoppingCart, BarChart3, Grid2x2,
          Settings, Store, Users, Briefcase,} from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
+import { useAuthStore } from "@/context/useAuthStore";
+import { esUsuarioAdmin } from "@/lib/authz";
 import { cn } from "@/lib/utils";
 
 const datosPanel = [
@@ -67,6 +69,14 @@ const datosPanel = [
 const PanelControl = () => {
     const setTitulo = useNavigationStore((s) => s.setTitulo);
     const navigate = useNavigate();
+    const user = useAuthStore((s) => s.user);
+    const modulosVisibles = useMemo(
+        () =>
+            datosPanel.filter(
+                (item) => item.to !== "/dashboard" || esUsuarioAdmin(user)
+            ),
+        [user]
+    );
 
     useEffect(() => {
         setTitulo("Panel de Control");
@@ -79,7 +89,7 @@ const PanelControl = () => {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 max-w-7xl w-full mx-auto pb-2">
                     
-                    {datosPanel.map((item) => {
+                    {modulosVisibles.map((item) => {
                         const Icon = item.icono;
 
                         return (

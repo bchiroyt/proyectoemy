@@ -20,10 +20,41 @@ export function useCotizacionesPendientesQuery(options = {}) {
   });
 }
 
-export function useCotizacionesHistorialQuery(options = {}) {
+export function useCotizacionesHistorialQuery(
+  {
+    page = 1,
+    pageSize = 20,
+    fechaDesde,
+    fechaHasta,
+    estado,
+    criterio,
+  } = {},
+  options = {}
+) {
+  const criterioNorm = String(criterio ?? "").trim() || undefined;
+  const estadoNorm = String(estado ?? "").trim() || undefined;
   return useQuery({
-    queryKey: [QK_COTIZACIONES, "historial"],
-    queryFn: fetchCotizacionesHistorial,
+    queryKey: [
+      QK_COTIZACIONES,
+      "historial",
+      {
+        page,
+        pageSize,
+        fechaDesde,
+        fechaHasta,
+        estado: estadoNorm,
+        criterio: criterioNorm,
+      },
+    ],
+    queryFn: () =>
+      fetchCotizacionesHistorial({
+        page,
+        pageSize,
+        fechaDesde,
+        fechaHasta,
+        estado: estadoNorm,
+        criterio: criterioNorm,
+      }),
     staleTime: 10_000,
     ...options,
   });

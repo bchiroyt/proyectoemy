@@ -1,6 +1,7 @@
 import { ShoppingCart, Barcode } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { descuentoMontoLinea, subtotalLinea, roundVenta, precioUnitarioLinea, precioUnitarioConDescuentoLinea, brutoLinea } from "@/lib/ventaMappers";
+import { buildNombreCatalogoPos } from "@/lib/varianteUtils";
 import {
   Table,
   TableBody,
@@ -52,7 +53,7 @@ export function CarritoPanel({
 
   return (
     <aside
-      className="w-[min(100%,22rem)] shrink-0 bg-(--color-pos-panel) border-r border-(--color-pos-borde-suave) flex flex-col min-h-0 shadow-sm"
+      className="w-[min(100%,24rem)] shrink-0 bg-(--color-pos-panel) border-r border-(--color-pos-borde-suave) flex flex-col min-h-0 shadow-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) deseleccionar();
       }}
@@ -148,7 +149,7 @@ export function CarritoPanel({
                           seleccionada ? "text-(--color-pagina)" : "text-foreground"
                         )}
                       >
-                        {item.nombre}
+                        {buildNombreCatalogoPos(item)}
                       </span>
                       {item.notaLinea && (
                         <p className="text-xs font-medium text-(--color-pagina) mt-1 leading-snug">

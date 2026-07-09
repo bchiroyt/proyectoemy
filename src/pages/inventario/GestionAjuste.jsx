@@ -9,14 +9,13 @@ import { useAjustesCatalogosQuery, useAjustesListQuery, useAjusteDetalleQuery,
 import { useVariantesBuscarQuery } from "@/hooks/queries/useComprasQueries";
 import { buscarVariantesCompra } from "@/services/productosService";
 import {
-  elegirVariantePorCriterio,
+  elegirVarianteAjustePorNombre,
   enriquecerVarianteDesdeDetalleProducto,
-  invalidarCacheDetalleProductoVariantes,
   unwrapVariantesCompraBuscar,
 } from "@/lib/compraVarianteUtils";
 import { fmtQ } from "@/lib/cajaMappers";
 import { cantidadAjusteDisplay, esEntradaAjusteDetalle } from "@/lib/ajustesMappers";
-import { buildVarianteDetallePartes } from "@/lib/varianteUtils";
+import { pickNombreVariante } from "@/lib/varianteUtils";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -127,7 +126,7 @@ const GestionAjuste = () => {
       setNotification({
         type: "error",
         title: "Producto ya agregado",
-        message: `El producto "${enriquecida.productoNombre ?? enriquecida.nombre}" ya está en el detalle del ajuste.`
+        message: `La variante "${enriquecida.nombreVariante || enriquecida.NombreVariante || enriquecida.productoNombre || enriquecida.nombre}" ya está en el detalle del ajuste.`
       });
       return;
     }
@@ -137,9 +136,12 @@ const GestionAjuste = () => {
     const color = enriquecida.color ?? enriquecida.Color ?? "";
     const talla = enriquecida.tallaNombre ?? enriquecida.TallaNombre ?? enriquecida.talla ?? enriquecida.Talla ?? "";
     const presentacion = enriquecida.presentacionNombre ?? enriquecida.PresentacionNombre ?? enriquecida.presentacion ?? enriquecida.Presentacion ?? "";
-    const extra =
-      buildVarianteDetallePartes(enriquecida).join(" · ") ||
-      [color, talla, presentacion].filter(Boolean).join(" · ");
+    const nombreVariante =
+      pickNombreVariante(enriquecida) ||
+      enriquecida.nombreVariante ||
+      enriquecida.NombreVariante ||
+      "";
+    const extra = [color, talla, presentacion].filter(Boolean).join(" · ");
     const sku = enriquecida.sku ?? enriquecida.Sku ?? "";
     const stockActual = resolverStockLinea(enriquecida);
 
@@ -149,6 +151,7 @@ const GestionAjuste = () => {
         idVariante,
         idProducto: enriquecida.idProducto ?? enriquecida.IdProducto ?? null,
         nombre: enriquecida.productoNombre ?? enriquecida.ProductoNombre ?? enriquecida.nombre ?? enriquecida.Nombre ?? "",
+        nombreVariante,
         sku,
         extra,
         stockActual,
@@ -199,7 +202,7 @@ const GestionAjuste = () => {
         items = await buscarVariantesInmediato(criterio);
       }
 
-      const elegida = elegirVariantePorCriterio(items, criterio);
+      const elegida = elegirVarianteAjustePorNombre(items, criterio);
       if (elegida) {
         await handleAgregarVariante(elegida);
       } else {
@@ -437,8 +440,8 @@ const GestionAjuste = () => {
                 <table className="w-full min-w-[900px] border-collapse text-sm">
                   <thead>
                     <tr>
-                      <th className={thClass} style={{ width: "24%" }}>Producto</th>
-                      <th className={thClass} style={{ width: "12%" }}>SKU</th>
+                      <th className={thClass} style={{ width: "24%" }}>Variante</th>
+                      <th className={thClass} style={{ width: "12%" }}>Producto</th>
                       <th className={thClass} style={{ width: "16%" }}>Tipo Ajuste</th>
                       <th className={thClass} style={{ width: "8%", textAlign: "center" }}>Cantidad</th>
                       <th className={thClass} style={{ width: "10%", textAlign: "right" }}>Costo Unit.</th>
@@ -467,7 +470,9 @@ const GestionAjuste = () => {
                           <tr key={row.idVariante} className="hover:bg-(--color-gris-fondo-suave)/50">
                             <td className={tdClass}>
                               <div className="min-w-0">
-                                <p className="font-semibold text-(--color-texto-principal) truncate">{row.nombre}</p>
+                                <p className="font-semibold text-(--color-texto-principal) truncate">
+                                  {row.nombreVariante || "Sin variante"}
+                                </p>
                                 {row.extra && (
                                   <p className="text-xs text-(--color-gris-letra) truncate mt-0.5">{row.extra}</p>
                                 )}
@@ -476,8 +481,8 @@ const GestionAjuste = () => {
                                 </p>
                               </div>
                             </td>
-                            <td className={cn(tdClass, "font-mono text-xs text-(--color-gris-letra)")}>
-                              {row.sku}
+                            <td className={cn(tdClass, "text-xs text-(--color-gris-letra)")}>
+                              {row.nombre || "—"}
                             </td>
                             <td className={tdClass}>
                               <select
@@ -551,7 +556,7 @@ const GestionAjuste = () => {
                 <div className="relative max-w-lg">
                   <BuscadorPrincipal
                     inputRef={buscadorInputRef}
-                    placeholder="Escanee código o busque por nombre — Enter agrega"
+                    placeholder="Busque por nombre de variante — Enter agrega"
                     value={busqueda}
                     onChange={(e) => {
                       setBusqueda(e.target.value);
@@ -588,7 +593,8 @@ const GestionAjuste = () => {
                       {resultados.map((v) => {
                         const id = v.idVariante ?? v.IdVariante;
                         const nombre = v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
-                        const sku = v.sku ?? v.Sku ?? "";
+                        const nombreVariante =
+                          pickNombreVariante(v) || v.nombreVariante || v.NombreVariante || "";
                         const color = v.color ?? v.Color ?? "";
                         const talla = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
                         const extra = [color, talla].filter(Boolean).join(" · ");
@@ -600,12 +606,16 @@ const GestionAjuste = () => {
                             onClick={() => void handleAgregarVariante(v)}
                             className="w-full text-left px-4 py-2.5 text-xs border-b border-(--color-gris-separador) last:border-0 hover:bg-(--color-gris-fondo-suave) flex justify-between items-center gap-3"
                           >
-                            <div>
-                              <p className="font-semibold text-(--color-texto-principal)">{nombre}</p>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-(--color-texto-principal)">
+                                {nombreVariante || "Sin variante"}
+                              </p>
                               {extra && <p className="text-[10px] text-(--color-gris-letra) mt-0.5">{extra}</p>}
                             </div>
                             <div className="flex flex-col items-end shrink-0 gap-1">
-                              <span className="font-mono text-(--color-gris-letra)">{sku}</span>
+                              <span className="font-medium text-(--color-gris-letra) text-right">
+                                {nombre || "—"}
+                              </span>
                               <span className={cn("text-[10px] font-bold", (v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0) > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
                                 Stock: {v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0}
                               </span>

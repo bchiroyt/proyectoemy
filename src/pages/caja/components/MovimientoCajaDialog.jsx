@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { AlertTriangle, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { NipDialog } from "./NipDialog";
 import { useRegistrarMovimientoCajaMutation, useCajaMovimientosQuery, useCajaMovimientoTiposQuery } from "@/hooks/queries/useCajaQueries";
-import { mergeTiposMovimiento } from "@/constants/cajaTiposMovimiento";
+import { mergeTiposMovimiento, filtrarTiposMovimientoManual } from "@/constants/cajaTiposMovimiento";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import Toast from "@/components/ui/Toast";
 
@@ -21,6 +21,7 @@ export function MovimientoCajaDialog({
   onOpenChange,
   idCaja,
   dialogTitle = "Movimiento manual de caja",
+  soloTiposManuales = false,
 }) {
   const movQ = useCajaMovimientosQuery(idCaja, { enabled: open && idCaja > 0 });
   const tiposQ = useCajaMovimientoTiposQuery({ enabled: open });
@@ -33,10 +34,10 @@ export function MovimientoCajaDialog({
   const [nipOpen, setNipOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
 
-  const tipos = useMemo(
-    () => mergeTiposMovimiento(tiposQ.data?.data ?? [], movQ.data?.data ?? []),
-    [tiposQ.data?.data, movQ.data?.data]
-  );
+  const tipos = useMemo(() => {
+    const merged = mergeTiposMovimiento(tiposQ.data?.data ?? [], movQ.data?.data ?? []);
+    return soloTiposManuales ? filtrarTiposMovimientoManual(merged) : merged;
+  }, [tiposQ.data?.data, movQ.data?.data, soloTiposManuales]);
 
   const tipoSel = tipos.find((t) => String(t.idTipoMovimientoCaja) === idTipo);
 

@@ -23,16 +23,21 @@ import { useAuthStore } from "@/context/useAuthStore";
 import { fmtQ } from "@/lib/cajaMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import { useVentaTicketQuery } from "@/hooks/queries/useVentaQueries";
+import { useReembolsoComprobanteQuery } from "@/hooks/queries/useReembolsoQueries";
 import { TicketVentaPreview } from "@/pages/pos/components/TicketVentaPreview";
 import { ReembolsoTicketPreview } from "@/pages/pos/components/ReembolsoTicketPreview";
 import { imprimirTicket } from "@/lib/printTicket";
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 
-function badgeEstadoClase(estado) {
+function badgeEstadoClase(estado, tipo) {
   const valor = String(estado ?? "").trim().toUpperCase();
+  if (tipo === "reembolso" || valor === "REEMBOLSO") {
+    return "bg-rose-100 text-rose-800 hover:bg-rose-100";
+  }
   if (valor === "CONFIRMADA") {
     return "bg-green-100 text-green-800 hover:bg-green-100";
   }
@@ -40,6 +45,11 @@ function badgeEstadoClase(estado) {
     return "bg-amber-100 text-amber-800 hover:bg-amber-100";
   }
   return "bg-muted text-muted-foreground hover:bg-muted";
+}
+
+function etiquetaHistorial(item) {
+  if (item.tipo === "reembolso") return "Reembolso";
+  return etiquetaEstadoVenta(item.estadoVenta);
 }
 
 function formatearFechaHora(valor) {
@@ -100,34 +110,44 @@ export function HistorialTransaccionesDialog({ open, onOpenChange }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((venta) => (
-                    <TableRow 
-                      key={venta.idVenta} 
+                  {items.map((transaccion) => (
+                    <TableRow
+                      key={transaccion.id ?? `${transaccion.tipo}-${transaccion.idVenta ?? transaccion.idReembolso}`}
                       className="hover:bg-muted/30 cursor-pointer transition-colors"
                       onClick={() =>
                         setTicketPreview({
-                          idVenta: venta.idVenta,
-                          idCaja: venta.idCaja,
-                          cajeroNombre: venta.usuarioNombre,
+                          tipo: transaccion.tipo ?? "venta",
+                          idVenta: transaccion.idVenta,
+                          idReembolso: transaccion.idReembolso,
+                          idCaja: transaccion.idCaja,
+                          cajeroNombre: transaccion.usuarioNombre,
                         })
                       }
                     >
                       <TableCell className="font-mono font-semibold text-(--color-pagina)">
-                        {venta.numeroTicket || `#${venta.idVenta}`}
+                        {transaccion.numeroTicket ||
+                          (transaccion.tipo === "reembolso"
+                            ? `#R-${transaccion.idReembolso}`
+                            : `#${transaccion.idVenta}`)}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
-                        {formatearFechaHora(venta.fechaHora)}
+                        {formatearFechaHora(transaccion.fechaHora)}
                       </TableCell>
                       <TableCell className="text-sm font-medium">
-                        {venta.usuarioNombre || "—"}
+                        {transaccion.usuarioNombre || "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge className={badgeEstadoClase(venta.estadoVenta)}>
-                          {etiquetaEstadoVenta(venta.estadoVenta)}
+                        <Badge className={badgeEstadoClase(transaccion.estadoVenta, transaccion.tipo)}>
+                          {etiquetaHistorial(transaccion)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums">
-                        {fmtQ(venta.total)}
+                      <TableCell
+                        className={cn(
+                          "text-right font-mono text-sm tabular-nums",
+                          transaccion.tipo === "reembolso" && "text-(--color-rojo-obscuro)"
+                        )}
+                      >
+                        {fmtQ(transaccion.total)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -165,13 +185,14 @@ export function HistorialTransaccionesDialog({ open, onOpenChange }) {
       </DialogContent>
       
       <Dialog open={!!ticketPreview} onOpenChange={(o) => !o && setTicketPreview(null)}>
-        <DialogContent aria-describedby={undefined} className="flex flex-col gap-0 p-0 sm:max-w-md h-[90vh] sm:h-auto overflow-hidden">
-          <DialogHeader className="shrink-0 border-b px-6 py-4 flex flex-row justify-between items-center">
+        <DialogContent
+          aria-describedby={undefined}
+          className="flex h-[min(90vh,720px)] max-h-[90vh] w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+        >
+          <DialogHeader className="flex shrink-0 flex-row items-center justify-between border-b px-6 py-4">
             <DialogTitle className="text-lg">Reimpresión de ticket</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-auto bg-muted/30 p-4">
-            <TicketPreviewContent venta={ticketPreview} />
-          </div>
+          <TicketPreviewContent venta={ticketPreview} />
         </DialogContent>
       </Dialog>
     </Dialog>
@@ -186,13 +207,21 @@ function TicketPreviewContent({ venta }) {
     user?.username ||
     "";
   const cajeroFallback = venta?.cajeroNombre || nombreSesion;
+  const esReembolso = venta?.tipo === "reembolso";
   const idVenta = venta?.idVenta;
+  const idReembolso = venta?.idReembolso;
   const idCaja = venta?.idCaja;
 
-  const ticketQ = useVentaTicketQuery(idVenta, {
-    enabled: !!idVenta,
+  const ventaTicketQ = useVentaTicketQuery(idVenta, {
+    enabled: !!idVenta && !esReembolso,
     idCaja,
   });
+  const reembolsoTicketQ = useReembolsoComprobanteQuery(idReembolso, {
+    enabled: !!idReembolso && esReembolso,
+    idCaja,
+  });
+
+  const ticketQ = esReembolso ? reembolsoTicketQ : ventaTicketQ;
 
   const ticket = useMemo(() => {
     const base = ticketQ.data?.data;
@@ -202,48 +231,52 @@ function TicketPreviewContent({ venta }) {
   
   if (ticketQ.isLoading) {
     return (
-      <div className="flex h-40 flex-col items-center justify-center text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin mb-2" />
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-muted/30 p-4 text-muted-foreground">
+        <Loader2 className="mb-2 h-6 w-6 animate-spin" />
         <p>Cargando ticket...</p>
       </div>
     );
   }
-  
+
   if (ticketQ.isError) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-red-50 p-4 text-sm text-(--color-rojo)">
-        {getApiErrorMessage(ticketQ.error, "Error al cargar el ticket.")}
-        <p className="mt-2 text-xs text-(--color-rojo-obscuro)/80 leading-relaxed">
-          Este mensaje lo devuelve el servidor al generar el ticket. Si menciona
-          sucursal activa, debe corregirse en el backend para que use la ubicación
-          o sucursal guardada en la venta, no la sesión actual.
-        </p>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30 p-4">
+        <div className="rounded-lg border border-destructive/30 bg-red-50 p-4 text-sm text-(--color-rojo)">
+          {getApiErrorMessage(ticketQ.error, "Error al cargar el ticket.")}
+          <p className="mt-2 text-xs leading-relaxed text-(--color-rojo-obscuro)/80">
+            Este mensaje lo devuelve el servidor al generar el ticket. Si menciona
+            sucursal activa, debe corregirse en el backend para que use la ubicación
+            o sucursal guardada en la venta, no la sesión actual.
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!ticket) return null;
-  
-  const isReembolso = ticket.tipo === "reembolso";
 
   return (
-    <div className="ticket-page flex flex-col gap-4">
-      {isReembolso ? (
-        <ReembolsoTicketPreview ticket={ticket} data-print-source />
-      ) : (
-        <TicketVentaPreview ticket={ticket} data-print-source />
-      )}
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30 p-4">
+        <div className="ticket-page mx-auto w-full max-w-md">
+          {esReembolso ? (
+            <ReembolsoTicketPreview ticket={ticket} data-print-source />
+          ) : (
+            <TicketVentaPreview ticket={ticket} data-print-source />
+          )}
+        </div>
+      </div>
 
-      <div className="ticket-actions">
+      <div className="ticket-actions shrink-0 border-t bg-(--color-pos-panel) p-4">
         <Button
           onClick={() => imprimirTicket()}
-          className="w-full mt-2 font-bold bg-(--color-pagina) hover:bg-(--color-pagina-2) text-white"
+          className="mt-0 w-full bg-(--color-pagina) font-bold text-white hover:bg-(--color-pagina-2)"
           size="lg"
         >
           <Printer className="mr-2 h-5 w-5" />
           Imprimir Ticket
         </Button>
       </div>
-    </div>
+    </>
   );
 }

@@ -52,6 +52,35 @@ export function mapCatalogoProducto(raw) {
       ? null
       : Number(costoPromedioRaw);
 
+  const codigosExternosRaw = pick(raw, "codigosExternos", "CodigosExternos") ?? [];
+  const codigosExternos = Array.isArray(codigosExternosRaw)
+    ? codigosExternosRaw
+        .map((item) => {
+          if (typeof item === "string") return { codigo: item, esPrincipal: false };
+          const codigo = pick(item, "codigo", "Codigo");
+          if (codigo == null || codigo === "") return null;
+          return {
+            codigo: String(codigo),
+            esPrincipal: Boolean(pick(item, "esPrincipal", "EsPrincipal")),
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const codigoBarras =
+    pick(
+      raw,
+      "codigoBarras",
+      "CodigoBarras",
+      "codigoPrincipal",
+      "CodigoPrincipal",
+      "codigoExterno",
+      "CodigoExterno"
+    ) ??
+    codigosExternos.find((c) => c.esPrincipal)?.codigo ??
+    codigosExternos[0]?.codigo ??
+    "";
+
   return {
     id: idVariante,
     idVariante,
@@ -73,7 +102,10 @@ export function mapCatalogoProducto(raw) {
     precioVentaMayor,
     costoPromedioActual,
     stockActual,
-    codigo: pick(raw, "sku", "Sku") ?? "",
+    codigoBarras: codigoBarras ? String(codigoBarras) : "",
+    codigosExternos,
+    /** @deprecated usar codigoBarras; se mantiene por compatibilidad de UI */
+    codigo: codigoBarras ? String(codigoBarras) : pick(raw, "sku", "Sku") ?? "",
   };
 }
 
@@ -94,6 +126,17 @@ export function mapVentaResumen(raw) {
     usuarioNombre: pick(raw, "usuarioNombre", "UsuarioNombre") ?? "",
     estadoVenta: pick(raw, "estadoVenta", "EstadoVenta") ?? "",
     total: Number(pick(raw, "total", "Total") ?? 0),
+  };
+}
+
+/** Ítem unificado del historial POS para ventas confirmadas. */
+export function mapVentaHistorialItem(raw) {
+  const venta = mapVentaResumen(raw);
+  if (!venta) return null;
+  return {
+    ...venta,
+    tipo: "venta",
+    id: `venta-${venta.idVenta}`,
   };
 }
 
@@ -203,7 +246,7 @@ export function buildVentaCrearBody(carrito, pagos, { observaciones = null, idCa
         idVariante: l.idVariante,
         cantidad: l.cantidad,
         descuentoMonto: descuento > 0 ? descuento : null,
-        idUbicacion: l.idUbicacion ?? 1, // Fallback a 1 para que el ticket encuentre la sucursal
+        idUbicacion: l.idUbicacion ?? null,
       };
     });
 
@@ -237,17 +280,49 @@ export function mapVentaCreada(raw) {
 function mapTicketDetalle(raw) {
   if (!raw) return null;
   const cantidad = Number(pick(raw, "cantidad", "Cantidad") ?? 0);
-  const precio = Number(pick(raw, "precio", "Precio") ?? 0);
-  const descuento = Number(
-    pick(raw, "descuento", "Descuento", "descuentoMonto", "DescuentoMonto") ?? 0
+  const precio = Number(
+    pick(
+      raw,
+      "precio",
+      "Precio",
+      "precioUnitario",
+      "PrecioUnitario",
+      "precioUnitarioSnapshot",
+      "PrecioUnitarioSnapshot"
+    ) ?? 0
   );
-  const subtotalRaw = pick(raw, "subtotal", "Subtotal");
+  let descuento = Number(
+    pick(
+      raw,
+      "descuento",
+      "Descuento",
+      "descuentoMonto",
+      "DescuentoMonto",
+      "montoDescuento",
+      "MontoDescuento"
+    ) ?? 0
+  );
+  const subtotalRaw = pick(
+    raw,
+    "subtotal",
+    "Subtotal",
+    "subtotalLinea",
+    "SubtotalLinea",
+    "subtotalLineaSnapshot",
+    "SubtotalLineaSnapshot"
+  );
+  const bruto = roundVenta(cantidad * precio);
   const subtotal =
     subtotalRaw != null
       ? roundVenta(Number(subtotalRaw))
-      : roundVenta(cantidad * precio - descuento);
+      : roundVenta(Math.max(0, bruto - descuento));
+
+  if (descuento <= 0 && bruto > subtotal) {
+    descuento = roundVenta(bruto - subtotal);
+  }
+
   return {
-    nombre: pick(raw, "nombre", "Nombre") ?? "",
+    nombre: buildNombreTicket(raw),
     cantidad,
     precio,
     descuento: roundVenta(descuento),
@@ -257,12 +332,51 @@ function mapTicketDetalle(raw) {
 
 function mapTicketPago(raw) {
   if (!raw) return null;
+  const montoAplicado = Number(pick(raw, "montoAplicado", "MontoAplicado") ?? 0);
+  let montoRecibido = Number(pick(raw, "montoRecibido", "MontoRecibido") ?? 0);
+  const cambio = Number(pick(raw, "cambio", "Cambio") ?? 0);
+
+  if (montoRecibido <= montoAplicado && cambio > 0) {
+    montoRecibido = roundVenta(montoAplicado + cambio);
+  } else if (montoRecibido <= 0) {
+    montoRecibido = montoAplicado;
+  }
+
   return {
     metodoPago: pick(raw, "metodoPago", "MetodoPago") ?? "",
-    montoAplicado: Number(pick(raw, "montoAplicado", "MontoAplicado") ?? 0),
-    montoRecibido: Number(pick(raw, "montoRecibido", "MontoRecibido") ?? 0),
-    cambio: Number(pick(raw, "cambio", "Cambio") ?? 0),
+    montoAplicado,
+    montoRecibido,
+    cambio,
   };
+}
+
+/** Completa descuentos del ticket API con los del carrito local cuando el backend no los envía. */
+export function enriquecerTicketDescuentosDesdeLineas(ticket, lineas = []) {
+  if (!ticket?.detalles?.length || !lineas?.length) return ticket;
+  if (ticket.detalles.some((d) => Number(d.descuento) > 0)) return ticket;
+
+  const detalles = ticket.detalles.map((detalle, idx) => {
+    const linea = lineas[idx];
+    if (!linea) return detalle;
+
+    const descuento = descuentoMontoLinea(linea);
+    if (descuento <= 0) return detalle;
+
+    const precio = Number(detalle.precio) > 0 ? Number(detalle.precio) : precioUnitarioLinea(linea);
+    return {
+      ...detalle,
+      precio,
+      descuento,
+      subtotal: subtotalLinea(linea),
+    };
+  });
+
+  const huboCambios = detalles.some(
+    (detalle, idx) => Number(detalle.descuento) !== Number(ticket.detalles[idx]?.descuento ?? 0)
+  );
+  if (!huboCambios) return ticket;
+
+  return { ...ticket, detalles };
 }
 
 export function enriquecerTicketEncabezado(ticket, { cajeroFallback = "" } = {}) {
@@ -288,6 +402,22 @@ export function mapVentaTicket(raw) {
   const data = pick(raw, "data", "Data") ?? raw;
   const detallesRaw = pick(data, "detalles", "Detalles") ?? [];
   const pagosRaw = pick(data, "pagos", "Pagos") ?? [];
+  const cambioTotal = Number(pick(data, "cambio", "Cambio") ?? 0);
+  let pagos = unwrapList(pagosRaw).map(mapTicketPago).filter(Boolean);
+
+  if (
+    cambioTotal > 0 &&
+    pagos.length === 1 &&
+    pagos[0].montoRecibido <= pagos[0].montoAplicado
+  ) {
+    pagos = [
+      {
+        ...pagos[0],
+        montoRecibido: roundVenta(pagos[0].montoAplicado + cambioTotal),
+        cambio: cambioTotal,
+      },
+    ];
+  }
 
   // No enriquecer aquí: el consumidor (VentaTicketPanel) vuelve a enriquecer
   // pasando el cajeroFallback. Si pre-enriqueciéramos, un cajero vacío del
@@ -300,8 +430,8 @@ export function mapVentaTicket(raw) {
     fechaHora: pick(data, "fechaHora", "FechaHora") ?? null,
     detalles: unwrapList(detallesRaw).map(mapTicketDetalle).filter(Boolean),
     total: Number(pick(data, "total", "Total") ?? 0),
-    pagos: unwrapList(pagosRaw).map(mapTicketPago).filter(Boolean),
-    cambio: Number(pick(data, "cambio", "Cambio") ?? 0),
+    pagos,
+    cambio: cambioTotal,
   };
 }
 

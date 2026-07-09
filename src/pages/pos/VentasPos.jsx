@@ -44,7 +44,7 @@ import Paginacion from "@/components/shared/Paginacion";
 const PAGE_SIZE = 30;
 const CATEGORIA_TODO = "todo";
 const CATALOGO_GRID_CLASS =
-  "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 w-full";
+  "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 min-[1700px]:grid-cols-6 min-[2100px]:grid-cols-7 gap-3 w-full";
 const CAMPOS_CATALOGO_LINEA = [
   "idVariante",
   "sku",
@@ -1052,6 +1052,7 @@ const VentasPOS = () => {
         onOpenChange={setGastosOpen}
         idCaja={idCaja}
         dialogTitle="Registrar gasto de caja"
+        soloTiposManuales
       />
 
       <CambiarCajeroDialog

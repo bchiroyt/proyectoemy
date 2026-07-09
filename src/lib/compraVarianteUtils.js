@@ -2,6 +2,7 @@ import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
 import { obtenerProductoPorId } from "@/services/productos";
 import { buscarVariantesCompra } from "@/services/productosService";
 import { unwrapProductoDetalleBody } from "@/lib/productoUtils";
+import { pickNombreVariante } from "@/lib/varianteUtils";
 
 const CAMPOS_COSTO_COMPRA = [
   "precioCompraActual",
@@ -42,6 +43,7 @@ export function normalizarVarianteCompraBusqueda(raw) {
     idProducto: toNumberOrNull(pick(raw, "idProducto", "IdProducto")),
     productoNombre:
       pick(raw, "productoNombre", "ProductoNombre", "nombre", "Nombre") ?? "",
+    nombreVariante: pickNombreVariante(raw) ?? "",
     sku: pick(raw, "sku", "Sku", "codigoPrincipal", "CodigoPrincipal") ?? "",
     stockActual,
     stock: stockActual,
@@ -246,6 +248,10 @@ function codigosConocidosVariante(v) {
   return codigos.map(normalizarCodigo).filter(Boolean);
 }
 
+function nombreVarianteNormalizado(v) {
+  return normalizarCodigo(pickNombreVariante(v) ?? v?.nombreVariante ?? v?.NombreVariante);
+}
+
 /**
  * Prioriza coincidencia exacta de código (lector) y, si no, un único resultado o el primero elegible.
  */
@@ -261,6 +267,30 @@ export function elegirVariantePorCriterio(items, criterio, esElegible = variante
 
   if (elegibles.length === 1) return elegibles[0];
 
+  return elegibles[0];
+}
+
+/**
+ * Selección para ajustes: prioriza nombreVariante (ya no se busca por SKU).
+ */
+export function elegirVarianteAjustePorNombre(items, criterio) {
+  const q = normalizarCodigo(criterio);
+  if (!q) return null;
+
+  const elegibles = (items ?? []).filter(varianteAjusteElegible);
+  if (!elegibles.length) return null;
+
+  const exacta = elegibles.find((v) => nombreVarianteNormalizado(v) === q);
+  if (exacta) return exacta;
+
+  const parciales = elegibles.filter((v) => {
+    const nombre = nombreVarianteNormalizado(v);
+    return nombre && nombre.includes(q);
+  });
+  if (parciales.length === 1) return parciales[0];
+  if (parciales.length > 1) return parciales[0];
+
+  if (elegibles.length === 1) return elegibles[0];
   return elegibles[0];
 }
 

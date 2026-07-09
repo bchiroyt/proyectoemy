@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Home, Boxes, ShoppingCart, Landmark, Users, LayoutDashboard,
     Settings, LogOut, Store, PanelLeft, Briefcase, ChevronDown, Truck, BarChart3, SlidersHorizontal } from "lucide-react";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import logoImg from "@/assets/tran1.png";
 import logo1Img from "@/assets/logo1.jpeg";
 import { useAuthStore } from "@/context/useAuthStore";
+import { esUsuarioAdmin } from "@/lib/authz";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import {
     AlertDialog,
@@ -63,7 +64,15 @@ const AppSidebar = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const logout = useAuthStore((s) => s.logout);
+    const user = useAuthStore((s) => s.user);
     const attemptNavigation = useNavigationStore((s) => s.attemptNavigation);
+    const menuItemsVisibles = useMemo(
+        () =>
+            menuItems.filter(
+                (item) => item.to !== "/dashboard" || esUsuarioAdmin(user)
+            ),
+        [user]
+    );
     const [logoutOpen, setLogoutOpen] = useState(false);
     const sidebarColapsada = !isMobile && state === "collapsed";
     const [inventarioMenuOpen, setInventarioMenuOpen] = useState(false);
@@ -184,7 +193,7 @@ const AppSidebar = () => {
 
                 <SidebarContent className="p-2">
                     <SidebarMenu className="gap-1">
-                        {menuItems.map((item) => {
+                        {menuItemsVisibles.map((item) => {
                             const itemActivo = isRouteActive(location.pathname, item.to);
                             const tieneSubmenu = item.children?.length > 0;
 
