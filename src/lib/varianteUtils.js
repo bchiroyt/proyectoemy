@@ -7,6 +7,44 @@ export function pickNombreVariante(raw) {
   return texto || null;
 }
 
+const MARCAS_DIACRITICAS_EN_VOCAL_REGEX = /([aeiouAEIOU])[\u0300-\u036f]+/g;
+
+function quitarAcentosDeVocales(valor) {
+  return valor
+    .normalize("NFD")
+    .replace(MARCAS_DIACRITICAS_EN_VOCAL_REGEX, "$1")
+    .normalize("NFC");
+}
+
+export function normalizarNombreVarianteParaComparar(valor) {
+  return quitarAcentosDeVocales(String(valor ?? "").trim()).toLocaleLowerCase("es-GT");
+}
+
+export function tieneNombreVarianteDuplicado(variantes = [], options = {}) {
+  const ignorarIdVariante = options.ignorarIdVariante != null ? Number(options.ignorarIdVariante) : null;
+  const nombres = new Set();
+
+  for (const variante of variantes) {
+    const idVariante = Number(variante?.idVariante ?? variante?.IdVariante);
+    if (
+      ignorarIdVariante != null &&
+      Number.isFinite(idVariante) &&
+      idVariante === ignorarIdVariante
+    ) {
+      continue;
+    }
+
+    const nombre = normalizarNombreVarianteParaComparar(
+      typeof variante === "string" ? variante : pickNombreVariante(variante)
+    );
+    if (!nombre) continue;
+    if (nombres.has(nombre)) return true;
+    nombres.add(nombre);
+  }
+
+  return false;
+}
+
 /** Normaliza atributosAdicionales desde API (objeto o string JSON). */
 export function normalizarAtributosAdicionales(raw) {
   const fuente = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};

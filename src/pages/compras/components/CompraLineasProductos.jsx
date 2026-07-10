@@ -2,8 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, Trash2 } from "lucide-react";
-import { useVariantesBuscarQuery } from "@/hooks/queries/useComprasQueries";
+import { useVariantesCompraBuscarQuery } from "@/hooks/queries/useComprasQueries";
 import {
+  aplicarCriteriosBusquedaCompra,
   elegirVarianteParaAgregar,
   unwrapVariantesCompraBuscar,
   valorInputCantidad,
@@ -160,7 +161,7 @@ export function CompraLineasProductos({
     return () => window.clearTimeout(t);
   }, [busqueda]);
 
-  const variantesQ = useVariantesBuscarQuery(debounced, {
+  const variantesQ = useVariantesCompraBuscarQuery(debounced, {
     enabled: debounced.length >= 1,
   });
 
@@ -259,7 +260,7 @@ export function CompraLineasProductos({
       const q = criterio.trim();
       if (!q) return [];
 
-      const cacheKey = ["productos", "variantes-buscar", q];
+      const cacheKey = ["productos", "variantes-buscar", "compra", q];
       const enCache = queryClient.getQueryData(cacheKey);
       if (Array.isArray(enCache) && enCache.length > 0) {
         return enCache;
@@ -269,7 +270,7 @@ export function CompraLineasProductos({
       if (raw && raw.exito === false) {
         throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
       }
-      const items = unwrapVariantesCompraBuscar(raw);
+      const items = aplicarCriteriosBusquedaCompra(unwrapVariantesCompraBuscar(raw), q);
       queryClient.setQueryData(cacheKey, items);
       return items;
     },

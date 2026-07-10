@@ -14,7 +14,10 @@ import {
 import { buscarVariantesCompra } from "@/services/productosService";
 import { fetchProveedores } from "@/services/proveedoresService";
 import { pick } from "@/lib/apiNormalizer";
-import { unwrapVariantesCompraBuscar } from "@/lib/compraVarianteUtils";
+import {
+  aplicarCriteriosBusquedaCompra,
+  unwrapVariantesCompraBuscar,
+} from "@/lib/compraVarianteUtils";
 
 function unwrapPaged(resp) {
   const inner = pick(resp, "data", "Data") ?? resp;
@@ -87,6 +90,21 @@ export function useVariantesBuscarQuery(criterio, options = {}) {
         throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
       }
       return unwrapVariantesCompraBuscar(raw);
+    },
+    enabled: Boolean(options.enabled && q.length >= 1),
+  });
+}
+
+export function useVariantesCompraBuscarQuery(criterio, options = {}) {
+  const q = (criterio ?? "").trim();
+  return useQuery({
+    queryKey: ["productos", "variantes-buscar", "compra", q],
+    queryFn: async () => {
+      const raw = await buscarVariantesCompra(q);
+      if (raw && raw.exito === false) {
+        throw new Error(raw.mensaje || raw.Mensaje || "Error en bÃºsqueda");
+      }
+      return aplicarCriteriosBusquedaCompra(unwrapVariantesCompraBuscar(raw), q);
     },
     enabled: Boolean(options.enabled && q.length >= 1),
   });

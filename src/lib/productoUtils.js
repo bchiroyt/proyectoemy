@@ -338,7 +338,6 @@ export function crearFormNuevaVarianteDesdeReferencia(variantes = [], catalogos 
     "PrecioVentaMayor"
   );
   const stockMinimo = pick(referencia, "stockMinimo", "StockMinimo");
-  const nombreVariante = pickNombreVariante(referencia) ?? "";
   const atributosAdicionales = atributosAdicionalesATexto(
     normalizarAtributosAdicionales(referencia)
   );
@@ -347,7 +346,7 @@ export function crearFormNuevaVarianteDesdeReferencia(variantes = [], catalogos 
     ...FORM_NUEVA_VARIANTE_VACIO,
     presentacion,
     talla,
-    nombreVariante,
+    nombreVariante: "",
     atributosAdicionales,
     precioVenta:
       precioVenta != null && precioVenta !== "" ? String(precioVenta) : "",
