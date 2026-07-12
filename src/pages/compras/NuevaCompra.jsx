@@ -45,6 +45,7 @@ function mapVarianteToLinea(v) {
   const sku = v.sku ?? v.Sku ?? "";
   const nombre =
     v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
+  const nombreVariante = v.nombreVariante ?? v.NombreVariante ?? "";
   const color = v.color ?? v.Color ?? "";
   const tallaNombre = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
   const presentacionNombre =
@@ -56,6 +57,7 @@ function mapVarianteToLinea(v) {
     idVariante,
     sku,
     nombre,
+    nombreVariante,
     color,
     tallaNombre,
     presentacionNombre,
@@ -73,6 +75,7 @@ function mapDetalleToLinea(d) {
   const idVariante = d.idVariante ?? d.IdVariante;
   const sku = d.sku ?? d.Sku ?? "";
   const nombre = d.productoNombre ?? d.ProductoNombre ?? "";
+  const nombreVariante = d.nombreVariante ?? d.NombreVariante ?? "";
   const color = d.color ?? d.Color ?? "";
   const tallaNombre = d.tallaNombre ?? d.TallaNombre ?? "";
   const presentacionNombre =
@@ -85,6 +88,7 @@ function mapDetalleToLinea(d) {
     idVariante,
     sku,
     nombre,
+    nombreVariante,
     color,
     tallaNombre,
     presentacionNombre,
@@ -203,6 +207,45 @@ const NuevaCompra = () => {
       nombre: p.nombre ?? p.Nombre ?? "",
     }));
   }, [provQ.data]);
+
+  const handleProveedorCreado = async ({ respuesta, nombre }) => {
+    const creado = respuesta?.data ?? respuesta?.Data ?? respuesta;
+    const idCreado =
+      typeof creado === "number" || typeof creado === "string"
+        ? creado
+        : creado?.idProveedor ?? creado?.IdProveedor ?? creado?.id ?? creado?.Id;
+
+    if (idCreado != null && String(idCreado)) {
+      setProveedor(String(idCreado));
+    }
+
+    const resultado = await provQ.refetch();
+    const lista = Array.isArray(resultado.data) ? resultado.data : [];
+    const obtenerId = (item) => item?.idProveedor ?? item?.IdProveedor ?? item?.id ?? item?.Id;
+
+    let encontrado =
+      idCreado != null
+        ? lista.find((item) => String(obtenerId(item)) === String(idCreado))
+        : null;
+
+    if (!encontrado) {
+      const nombreNormalizado = nombre.trim().toLocaleLowerCase("es-GT");
+      for (const item of lista) {
+        const nombreItem = String(item?.nombre ?? item?.Nombre ?? "")
+          .trim()
+          .toLocaleLowerCase("es-GT");
+        if (nombreItem !== nombreNormalizado) continue;
+        if (!encontrado || Number(obtenerId(item)) > Number(obtenerId(encontrado))) {
+          encontrado = item;
+        }
+      }
+    }
+
+    const idEncontrado = obtenerId(encontrado);
+    if (idEncontrado != null) {
+      setProveedor(String(idEncontrado));
+    }
+  };
 
   const subtotal = lineas.reduce((a, l) => {
     const cant = isDirecta ? l.cantidadRecibida : l.cantidadSolicitada;
@@ -550,6 +593,7 @@ const NuevaCompra = () => {
           onProveedorChange={setProveedor}
           proveedores={proveedores}
           proveedoresLoading={provQ.isLoading}
+          onProveedorCreado={handleProveedorCreado}
           fechaPedido={fechaPedido}
           onFechaPedidoChange={setFechaPedido}
           documentoRef={documentoRef}

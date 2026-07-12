@@ -9,7 +9,8 @@ import {
   Package,
   Camera,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  CircleSlash
 } from "lucide-react";
 
 // IMPORTACIONES OFICIALES DE TU ARQUITECTURA
@@ -27,6 +28,10 @@ import { obtenerUbicaciones } from "@/services/ubicaciones";
 import { UBICACIONES_PRODUCTO_UI_HABILITADAS } from "@/lib/featureFlags";
 import { obtenerCategorias } from "@/services/categorias";
 import { obtenerMarcas } from "@/services/marcas";
+import {
+  MODOS_EDICION_DETALLE_PRODUCTO,
+  useDetalleProductoEdicionStore,
+} from "@/context/useDetalleProductoEdicionStore";
 import BuscadorCombo from "./BuscadorCombo";
 import { throwIfEnvelopeFailed } from "@/lib/apiNormalizer";
 import { getApiErrorMessage, API_BASE_URL } from "@/lib/apiClient";
@@ -42,6 +47,7 @@ import {
 import {
   atributosAdicionalesATexto,
   CLASES_ETIQUETA_VARIANTE,
+  normalizarNombreVarianteParaComparar,
   obtenerEtiquetasVariante,
   parsearAtributosAdicionalesDesdeTexto,
 } from "@/lib/varianteUtils";
@@ -223,6 +229,16 @@ const ModalDetalleProducto = ({
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [catalogosCabeceraCargados, setCatalogosCabeceraCargados] = useState(false);
+  const modoEdicionActivo = useDetalleProductoEdicionStore((state) => state.modoActivo);
+  const iniciarModoEdicion = useDetalleProductoEdicionStore((state) => state.iniciarModo);
+  const finalizarModoEdicion = useDetalleProductoEdicionStore((state) => state.finalizarModo);
+  const resetModoEdicion = useDetalleProductoEdicionStore((state) => state.reset);
+  const detalleProductoBloqueado =
+    modoEdicionActivo !== null && modoEdicionActivo !== MODOS_EDICION_DETALLE_PRODUCTO.DETALLES;
+  const nuevaVarianteBloqueada =
+    (modoEdicionActivo !== null && modoEdicionActivo !== MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE) ||
+    (modoEdicionActivo === MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE && !mostrandoNuevaVariante);
+  const editarVarianteBloqueado = modoEdicionActivo !== null || editandoId !== null;
 
   // NOTIFICACIÓN FLOTANTE (Toast)
   const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
@@ -243,6 +259,8 @@ const ModalDetalleProducto = ({
   );
   const nombreBloqueadoPorActivo =
     estadoCatalogoNormalizado === "ACTIVO" || (!estadoCatalogoNormalizado && productoTieneStock);
+
+  useEffect(() => () => resetModoEdicion(), [resetModoEdicion]);
 
   // EFECTO: Consulta al servidor al abrirse el modal
   useEffect(() => {
@@ -351,16 +369,16 @@ const ModalDetalleProducto = ({
       setUbicacionInput("");
       setStockMinimoInput("");
       setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
+      resetModoEdicion();
     }
-  }, [open]);
+  }, [open, resetModoEdicion]);
 
   // Cargar catálogos al mostrar el formulario de nueva variante o editar variante
   useEffect(() => {
     const faltaCatalogoUbicacion = UBICACIONES_PRODUCTO_UI_HABILITADAS && ubicaciones.length === 0;
-    if (
-      (mostrandoNuevaVariante || editandoId !== null) &&
-      (tallas.length === 0 || presentaciones.length === 0 || faltaCatalogoUbicacion)
-    ) {
+    const requiereCatalogosBase = tallas.length === 0 || presentaciones.length === 0;
+    const requiereCatalogoUbicacion = editandoId !== null && faltaCatalogoUbicacion;
+    if ((mostrandoNuevaVariante || editandoId !== null) && (requiereCatalogosBase || requiereCatalogoUbicacion)) {
       const cargarCatalogos = async () => {
         setCargandoCatalogos(true);
         try {
@@ -368,14 +386,14 @@ const ModalDetalleProducto = ({
             obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
             obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
           ];
-          if (UBICACIONES_PRODUCTO_UI_HABILITADAS) {
+          if (requiereCatalogoUbicacion) {
             promesas.push(obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }));
           }
 
           const resultados = await Promise.all(promesas);
           setTallas(resultados[0].items || []);
           setPresentaciones(resultados[1].items || []);
-          if (UBICACIONES_PRODUCTO_UI_HABILITADAS) {
+          if (requiereCatalogoUbicacion) {
             setUbicaciones(resultados[2].items || []);
           }
         } catch (error) {
@@ -388,21 +406,21 @@ const ModalDetalleProducto = ({
     }
   }, [mostrandoNuevaVariante, editandoId, tallas.length, presentaciones.length, ubicaciones.length]);
 
-  const cargarCatalogosVariante = async () => {
+  const cargarCatalogosVariante = async ({ incluirUbicaciones = UBICACIONES_PRODUCTO_UI_HABILITADAS } = {}) => {
     setCargandoCatalogos(true);
     try {
       const promesas = [
         obtenerTallas({ Activo: true, Page: 1, PageSize: 500 }),
         obtenerPresentaciones({ Activo: true, Page: 1, PageSize: 500 }),
       ];
-      if (UBICACIONES_PRODUCTO_UI_HABILITADAS) {
+      if (incluirUbicaciones) {
         promesas.push(obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 }));
       }
 
       const resultados = await Promise.all(promesas);
       const itemsTallas = resultados[0].items || [];
       const itemsPresentaciones = resultados[1].items || [];
-      const itemsUbicaciones = UBICACIONES_PRODUCTO_UI_HABILITADAS ? (resultados[2].items || []) : [];
+      const itemsUbicaciones = incluirUbicaciones ? (resultados[2].items || []) : ubicaciones;
       setTallas(itemsTallas);
       setPresentaciones(itemsPresentaciones);
       setUbicaciones(itemsUbicaciones);
@@ -418,7 +436,7 @@ const ModalDetalleProducto = ({
   // Cargar catálogos al mostrar el formulario de nueva variante
   useEffect(() => {
     if (mostrandoNuevaVariante && tallas.length === 0 && presentaciones.length === 0) {
-      cargarCatalogosVariante();
+      cargarCatalogosVariante({ incluirUbicaciones: false });
     }
   }, [mostrandoNuevaVariante, tallas.length, presentaciones.length]);
 
@@ -438,13 +456,19 @@ const ModalDetalleProducto = ({
   };
 
   const hayEdicionPendiente = () =>
-    editandoId !== null || (mostrandoNuevaVariante && hayCambiosNuevaVariante());
+    editandoCabecera || editandoId !== null || (mostrandoNuevaVariante && hayCambiosNuevaVariante());
 
   const cancelarNuevaVarianteForm = () => {
     setMostrandoNuevaVariante(false);
     setFormNuevaVariante({ ...FORM_NUEVA_VARIANTE_VACIO });
     setFormNuevaVarianteInicial({ ...FORM_NUEVA_VARIANTE_VACIO });
     setErrorNuevaVariante("");
+    finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE);
+  };
+
+  const cancelarEdicionCabecera = () => {
+    setEditandoCabecera(false);
+    finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.DETALLES);
   };
 
   const handleToggleNuevaVariante = async () => {
@@ -458,9 +482,12 @@ const ModalDetalleProducto = ({
       return;
     }
 
+    const pudoIniciar = iniciarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.NUEVA_VARIANTE);
+    if (!pudoIniciar) return;
+
     let catalogos = { tallas, presentaciones };
     if (tallas.length === 0 || presentaciones.length === 0) {
-      catalogos = await cargarCatalogosVariante();
+      catalogos = await cargarCatalogosVariante({ incluirUbicaciones: false });
     }
     const inicial = crearFormNuevaVarianteDesdeReferencia(estadoProducto?.variantes, catalogos);
     setFormNuevaVariante(inicial);
@@ -483,6 +510,7 @@ const ModalDetalleProducto = ({
     const accion = accionSalidaPendiente;
     cancelarEdicion();
     cancelarNuevaVarianteForm();
+    cancelarEdicionCabecera();
     setOpenConfirmarSalida(false);
     setAccionSalidaPendiente(null);
     if (accion === "cerrarModal") {
@@ -636,6 +664,11 @@ const ModalDetalleProducto = ({
   };
 
   const iniciarEdicion = async (v, idActual) => {
+    const pudoIniciar = iniciarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE, {
+      idVariante: idActual,
+    });
+    if (!pudoIniciar) return;
+
     setErrorEdicion("");
     let catalogos = { tallas, presentaciones, ubicaciones };
     const faltaCatalogoUbicacion = UBICACIONES_PRODUCTO_UI_HABILITADAS && ubicaciones.length === 0;
@@ -676,6 +709,30 @@ const ModalDetalleProducto = ({
     setStockMinimoInput("");
     setCodigosSecundariosInput([]);
     setCodigoSecundarioPendienteInput("");
+    finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE);
+  };
+
+  const getMensajeNombreVarianteDuplicado = (nombreVariante, idVarianteIgnorada = null) => {
+    const nombreNormalizado = normalizarNombreVarianteParaComparar(nombreVariante);
+    if (!nombreNormalizado) return "";
+
+    const variantes = estadoProducto?.variantes || [];
+    const existe = variantes.some((variante) => {
+      const idVariante = Number(variante?.idVariante ?? variante?.IdVariante);
+      if (
+        idVarianteIgnorada != null &&
+        Number.isFinite(idVariante) &&
+        idVariante === Number(idVarianteIgnorada)
+      ) {
+        return false;
+      }
+
+      return normalizarNombreVarianteParaComparar(variante?.nombreVariante ?? variante?.NombreVariante) === nombreNormalizado;
+    });
+
+    return existe
+      ? `Ya existe una variante con el nombre "${String(nombreVariante).trim()}". Usa otro nombre de variante.`
+      : "";
   };
 
   const verificarCambios = (v) => {
@@ -711,12 +768,19 @@ const ModalDetalleProducto = ({
       return;
     }
 
-    if (!idProducto) {
-      setErrorEdicion("No se puede actualizar la variante sin el ID del producto.");
-      return;
+    const valoresOriginales = obtenerValoresOriginalesVariante(v);
+    const cambioNombreVariante =
+      normalizarNombreVarianteParaComparar(nombreVarianteInput) !==
+      normalizarNombreVarianteParaComparar(valoresOriginales.nombreVariante);
+    if (cambioNombreVariante) {
+      const mensajeDuplicado = getMensajeNombreVarianteDuplicado(nombreVarianteInput, idNumerico);
+      if (mensajeDuplicado) {
+        setErrorEdicion(mensajeDuplicado);
+        mostrarAviso("error", mensajeDuplicado);
+        return;
+      }
     }
 
-    const valoresOriginales = obtenerValoresOriginalesVariante(v);
     const precioVentaNormalizado = normalizarTextoNumeroEditable(precioVentaInput);
     const precioVentaMayorNormalizado = normalizarTextoNumeroEditable(precioVentaMayorInput);
     const cambioPrecioVenta = precioVentaNormalizado !== valoresOriginales.precioVenta;
@@ -838,10 +902,11 @@ const ModalDetalleProducto = ({
       if (Object.keys(payload).length === 0) {
         setCodigoSecundarioPendienteInput("");
         setEditandoId(null);
+        finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE);
         return;
       }
 
-      const respuesta = await actualizarVariante(idProducto, idNumerico, payload);
+      const respuesta = await actualizarVariante(idNumerico, payload);
       throwIfEnvelopeFailed(respuesta, "No se pudo actualizar la variante.");
 
       setEstadoProducto((prev) => {
@@ -901,11 +966,12 @@ const ModalDetalleProducto = ({
 
       setCodigoSecundarioPendienteInput("");
       setEditandoId(null);
+      finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE);
     } catch (error) {
       console.error("Error al actualizar la variante:", error);
       const message = getApiErrorMessage(error, "No se pudo actualizar la variante.");
       setErrorEdicion(message);
-      mostrarAviso("error", getApiErrorMessage(error, "No se pudo actualizar la variante. Verifique los datos."));
+      mostrarAviso("error", message);
     } finally {
       setCargando(false);
     }
@@ -927,6 +993,7 @@ const ModalDetalleProducto = ({
     const precioVentaMayorInvalido =
       precioVentaMayor !== "" &&
       (!Number.isFinite(Number(precioVentaMayor)) || Number(precioVentaMayor) < 0);
+    const codigoBarras = formNuevaVariante.codigoBarras.trim();
     let atributosValidos = true;
     if (formNuevaVariante.atributosAdicionales.trim()) {
       try {
@@ -940,6 +1007,8 @@ const ModalDetalleProducto = ({
       atributosValidos &&
       Number.isFinite(precioVenta) &&
       precioVenta > 0 &&
+      formNuevaVariante.color.trim().length <= 50 &&
+      codigoBarras.length <= 100 &&
       !stockMinimoInvalido &&
       !precioVentaMayorInvalido
     );
@@ -953,13 +1022,21 @@ const ModalDetalleProducto = ({
       return;
     }
 
+    const mensajeDuplicado = getMensajeNombreVarianteDuplicado(formNuevaVariante.nombreVariante);
+    if (mensajeDuplicado) {
+      setErrorNuevaVariante(mensajeDuplicado);
+      mostrarAviso("error", mensajeDuplicado);
+      return;
+    }
+
     try {
       setGuardandoNuevaVariante(true);
       setErrorNuevaVariante("");
 
       const atributosAdicionales = formNuevaVariante.atributosAdicionales.trim()
-        ? parsearAtributosAdicionalesDesdeTexto(formNuevaVariante.atributosAdicionales)
+        ? JSON.stringify(parsearAtributosAdicionalesDesdeTexto(formNuevaVariante.atributosAdicionales))
         : null;
+      const codigoBarras = formNuevaVariante.codigoBarras.trim();
       
       const payload = [{
         talla: formNuevaVariante.talla ? Number(formNuevaVariante.talla) : null,
@@ -970,10 +1047,12 @@ const ModalDetalleProducto = ({
         precioVenta: Number(formNuevaVariante.precioVenta),
         precioVentaMayor: formNuevaVariante.precioVentaMayor !== "" ? Number(formNuevaVariante.precioVentaMayor) : null,
         stockMinimo: formNuevaVariante.stockMinimo !== "" ? Number(formNuevaVariante.stockMinimo) : null,
-        codigosExternos: formNuevaVariante.codigoBarras ? [{ codigo: formNuevaVariante.codigoBarras, esPrincipal: true }] : []
+        permiteNegativoDefault: false,
+        codigosExternos: codigoBarras ? [{ codigo: codigoBarras, esPrincipal: true }] : []
       }];
 
-      await agregarVariantesAProducto(idProducto, payload);
+      const respuesta = await agregarVariantesAProducto(idProducto, payload);
+      throwIfEnvelopeFailed(respuesta, "No se pudo crear la variante.");
       
       cancelarNuevaVarianteForm();
       
@@ -990,9 +1069,9 @@ const ModalDetalleProducto = ({
       }
     } catch (error) {
       console.error("Error al crear variante:", error);
-      setErrorNuevaVariante(
-        getApiErrorMessage(error, "No se pudo crear la variante.")
-      );
+      const message = getApiErrorMessage(error, "No se pudo crear la variante.");
+      setErrorNuevaVariante(message);
+      mostrarAviso("error", message);
     } finally {
       setGuardandoNuevaVariante(false);
       setCargandoDetalle(false);
@@ -1000,6 +1079,9 @@ const ModalDetalleProducto = ({
   };
 
   const iniciarEdicionCabecera = async () => {
+    const pudoIniciar = iniciarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.DETALLES);
+    if (!pudoIniciar) return;
+
     setNombreCabecera(estadoProducto?.nombre || "");
     setDescripcionCabecera(estadoProducto?.descripcion || "");
     setEditandoCabecera(true);
@@ -1066,6 +1148,7 @@ const ModalDetalleProducto = ({
       await actualizarProducto(idProducto, payload);
 
       setEditandoCabecera(false);
+      finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.DETALLES);
       mostrarAviso("exito", "Detalles principales actualizados correctamente");
 
       // Recargar producto
@@ -1199,6 +1282,7 @@ const ModalDetalleProducto = ({
                     variant="ghost"
                     size="sm"
                     onClick={iniciarEdicionCabecera}
+                    disabled={detalleProductoBloqueado}
                     className="h-8 px-2 text-xs text-slate-500 hover:text-slate-900"
                   >
                     <Edit2 className="w-3.5 h-3.5 mr-1" />
@@ -1293,7 +1377,7 @@ const ModalDetalleProducto = ({
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setEditandoCabecera(false)}
+                        onClick={cancelarEdicionCabecera}
                         disabled={cargandoCabecera}
                         className="h-8 text-xs"
                       >
@@ -1363,6 +1447,7 @@ const ModalDetalleProducto = ({
                   <Button
                     size="sm"
                     onClick={handleToggleNuevaVariante}
+                    disabled={nuevaVarianteBloqueada}
                     className="h-8 px-3 text-xs bg-slate-800 hover:bg-slate-900 text-white rounded-lg"
                   >
                     {mostrandoNuevaVariante ? <X className="w-3.5 h-3.5 mr-1" /> : <PlusCircle className="w-3.5 h-3.5 mr-1" />}
@@ -1378,31 +1463,41 @@ const ModalDetalleProducto = ({
                           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-8">
                             <div className="lg:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Talla</label>
-                              <select
-                                className="w-full h-8 text-xs rounded-md border-slate-200 focus:ring-pink-500"
-                                value={formNuevaVariante.talla}
-                                onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, talla: e.target.value })}
-                                disabled={cargandoCatalogos}
-                              >
-                                <option value="">N/A</option>
-                                {tallas.map((t, index) => (
-                                  <option key={`talla-${t.idTalla ?? "sin-id"}-${index}`} value={t.idTalla}>{t.nombre}</option>
-                                ))}
-                              </select>
+                              <div className="relative">
+                                {!formNuevaVariante.talla ? (
+                                  <CircleSlash className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                                ) : null}
+                                <select
+                                  className={`w-full h-8 text-xs rounded-md border-slate-200 focus:ring-pink-500 ${!formNuevaVariante.talla ? "pl-7 text-slate-500" : ""}`.trim()}
+                                  value={formNuevaVariante.talla}
+                                  onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, talla: e.target.value })}
+                                  disabled={cargandoCatalogos}
+                                >
+                                  <option value="">N/A</option>
+                                  {tallas.map((t, index) => (
+                                    <option key={`talla-${t.idTalla ?? "sin-id"}-${index}`} value={t.idTalla}>{t.nombre}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                             <div className="lg:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Presentación</label>
-                              <select
-                                className="w-full h-8 text-xs rounded-md border-slate-200 focus:ring-pink-500"
-                                value={formNuevaVariante.presentacion}
-                                onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, presentacion: e.target.value })}
-                                disabled={cargandoCatalogos}
-                              >
-                                <option value="">N/A</option>
-                                {presentaciones.map((p, index) => (
-                                  <option key={`presentacion-${p.idPresentacion ?? "sin-id"}-${index}`} value={p.idPresentacion}>{p.nombre}</option>
-                                ))}
-                              </select>
+                              <div className="relative">
+                                {!formNuevaVariante.presentacion ? (
+                                  <CircleSlash className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                                ) : null}
+                                <select
+                                  className={`w-full h-8 text-xs rounded-md border-slate-200 focus:ring-pink-500 ${!formNuevaVariante.presentacion ? "pl-7 text-slate-500" : ""}`.trim()}
+                                  value={formNuevaVariante.presentacion}
+                                  onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, presentacion: e.target.value })}
+                                  disabled={cargandoCatalogos}
+                                >
+                                  <option value="">N/A</option>
+                                  {presentaciones.map((p, index) => (
+                                    <option key={`presentacion-${p.idPresentacion ?? "sin-id"}-${index}`} value={p.idPresentacion}>{p.nombre}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                             <div className="lg:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Color</label>
@@ -1524,102 +1619,164 @@ const ModalDetalleProducto = ({
                       return (
                         <Card key={keyVariante} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
                           <CardContent className="p-4">
-                            <div className="mb-3 min-w-0">
-                              {esModoEdicion ? (
-                                <Input
-                                  className="h-8 max-w-xl border-0 border-b border-transparent bg-transparent px-0 text-sm font-semibold text-slate-800 shadow-none focus-visible:border-slate-300 focus-visible:ring-0"
-                                  placeholder="Nombre variante"
-                                  value={nombreVarianteInput}
-                                  onChange={(e) => setNombreVarianteInput(e.target.value)}
-                                />
-                              ) : (
-                                <p
-                                  className="truncate text-sm font-semibold text-slate-800"
-                                  title={nombreVarianteMostrar || undefined}
-                                >
-                                  {nombreVarianteMostrar || "Sin nombre de variante"}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
-                              
-                              {/* SKU */}
-                              <div className="lg:col-span-1">
-                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                            <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0 flex-1">
+                                {esModoEdicion ? (
+                                  <div className="grid min-w-0 gap-1.5 md:grid-cols-2 lg:grid-cols-10">
+                                    <div className="rounded-md border border-pink-200 bg-pink-50/40 p-1.5 lg:col-span-3">
+                                      <label className="mb-0.5 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-pink-700">
+                                        <Edit2 className="h-2.5 w-2.5" />
+                                        Nombre variante
+                                      </label>
+                                      <Input
+                                        className="h-8 border-pink-200 bg-white text-xs font-semibold text-slate-800 shadow-sm focus-visible:border-pink-400 focus-visible:ring-pink-200"
+                                        placeholder="Ej. Azul talla M"
+                                        value={nombreVarianteInput}
+                                        onChange={(e) => setNombreVarianteInput(e.target.value)}
+                                      />
+                                    </div>
+                                    <div className="rounded-md border border-slate-200 bg-slate-50/70 p-1.5 lg:col-span-3">
+                                      <label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                                        Atributos
+                                      </label>
+                                      <Input
+                                        className="h-8 bg-white text-xs shadow-sm focus-visible:ring-pink-500"
+                                        placeholder="Atributos adicionales (Ej. Algodón)"
+                                        value={atributosAdicionalesInput}
+                                        onChange={(e) => setAtributosAdicionalesInput(e.target.value)}
+                                      />
+                                    </div>
+                                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/70 p-1.5 lg:col-span-2">
+                                      <label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                                        Precio venta
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        className="h-10 bg-white text-sm font-semibold focus-visible:ring-pink-500"
+                                        value={precioVentaInput}
+                                        onChange={(e) => setPrecioVentaInput(e.target.value)}
+                                      />
+                                    </div>
+                                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/70 p-1.5 lg:col-span-2">
+                                      <label
+                                        className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500"
+                                        title="Precio mayor"
+                                      >
+                                        Precio mayorista
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        className="h-10 bg-white text-sm font-semibold focus-visible:ring-pink-500"
+                                        value={precioVentaMayorInput}
+                                        onChange={(e) => setPrecioVentaMayorInput(e.target.value)}
+                                        placeholder="Mayor"
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p
+                                    className="truncate text-sm font-semibold text-slate-800"
+                                    title={nombreVarianteMostrar || undefined}
+                                  >
+                                    {nombreVarianteMostrar || "Sin nombre de variante"}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="max-w-full shrink-0 sm:max-w-48 sm:pr-2 sm:text-right">
+                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
                                   SKU Variante
                                 </p>
-                                <p className="text-xs font-mono font-semibold text-slate-700 truncate">
+                                <p className="truncate text-xs font-mono font-semibold text-slate-700" title={v.sku || undefined}>
                                   {v.sku || "Sin SKU"}
                                 </p>
                               </div>
+                            </div>
 
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
                               {/* ATRIBUTOS */}
-                              <div className="lg:col-span-2">
-                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  Atributos
-                                </p>
-                                {esModoEdicion ? (
-                                  <Input
-                                    className="h-8 text-xs focus-visible:ring-pink-500"
-                                    placeholder="Atributos adicionales (Ej. Algodón)"
-                                    value={atributosAdicionalesInput}
-                                    onChange={(e) => setAtributosAdicionalesInput(e.target.value)}
-                                  />
-                                ) : (
+                              {!esModoEdicion ? (
+                                <div className="lg:col-span-2">
+                                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                    Atributos
+                                  </p>
                                   <div className="space-y-1.5">
                                     <EtiquetasVariante variante={v} keys={["atributos"]} />
                                     {!v.atributosAdicionales ? (
                                       <p className="text-xs text-slate-500">—</p>
                                     ) : null}
                                   </div>
-                                )}
-                              </div>
+                                </div>
+                              ) : null}
 
                               {/* ESPECIFICACIONES */}
-                              <div className="lg:col-span-2">
-                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  {UBICACIONES_PRODUCTO_UI_HABILITADAS
-                                    ? "Presentación / Talla / Ubicación"
-                                    : "Presentación / Talla"}
-                                </p>
+                              <div className={esModoEdicion ? "lg:col-span-3" : "lg:col-span-2"}>
+                                {!esModoEdicion ? (
+                                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                    Presentación / Talla
+                                  </p>
+                                ) : null}
                                 {esModoEdicion ? (
-                                  <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5">
-                                    <select
-                                      className="w-full h-8 text-[11px] rounded-md border border-slate-300 bg-white p-1 shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                      value={presentacionInput}
-                                      onChange={(e) => setPresentacionInput(e.target.value)}
-                                      disabled={cargandoCatalogos}
-                                    >
-                                      <option value="">Pres. N/A</option>
-                                      {presentaciones.map((p, index) => (
-                                        <option key={`presentacion-${p.idPresentacion ?? "sin-id"}-${index}`} value={p.idPresentacion}>{p.nombre}</option>
-                                      ))}
-                                    </select>
-                                    <select
-                                      className="w-full h-8 text-[11px] rounded-md border border-slate-300 bg-white p-1 shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                      value={tallaInput}
-                                      onChange={(e) => setTallaInput(e.target.value)}
-                                      disabled={cargandoCatalogos}
-                                    >
-                                      <option value="">Talla N/A</option>
-                                      {tallas.map((t, index) => (
-                                        <option key={`talla-${t.idTalla ?? "sin-id"}-${index}`} value={t.idTalla}>{t.nombre}</option>
-                                      ))}
-                                    </select>
-                                    {UBICACIONES_PRODUCTO_UI_HABILITADAS ? (
-                                    <select
-                                      className="w-full h-8 text-[11px] rounded-md border border-slate-300 bg-white p-1 shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                      value={ubicacionInput}
-                                      onChange={(e) => setUbicacionInput(e.target.value)}
-                                      disabled={cargandoCatalogos}
-                                    >
-                                      <option value="">Ubic. N/A</option>
-                                      {ubicaciones.map((u, index) => (
-                                        <option key={`ubicacion-${u.idUbicacion ?? "sin-id"}-${index}`} value={u.idUbicacion}>{u.nombre}</option>
-                                      ))}
-                                    </select>
-                                    ) : null}
+                                  <div className="grid gap-1.5 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+                                    <div className="min-w-0 space-y-1">
+                                      <label
+                                        htmlFor={`presentacion-variante-${keyVariante}`}
+                                        className="block text-[9px] font-bold uppercase tracking-wider text-slate-500"
+                                      >
+                                        Presentación
+                                      </label>
+                                      <select
+                                        id={`presentacion-variante-${keyVariante}`}
+                                        className="h-9 w-full rounded-md border border-slate-300 bg-white p-1.5 text-xs shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        value={presentacionInput}
+                                        onChange={(e) => setPresentacionInput(e.target.value)}
+                                        disabled={cargandoCatalogos || presentaciones.length === 0}
+                                      >
+                                        {cargandoCatalogos ? (
+                                          <option value="" disabled>
+                                            Cargando...
+                                          </option>
+                                        ) : null}
+                                        {!cargandoCatalogos && !presentacionInput ? (
+                                          <option value="" disabled>
+                                            {presentaciones.length === 0 ? "Sin presentaciones" : "Selecciona presentación"}
+                                          </option>
+                                        ) : null}
+                                        {presentaciones.map((p, index) => (
+                                          <option key={`presentacion-${p.idPresentacion ?? "sin-id"}-${index}`} value={p.idPresentacion}>{p.nombre}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div className="min-w-0 space-y-1">
+                                      <label
+                                        htmlFor={`talla-variante-${keyVariante}`}
+                                        className="block text-[9px] font-bold uppercase tracking-wider text-slate-500"
+                                      >
+                                        Talla
+                                      </label>
+                                      <select
+                                        id={`talla-variante-${keyVariante}`}
+                                        className="h-9 w-full rounded-md border border-slate-300 bg-white p-1.5 text-xs shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        value={tallaInput}
+                                        onChange={(e) => setTallaInput(e.target.value)}
+                                        disabled={cargandoCatalogos || tallas.length === 0}
+                                      >
+                                        {/* <option value="">Talla N/A</option> */}
+                                        {cargandoCatalogos ? (
+                                          <option value="" disabled>
+                                            Cargando...
+                                          </option>
+                                        ) : null}
+                                        {!cargandoCatalogos && !tallaInput ? (
+                                          <option value="" disabled>
+                                            {tallas.length === 0 ? "Sin tallas" : "Selecciona talla"}
+                                          </option>
+                                        ) : null}
+                                        {tallas.map((t, index) => (
+                                          <option key={`talla-${t.idTalla ?? "sin-id"}-${index}`} value={t.idTalla}>{t.nombre}</option>
+                                        ))}
+                                      </select>
+                                    </div>
                                   </div>
                                 ) : (
                                   <div className="space-y-1.5">
@@ -1740,30 +1897,50 @@ const ModalDetalleProducto = ({
                               </div>
 
                               {/* STOCK */}
-                              <div className="lg:col-span-1">
-                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  Stock
-                                </p>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${Number(stockActual) > 0 ? 'bg-slate-100 text-slate-800' : 'bg-red-50 text-red-600'}`}>
-                                  {stockActual}
-                                </span>
+                              <div className={esModoEdicion ? "lg:col-span-2" : "lg:col-span-1"}>
                                 {esModoEdicion ? (
-                                  <div className="mt-1">
-                                    <label className="text-[9px] text-slate-400 font-medium">Mínimo</label>
-                                    <Input
-                                      type="number"
-                                      className="h-7 text-xs focus-visible:ring-pink-500 w-full"
-                                      value={stockMinimoInput}
-                                      onChange={(e) => setStockMinimoInput(e.target.value)}
-                                      placeholder="Mínimo"
-                                    />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                        Stock actual
+                                      </p>
+                                      <span className={`inline-flex text-xs font-bold px-2 py-0.5 rounded ${Number(stockActual) > 0 ? 'bg-slate-100 text-slate-800' : 'bg-red-50 text-red-600'}`}>
+                                        {stockActual}
+                                      </span>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <label
+                                        className="mb-1 block text-[10px] uppercase text-slate-400 font-bold tracking-wider"
+                                        title="Criterio para el reporte de niveles de stock"
+                                      >
+                                        Stock Mínimo
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        className="h-7 w-full text-xs focus-visible:ring-pink-500"
+                                        value={stockMinimoInput}
+                                        onChange={(e) => setStockMinimoInput(e.target.value)}
+                                        placeholder="Mínimo"
+                                      />
+                                    </div>
                                   </div>
                                 ) : (
-                                  v.stockMinimo != null && v.stockMinimo !== "" && (
-                                    <p className="text-[10px] text-slate-400 mt-1">
-                                      Mín. {Number(v.stockMinimo)}
+                                  <>
+                                    <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                      Stock actual
                                     </p>
-                                  )
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${Number(stockActual) > 0 ? 'bg-slate-100 text-slate-800' : 'bg-red-50 text-red-600'}`}>
+                                      {stockActual}
+                                    </span>
+                                    {v.stockMinimo != null && v.stockMinimo !== "" && (
+                                      <p
+                                        className="text-[10px] text-slate-400 mt-1"
+                                        title="Criterio para el reporte de niveles de stock"
+                                      >
+                                        Stock Mínimo {Number(v.stockMinimo)}
+                                      </p>
+                                    )}
+                                  </>
                                 )}
                               </div>
 
@@ -1778,52 +1955,40 @@ const ModalDetalleProducto = ({
                               </div>
 
                               {/* PRECIO DE VENTA */}
-                              <div className="lg:col-span-1">
-                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  Venta
-                                </p>
-                                {esModoEdicion ? (
-                                  <Input
-                                    type="number"
-                                    className="h-8 text-xs focus-visible:ring-pink-500"
-                                    value={precioVentaInput}
-                                    onChange={(e) => setPrecioVentaInput(e.target.value)}
-                                  />
-                                ) : (
+                              {!esModoEdicion ? (
+                                <div className="lg:col-span-1">
+                                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                    Precio venta
+                                  </p>
                                   <p className="text-xs font-extrabold text-pink-600">
                                     Q {Number(v.precioVentaActual ?? v.precioVenta ?? 0).toFixed(2)}
                                   </p>
-                                )}
-                              </div>
+                                </div>
+                              ) : null}
 
                               {/* PRECIO VENTA MAYOR */}
-                              <div className="lg:col-span-1">
-                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
-                                  P. Mayor
-                                </p>
-                                {esModoEdicion ? (
-                                  <Input
-                                    type="number"
-                                    className="h-8 text-xs focus-visible:ring-pink-500"
-                                    value={precioVentaMayorInput}
-                                    onChange={(e) => setPrecioVentaMayorInput(e.target.value)}
-                                    placeholder="Mayor"
-                                  />
-                                ) : (
+                              {!esModoEdicion ? (
+                                <div className="lg:col-span-1">
+                                  <p
+                                    className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1"
+                                    title="Precio mayorista"
+                                  >
+                                    Precio mayorista
+                                  </p>
                                   <p className="text-xs font-extrabold text-amber-600">
                                     Q {Number(v.precioVentaMayorActual ?? v.precioVentaMayor ?? 0).toFixed(2)}
                                   </p>
-                                )}
-                              </div>
+                                </div>
+                              ) : null}
 
                               {/* BOTONES ACCIÓN */}
-                              <div className="lg:col-span-2 flex justify-end">
+                              <div className={esModoEdicion ? "lg:col-span-3 flex justify-end" : "lg:col-span-1 flex justify-end"}>
                                 {esModoEdicion ? (
-                                  <div className="flex gap-1.5">
+                                  <div className="flex flex-wrap justify-end gap-1.5">
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="h-8 px-2 text-xs text-slate-500"
+                                      className="h-8 border border-slate-200 px-2 text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                                       onClick={cancelarEdicion}
                                     >
                                       Cancelar
@@ -1848,7 +2013,7 @@ const ModalDetalleProducto = ({
                                     variant="outline"
                                     className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
                                     onClick={() => iniciarEdicion(v, idActual)}
-                                    disabled={editandoId !== null || !idVarianteValido}
+                                    disabled={editarVarianteBloqueado || !idVarianteValido}
                                   >
                                     <Edit2 className="w-3 h-3 mr-1" />
                                     Editar

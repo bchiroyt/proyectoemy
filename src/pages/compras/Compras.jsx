@@ -349,7 +349,7 @@ const Compras = () => {
         <DetalleCompraDialog
           open={!!detalle}
           onOpenChange={(o) => !o && setDetalle(null)}
-          compra={detalle}
+          idCompra={detalle?.idCompra ?? null}
         />
 
         <RecibirCompraDialog

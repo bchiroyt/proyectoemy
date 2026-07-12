@@ -60,6 +60,70 @@ export function unwrapVariantesCompraBuscar(raw) {
   return unwrapList(raw).map(normalizarVarianteCompraBusqueda).filter(Boolean);
 }
 
+function normalizarTextoBusqueda(valor) {
+  return String(valor ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es-GT");
+}
+
+function valoresCodigoBarrasVariante(v) {
+  return [
+    pick(v, "codigoBarras", "CodigoBarras"),
+    pick(v, "codigoBarra", "CodigoBarra"),
+    pick(v, "codigoPrincipal", "CodigoPrincipal"),
+  ]
+    .map(normalizarCodigo)
+    .filter(Boolean);
+}
+
+function valoresCodigosExternosVariante(v) {
+  const externos = v?.codigosExternos ?? v?.CodigosExternos ?? [];
+  if (!Array.isArray(externos)) return [];
+
+  return externos
+    .map((item) => (typeof item === "string" ? item : item?.codigo ?? item?.Codigo))
+    .map(normalizarCodigo)
+    .filter(Boolean);
+}
+
+function obtenerNombreProductoVariante(v) {
+  return (
+    pick(v, "productoNombre", "ProductoNombre", "nombreProducto", "NombreProducto", "nombre", "Nombre") ??
+    ""
+  );
+}
+
+function prioridadBusquedaCompra(v, criterio) {
+  const qCodigo = normalizarCodigo(criterio);
+  const qTexto = normalizarTextoBusqueda(criterio);
+  if (!qTexto) return Number.POSITIVE_INFINITY;
+
+  if (qCodigo && valoresCodigoBarrasVariante(v).includes(qCodigo)) return 1;
+  if (qCodigo && valoresCodigosExternosVariante(v).includes(qCodigo)) return 2;
+
+  const nombreVariante = normalizarTextoBusqueda(pickNombreVariante(v));
+  if (nombreVariante && nombreVariante.includes(qTexto)) return 3;
+
+  const nombreProducto = normalizarTextoBusqueda(obtenerNombreProductoVariante(v));
+  if (nombreProducto && nombreProducto.includes(qTexto)) return 4;
+
+  return Number.POSITIVE_INFINITY;
+}
+
+export function aplicarCriteriosBusquedaCompra(items, criterio) {
+  return (items ?? [])
+    .map((item, index) => ({
+      item,
+      index,
+      prioridad: prioridadBusquedaCompra(item, criterio),
+    }))
+    .filter((x) => Number.isFinite(x.prioridad))
+    .sort((a, b) => a.prioridad - b.prioridad || a.index - b.index)
+    .map((x) => x.item);
+}
+
 const cacheVariantesPorProducto = new Map();
 
 export function invalidarCacheDetalleProductoVariantes() {
@@ -238,14 +302,13 @@ function normalizarCodigo(valor) {
   return String(valor ?? "").trim().toLowerCase();
 }
 
-function codigosConocidosVariante(v) {
-  const codigos = [v?.sku ?? v?.Sku, v?.codigoBarras ?? v?.CodigoBarras];
-  const externos = v?.codigosExternos ?? v?.CodigosExternos ?? [];
-  for (const item of externos) {
-    if (typeof item === "string") codigos.push(item);
-    else codigos.push(item?.codigo ?? item?.Codigo);
-  }
-  return codigos.map(normalizarCodigo).filter(Boolean);
+function codigosConocidosVariante(v, { incluirSku = true } = {}) {
+  const codigos = [
+    ...(incluirSku ? [v?.sku ?? v?.Sku] : []),
+    ...valoresCodigoBarrasVariante(v),
+    ...valoresCodigosExternosVariante(v),
+  ];
+  return Array.from(new Set(codigos.map(normalizarCodigo).filter(Boolean)));
 }
 
 function nombreVarianteNormalizado(v) {
@@ -255,14 +318,19 @@ function nombreVarianteNormalizado(v) {
 /**
  * Prioriza coincidencia exacta de código (lector) y, si no, un único resultado o el primero elegible.
  */
-export function elegirVariantePorCriterio(items, criterio, esElegible = varianteAjusteElegible) {
+export function elegirVariantePorCriterio(
+  items,
+  criterio,
+  esElegible = varianteAjusteElegible,
+  opciones = {}
+) {
   const q = normalizarCodigo(criterio);
   if (!q) return null;
 
   const elegibles = (items ?? []).filter(esElegible);
   if (!elegibles.length) return null;
 
-  const exacta = elegibles.find((v) => codigosConocidosVariante(v).includes(q));
+  const exacta = elegibles.find((v) => codigosConocidosVariante(v, opciones).includes(q));
   if (exacta) return exacta;
 
   if (elegibles.length === 1) return elegibles[0];
@@ -295,5 +363,5 @@ export function elegirVarianteAjustePorNombre(items, criterio) {
 }
 
 export function elegirVarianteParaAgregar(items, criterio) {
-  return elegirVariantePorCriterio(items, criterio, varianteCompraElegible);
+  return elegirVariantePorCriterio(items, criterio, varianteCompraElegible, { incluirSku: false });
 }

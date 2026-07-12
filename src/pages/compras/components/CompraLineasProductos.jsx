@@ -2,8 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, Trash2 } from "lucide-react";
-import { useVariantesBuscarQuery } from "@/hooks/queries/useComprasQueries";
+import { useVariantesCompraBuscarQuery } from "@/hooks/queries/useComprasQueries";
 import {
+  aplicarCriteriosBusquedaCompra,
   elegirVarianteParaAgregar,
   unwrapVariantesCompraBuscar,
   valorInputCantidad,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 import {
   CLASES_ETIQUETA_VARIANTE,
   obtenerEtiquetasVariante,
+  pickNombreVariante,
 } from "@/lib/varianteUtils";
 
 const fmtQ = (n) =>
@@ -60,8 +62,23 @@ function resolverStockVariante(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function nombreDisplayCompra(item) {
+  return (
+    pickNombreVariante(item) ||
+    item?.productoNombre ||
+    item?.ProductoNombre ||
+    item?.nombreProducto ||
+    item?.NombreProducto ||
+    item?.nombre ||
+    item?.Nombre ||
+    "Producto"
+  );
+}
+
 function EtiquetasVarianteCompactas({ item, className = "" }) {
-  const etiquetas = obtenerEtiquetasVariante(item);
+  const etiquetas = obtenerEtiquetasVariante(item).filter(
+    (etiqueta) => etiqueta.key !== "nombreVariante" && etiqueta.key !== "atributos"
+  );
   if (!etiquetas.length) return null;
 
   return (
@@ -86,7 +103,7 @@ function VarianteOpcion({ v, onElegir }) {
   const idVariante = v.idVariante ?? v.IdVariante;
   const disp = v.disponibleParaCompra ?? v.DisponibleParaCompra;
   const motivo = v.motivoNoDisponible ?? v.MotivoNoDisponible;
-  const nombre = v.productoNombre ?? v.ProductoNombre ?? v.nombre ?? v.Nombre ?? "";
+  const nombre = nombreDisplayCompra(v);
   const sku = v.sku ?? v.Sku ?? "";
   const stock = resolverStockVariante(v);
   const sinId = idVariante == null || Number(idVariante) <= 0;
@@ -160,7 +177,7 @@ export function CompraLineasProductos({
     return () => window.clearTimeout(t);
   }, [busqueda]);
 
-  const variantesQ = useVariantesBuscarQuery(debounced, {
+  const variantesQ = useVariantesCompraBuscarQuery(debounced, {
     enabled: debounced.length >= 1,
   });
 
@@ -259,7 +276,7 @@ export function CompraLineasProductos({
       const q = criterio.trim();
       if (!q) return [];
 
-      const cacheKey = ["productos", "variantes-buscar", q];
+      const cacheKey = ["productos", "variantes-buscar", "compra", q];
       const enCache = queryClient.getQueryData(cacheKey);
       if (Array.isArray(enCache) && enCache.length > 0) {
         return enCache;
@@ -269,7 +286,7 @@ export function CompraLineasProductos({
       if (raw && raw.exito === false) {
         throw new Error(raw.mensaje || raw.Mensaje || "Error en búsqueda");
       }
-      const items = unwrapVariantesCompraBuscar(raw);
+      const items = aplicarCriteriosBusquedaCompra(unwrapVariantesCompraBuscar(raw), q);
       queryClient.setQueryData(cacheKey, items);
       return items;
     },
@@ -405,7 +422,9 @@ export function CompraLineasProductos({
                 <TableRow key={rowKey}>
                   <TableCell className={tdClass}>
                     <div>
-                      <p className="text-xs font-medium leading-tight text-(--color-negro)">{row.nombre}</p>
+                      <p className="text-xs font-medium leading-tight text-(--color-negro)">
+                        {nombreDisplayCompra(row)}
+                      </p>
                       <EtiquetasVarianteCompactas item={row} />
                       <div className="flex flex-wrap items-center gap-x-2 text-[10px]">
                         {row.stockActual !== undefined && row.stockActual !== null ? (

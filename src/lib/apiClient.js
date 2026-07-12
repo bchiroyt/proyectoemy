@@ -62,14 +62,29 @@ export function getApiErrorMessage(err, fallback = "Error de conexión con el se
 
 function pickMessage(data) {
   if (!data || typeof data !== "object") return null;
+  const errorsMessage = pickErrorsMessage(data.errors || data.Errors || data.errores || data.Errores);
   return (
     data.mensaje ||
     data.Mensaje ||
     data.message ||
     data.Message ||
+    errorsMessage ||
     data.title ||
     data.Title ||
-    (Array.isArray(data.errors) && data.errors.join?.(", ")) ||
     null
   );
+}
+
+function pickErrorsMessage(errors) {
+  if (!errors) return null;
+  if (Array.isArray(errors)) return errors.filter(Boolean).join(", ") || null;
+  if (typeof errors === "string") return errors.trim() || null;
+  if (typeof errors !== "object") return null;
+
+  const messages = Object.values(errors)
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .filter(Boolean)
+    .map(String);
+
+  return messages.length > 0 ? messages.join(", ") : null;
 }

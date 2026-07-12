@@ -1,4 +1,4 @@
-import { pick } from "../lib/apiNormalizer";
+import { pick, throwIfEnvelopeFailed } from "../lib/apiNormalizer";
 import { apiClient } from "../lib/apiClient";
 
 const cacheImagenProducto = new Map();
@@ -60,7 +60,8 @@ export const obtenerProductoPorId = async (idProducto) => {
 export const crearProducto = async (data) => {
   const isFormData = data instanceof FormData;
   const config = isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
-  const res = await apiClient.post("/api/Productos", data, config);
+  const res = await apiClient.post("/api/productos", data, config);
+  throwIfEnvelopeFailed(res.data, "No se pudo crear el producto.");
   return res.data?.data;
 };
 
@@ -73,8 +74,9 @@ export const actualizarImagenProducto = async (idProducto, formData) => {
 };
 
 // ACTUALIZAR VARIANTE DE PRODUCTO
-export const actualizarVariante = async (idProducto, idVariante, data) => {
-  const res = await apiClient.patch(`/api/Productos/${idProducto}/variantes/${idVariante}`, data);
+export const actualizarVariante = async (idVariante, data) => {
+  const res = await apiClient.patch(`/api/productos/variantes/${idVariante}`, data);
+  throwIfEnvelopeFailed(res.data, "No se pudo actualizar la variante.");
   return res.data;
 };
 
@@ -131,7 +133,8 @@ export const completarProductosConImagen = async (productos = []) => {
 
 // AGREGAR VARIANTES A PRODUCTO EXISTENTE
 export const agregarVariantesAProducto = async (idProducto, variantes) => {
-  const res = await apiClient.patch(`/api/Productos/${idProducto}/variantes`, { variantes });
+  const res = await apiClient.post(`/api/productos/${idProducto}/variantes`, { variantes });
+  throwIfEnvelopeFailed(res.data, "No se pudo crear la variante.");
   return res.data;
 };
 

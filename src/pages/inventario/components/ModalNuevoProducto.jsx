@@ -7,11 +7,14 @@ import { obtenerMarcas, crearMarca } from "@/services/marcas";
 import { obtenerCategorias, crearCategoria } from "@/services/categorias";
 import { obtenerPresentaciones, crearPresentacion } from "@/services/presentaciones";
 import { obtenerTallas, crearTalla } from "@/services/tallas";
-import { obtenerUbicaciones, crearUbicacion } from "@/services/ubicaciones";
 
 import { crearProducto } from "@/services/productos";
-import { formatearAtributosAdicionales, parsearAtributosAdicionalesDesdeTexto } from "@/lib/varianteUtils";
-import { UBICACIONES_PRODUCTO_UI_HABILITADAS } from "@/lib/featureFlags";
+import { getApiErrorMessage } from "@/lib/apiClient";
+import {
+  normalizarNombreVarianteParaComparar,
+  parsearAtributosAdicionalesDesdeTexto,
+  tieneNombreVarianteDuplicado,
+} from "@/lib/varianteUtils";
 
 function atributosAdicionalesSonValidos(texto) {
   if (!String(texto ?? "").trim()) return true;
@@ -233,8 +236,14 @@ const VARIANTE_VACIA = {
   precioCompra: "",
   stockMinimo: "10",
   codigoBarras: "",
-  ubicacion: "",
 };
+
+const varianteTieneCambios = (variante) =>
+  Object.keys(VARIANTE_VACIA).some((campo) => {
+    const valorActual = String(variante?.[campo] ?? "").trim();
+    const valorInicial = String(VARIANTE_VACIA[campo] ?? "").trim();
+    return valorActual !== valorInicial;
+  });
 
 const formatFileSize = (bytes) => {
   const size = Number(bytes ?? 0);
@@ -262,14 +271,12 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [marcas, setMarcas] = useState([]);
   const [presentaciones, setPresentaciones] = useState([]);
   const [tallas, setTallas] = useState([]);
-  const [ubicaciones, setUbicaciones] = useState([]);
   const [variantes, setVariantes] = useState([{ ...VARIANTE_VACIA }]);
 
   const [openMarcaModal, setOpenMarcaModal] = useState(false);
   const [openCategoriaModal, setOpenCategoriaModal] = useState(false);
   const [openPresentacionModal, setOpenPresentacionModal] = useState(false);
   const [openTallaModal, setOpenTallaModal] = useState(false);
-  const [openUbicacionModal, setOpenUbicacionModal] = useState(false);
   const [activeVariantIndex, setActiveVariantIndex] = useState(null);
 
   const mostrarAviso = (tipo, mensaje) => {
@@ -317,23 +324,11 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     }
   };
 
-  const cargarUbicaciones = async () => {
-    try {
-      const data = await obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 });
-      setUbicaciones(data?.items || []);
-    } catch (error) {
-      console.error("Error al cargar ubicaciones:", error);
-    }
-  };
-
   const formularioTieneDatos = () => {
-    if (nombre.trim() || descripcion.trim() || categoriaSeleccionada || marcaSeleccionada) {
+    if (nombre.trim() || descripcion.trim() || imagen || categoriaSeleccionada || marcaSeleccionada) {
       return true;
     }
-    const algunaVarianteModificada = variantes.some((v) =>
-      v.talla || v.presentacion || v.color.trim() || v.nombreVariante.trim() || v.atributosAdicionales.trim() || v.precioVenta || v.precioCompra || v.stockMinimo || v.codigoBarras || v.ubicacion
-    );
-    return algunaVarianteModificada || variantes.length > 1;
+    return variantes.length !== 1 || variantes.some(varianteTieneCambios);
   };
 
   const handleIntentoCierre = () => {
@@ -377,6 +372,22 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     return tieneVariantesInvalidas;
   };
 
+  const getMensajeNombreVarianteDuplicado = () => {
+    if (!tieneNombreVarianteDuplicado(variantes)) return "";
+    const nombres = new Set();
+    const duplicada = variantes.find((variante) => {
+      const nombre = normalizarNombreVarianteParaComparar(variante.nombreVariante);
+      if (!nombre) return false;
+      if (nombres.has(nombre)) return true;
+      nombres.add(nombre);
+      return false;
+    });
+    const nombreMostrar = duplicada?.nombreVariante?.trim();
+    return nombreMostrar
+      ? `Ya existe una variante con el nombre "${nombreMostrar}". Usa otro nombre de variante.`
+      : "No se permiten variantes con el mismo nombre. Usa nombres de variante diferentes.";
+  };
+
   const handleAgregarVariante = () => {
     const primeraVariante = variantes[0];
     if (primeraVariante) {
@@ -389,7 +400,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
           precioVenta: primeraVariante.precioVenta,
           precioCompra: primeraVariante.precioCompra,
           stockMinimo: primeraVariante.stockMinimo,
-          ubicacion: primeraVariante.ubicacion,
           precioVentaMayor: primeraVariante.precioVentaMayor,
           color: "",
           codigoBarras: "",
@@ -423,7 +433,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     setMarcas([]);
     setPresentaciones([]);
     setTallas([]);
-    setUbicaciones([]);
     setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
     setOpenConfirmarSalida(false);
     setVariantes([{ ...VARIANTE_VACIA }]);
@@ -436,6 +445,12 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
   const handleRegistrar = async () => {
     if (formularioInvalido()) return;
+    const mensajeDuplicado = getMensajeNombreVarianteDuplicado();
+    if (mensajeDuplicado) {
+      mostrarAviso("error", mensajeDuplicado);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -465,7 +480,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         if (v.precioVentaMayor) formData.append(`Variantes[${index}].precioVentaMayor`, Number(v.precioVentaMayor));
         if (v.precioCompra) formData.append(`Variantes[${index}].precioCompra`, Number(v.precioCompra));
         if (v.stockMinimo !== "") formData.append(`Variantes[${index}].stockMinimo`, Number(v.stockMinimo));
-        if (v.ubicacion) formData.append(`Variantes[${index}].idUbicacionDefault`, Number(v.ubicacion));
         
         if (v.codigoBarras) {
           formData.append(`Variantes[${index}].codigosExternos[0].codigo`, v.codigoBarras);
@@ -483,7 +497,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
     } catch (error) {
       console.error(error);
-      const msgError = error?.response?.data?.mensaje || "Error interno al intentar crear el producto.";
+      const msgError = getApiErrorMessage(error, "Error interno al intentar crear el producto.");
       mostrarAviso("error", msgError);
     } finally {
       setLoading(false);
@@ -769,7 +783,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                           />
                         </div>
 
-                        <div className={`space-y-1 ${UBICACIONES_PRODUCTO_UI_HABILITADAS ? "" : "md:col-span-2"}`}>
+                        <div className="space-y-1 md:col-span-2">
                           <label className="text-xs font-semibold text-gray-600 block">Atributos adicionales</label>
                           <input
                             value={v.atributosAdicionales}
@@ -778,26 +792,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
                           />
                         </div>
-
-                        {UBICACIONES_PRODUCTO_UI_HABILITADAS ? (
-                        <div className="space-y-1 relative">
-                          <label className="text-xs font-semibold text-gray-600 block">Ubicación</label>
-                          <BuscadorCombo
-                            placeholder="Seleccionar ubicación..."
-                            value={v.ubicacion}
-                            onChange={(val) => handleCambioVariante(index, "ubicacion", val)}
-                            items={ubicaciones}
-                            idField="idUbicacion"
-                            nameField="nombre"
-                            onLoadData={cargarUbicaciones}
-                            onAddNew={() => {
-                              setActiveVariantIndex(index);
-                              setOpenUbicacionModal(true);
-                            }}
-                            limit={3}
-                          />
-                        </div>
-                        ) : null}
                       </div>
                     </div>
                   );
@@ -975,40 +969,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         nombrePlaceholder="Nombre (Ej: M, L, XL)"
       />
 
-      {UBICACIONES_PRODUCTO_UI_HABILITADAS ? (
-      <ModalCatalogoInventario
-        open={openUbicacionModal}
-        onClose={() => setOpenUbicacionModal(false)}
-        onSave={async (form) => {
-          try {
-            const payload = {
-              nombre: form.nombre,
-              descripcion: form.descripcion,
-              activo: form.activo,
-            };
-            const respuestaApi = await crearUbicacion(payload);
-            const dataReal = respuestaApi?.data || respuestaApi;
-            const idFinal = dataReal?.idUbicacion || dataReal?.id;
-            const res = await obtenerUbicaciones({ Activo: true, Page: 1, PageSize: 500 });
-            const listaActualizada = res?.items || [];
-            setUbicaciones(listaActualizada);
-            if (idFinal) {
-              const deLista = listaActualizada.find(u => Number(u.idUbicacion) === Number(idFinal));
-              if (deLista && activeVariantIndex !== null) {
-                const nuevasVariantes = [...variantes];
-                nuevasVariantes[activeVariantIndex].ubicacion = idFinal;
-                setVariantes(nuevasVariantes);
-              }
-            }
-          } catch (error) {
-            console.error("Error al guardar ubicación:", error);
-          } finally {
-            setOpenUbicacionModal(false);
-          }
-        }}
-        tituloNuevo="Nueva Ubicación"
-      />
-      ) : null}
     </div>
   );
 };
