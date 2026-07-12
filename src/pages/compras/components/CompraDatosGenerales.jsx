@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CreditCard } from "lucide-react";
+import { NuevoProveedorDialog } from "@/pages/compras/components/NuevoProveedorDialog";
 
 const controlClass = "h-7 min-h-7 bg-(--color-gris-claro-2) text-xs shadow-none";
 
@@ -195,6 +196,7 @@ export function CompraDatosGenerales({
   onProveedorChange,
   proveedores,
   proveedoresLoading,
+  onProveedorCreado,
   fechaPedido,
   onFechaPedidoChange,
   documentoRef,
@@ -209,6 +211,7 @@ export function CompraDatosGenerales({
   disabled = false,
 }) {
   const fechaMinimaVencimiento = addDaysToDateString(fechaPedido, 1);
+  const [nuevoProveedorAbierto, setNuevoProveedorAbierto] = useState(false);
 
   return (
     <section
@@ -277,16 +280,30 @@ export function CompraDatosGenerales({
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 lg:flex-nowrap">
           <Campo label="Proveedor" className="w-full sm:w-auto sm:min-w-[11rem] lg:min-w-[12rem] lg:flex-[1.35]">
-            {proveedoresLoading ? (
-              <div className={cn(controlClass, "w-full animate-pulse rounded-md")} />
-            ) : (
-              <ProveedorBuscador
-                value={proveedor}
-                onChange={onProveedorChange}
-                proveedores={proveedores}
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="min-w-0 flex-1">
+                {proveedoresLoading ? (
+                  <div className={cn(controlClass, "w-full animate-pulse rounded-md")} />
+                ) : (
+                  <ProveedorBuscador
+                    value={proveedor}
+                    onChange={onProveedorChange}
+                    proveedores={proveedores}
+                    disabled={disabled}
+                  />
+                )}
+              </div>
+              <button
+                type="button"
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-(--color-pagina-2) text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => setNuevoProveedorAbierto(true)}
                 disabled={disabled}
-              />
-            )}
+                aria-label="Crear proveedor"
+                title="Crear proveedor"
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
           </Campo>
 
           <Campo label="Fecha" className="w-full sm:w-auto sm:min-w-[9.5rem]">
@@ -324,6 +341,13 @@ export function CompraDatosGenerales({
           </Campo>
         </div>
       </div>
+      {nuevoProveedorAbierto ? (
+        <NuevoProveedorDialog
+          onClose={() => setNuevoProveedorAbierto(false)}
+          onCreated={onProveedorCreado}
+        />
+      ) : null}
+
     </section>
   );
 }

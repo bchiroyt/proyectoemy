@@ -238,6 +238,13 @@ const VARIANTE_VACIA = {
   codigoBarras: "",
 };
 
+const varianteTieneCambios = (variante) =>
+  Object.keys(VARIANTE_VACIA).some((campo) => {
+    const valorActual = String(variante?.[campo] ?? "").trim();
+    const valorInicial = String(VARIANTE_VACIA[campo] ?? "").trim();
+    return valorActual !== valorInicial;
+  });
+
 const formatFileSize = (bytes) => {
   const size = Number(bytes ?? 0);
   if (!Number.isFinite(size) || size <= 0) return "0 KB";
@@ -318,13 +325,10 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   };
 
   const formularioTieneDatos = () => {
-    if (nombre.trim() || descripcion.trim() || categoriaSeleccionada || marcaSeleccionada) {
+    if (nombre.trim() || descripcion.trim() || imagen || categoriaSeleccionada || marcaSeleccionada) {
       return true;
     }
-    const algunaVarianteModificada = variantes.some((v) =>
-      v.talla || v.presentacion || v.color.trim() || v.nombreVariante.trim() || v.atributosAdicionales.trim() || v.precioVenta || v.precioCompra || v.stockMinimo || v.codigoBarras
-    );
-    return algunaVarianteModificada || variantes.length > 1;
+    return variantes.length !== 1 || variantes.some(varianteTieneCambios);
   };
 
   const handleIntentoCierre = () => {

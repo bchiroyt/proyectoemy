@@ -131,7 +131,7 @@ export const generarInformeNivelStockPdf = async ({ fecha, items }) => {
 };
 
 export const generarDetalleCompraPdf = async (compra) => {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginX = 14;
 
@@ -169,7 +169,9 @@ export const generarDetalleCompraPdf = async (compra) => {
   doc.setTextColor(...GRAY_TEXT);
   doc.text(`Compra #${compra.id} - ${compra.estado}`, pageWidth - marginX, 23, { align: "right" });
 
-  const fechaFormat = compra.fechaPedido ? new Date(compra.fechaPedido + "T12:00:00").toLocaleDateString("es-GT") : "N/A";
+  const fechaFormat = compra.fechaPedido
+    ? new Date(String(compra.fechaPedido).slice(0, 10) + "T12:00:00").toLocaleDateString("es-GT")
+    : "N/A";
   doc.text(`Fecha: ${fechaFormat}`, pageWidth - marginX, 28, { align: "right" });
 
   doc.setDrawColor(...SIDEBAR_COLOR);
@@ -196,28 +198,44 @@ export const generarDetalleCompraPdf = async (compra) => {
 
   const esRecibida = compra.estado === "Recibido";
 
+  const filasDetalle = compra.items.map((item) => {
+    const producto = [item.productoVariante, item.detalleColorTalla]
+      .filter(Boolean)
+      .join("\n") || "\u2014";
+    const atributos = [
+      item.presentacion ? "Presentaci\u00f3n: " + item.presentacion : null,
+      item.atributosAdicionales ? "Atributos: " + item.atributosAdicionales : null,
+    ]
+      .filter(Boolean)
+      .join("\n") || "\u2014";
+
+    return [
+      producto,
+      atributos,
+      item.codigo || "\u2014",
+      String(item.cantidad ?? 0),
+      fmtQ(item.precioUnitario),
+      item.precioFinal == null ? "\u2014" : fmtQ(item.precioFinal),
+      fmtQ(item.total ?? (item.cantidad * (item.precioFinal ?? item.precioUnitario))),
+    ];
+  });
+
   autoTable(doc, {
     startY: 60,
     margin: { left: marginX, right: marginX },
     head: [[
-      "DESCRIPCIÓN",
-      "VARIANTE",
-      "SKU",
+      "PRODUCTO / VARIANTE",
+      "ATRIBUTOS",
+      "CÓDIGO",
       "CANTIDAD",
-      "PRECIO U.",
+      "P. UNIT.",
+      "FINAL",
       "TOTAL"
     ]],
-    body: compra.items.map((item) => [
-      item.descripcion || "—",
-      [item.color, item.talla].filter(Boolean).join(" / ") || "—",
-      item.sku || "—",
-      item.cantidad?.toString() || "0",
-      fmtQ(item.precioUnitario),
-      fmtQ(item.totalLinea ?? (item.cantidad * item.precioUnitario))
-    ]),
+    body: filasDetalle,
     styles: {
       font: "helvetica",
-      fontSize: 8,
+      fontSize: 7.5,
       cellPadding: 2,
       textColor: [31, 41, 55],
     },
@@ -230,15 +248,19 @@ export const generarDetalleCompraPdf = async (compra) => {
       fillColor: [249, 250, 251],
     },
     columnStyles: {
-      3: { halign: "right" },
-      4: { halign: "right" },
-      5: { halign: "right" },
+      0: { cellWidth: 52 },
+      1: { cellWidth: 62 },
+      2: { cellWidth: 32 },
+      3: { cellWidth: 20, halign: "right" },
+      4: { cellWidth: 25, halign: "right" },
+      5: { cellWidth: 25, halign: "right" },
+      6: { cellWidth: 28, halign: "right" },
     },
   });
 
   const finalY = doc.lastAutoTable.finalY || 60;
   
-  const subtotal = compra.items.reduce((acc, it) => acc + (it.totalLinea ?? (it.cantidad * it.precioUnitario)), 0);
+  const subtotal = compra.items.reduce((acc, it) => acc + (it.total ?? (it.cantidad * (it.precioFinal ?? it.precioUnitario))), 0);
   const total = esRecibida && Number(compra.total) > 0 ? Number(compra.total) : subtotal;
 
   doc.setFont("helvetica", "bold");

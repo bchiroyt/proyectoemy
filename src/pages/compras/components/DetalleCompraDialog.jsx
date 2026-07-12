@@ -2,10 +2,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarDays, Store, FileText, Printer, Download, X } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CalendarDays, Store, FileText, Download, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generarDetalleCompraPdf } from "@/lib/pdfExport";
-import { useState } from "react";
+import { getApiErrorMessage } from "@/lib/apiClient";
+import { mapCompraApiToListRow } from "@/lib/comprasMappers";
+import { useCompraDetalleQuery } from "@/hooks/queries/useComprasQueries";
+import { normalizarAtributosAdicionales } from "@/lib/varianteUtils";
+import { useMemo, useState } from "react";
 
 const fmtQ = (n) =>
   new Intl.NumberFormat("es-GT", {
@@ -32,8 +37,133 @@ const estadoBadge = (estado) => {
     return cn(base, "bg-pink-100 text-pink-700");
   return cn(base, "bg-slate-100 text-slate-600");
 };
+const truncarTexto = (valor, maximo = 18) => {
+  const texto = String(valor ?? "").trim();
+  if (texto.length <= maximo) return texto;
+  return texto.slice(0, Math.max(1, maximo - 1)).trimEnd() + "\u2026";
+};
 
-const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
+function mapLineaDetalle(d, estadoCompra) {
+  const esRecibida = String(estadoCompra ?? "").toUpperCase() === "CERRADA";
+  const producto = d.productoNombre ?? d.ProductoNombre ?? "";
+  const nombreVariante = d.nombreVariante ?? d.NombreVariante ?? "";
+  const color = d.color ?? d.Color ?? "";
+  const talla = d.tallaNombre ?? d.TallaNombre ?? "";
+  const presentacion = d.presentacionNombre ?? d.PresentacionNombre ?? "";
+  const material = d.material ?? d.Material ?? d.materialNombre ?? d.MaterialNombre ?? "";
+  const genero = d.genero ?? d.Genero ?? d.generoNombre ?? d.GeneroNombre ?? "";
+  const sku = d.sku ?? d.Sku ?? "";
+  const codigo =
+    sku ||
+    d.codigoPrincipal ||
+    d.CodigoPrincipal ||
+    d.codigoBarras ||
+    d.CodigoBarras ||
+    d.codigo ||
+    d.Codigo ||
+    "";
+
+  const solicitada = Number(d.cantidadSolicitada ?? d.CantidadSolicitada ?? 0);
+  const recibida = Number(d.cantidadRecibida ?? d.CantidadRecibida ?? 0);
+  const precioUnitario = Number(d.costoEstimado ?? d.CostoEstimado ?? 0);
+  const costoReal = Number(d.costoReal ?? d.CostoReal ?? 0);
+  const cantidad = esRecibida && recibida > 0 ? recibida : solicitada;
+  const precioFinal = esRecibida && costoReal > 0 ? costoReal : null;
+  const subtotalApi = Number(d.subtotal ?? d.Subtotal ?? 0);
+  const total = subtotalApi > 0 ? subtotalApi : cantidad * (precioFinal ?? precioUnitario);
+
+  const productoVariante =
+    String(nombreVariante || producto).trim() || "\u2014";
+  const detalleColorTalla = [
+    color ? "Color: " + String(color).trim() : null,
+    talla ? "Talla: " + String(talla).trim() : null,
+  ]
+    .filter(Boolean)
+    .join(" \u00b7 ");
+
+  const atributosAdicionalesPartes = [];
+  const claves = new Set();
+  const agregar = (etiqueta, valor) => {
+    if (valor == null || typeof valor === "object") return;
+    const texto = String(valor).trim();
+    if (!texto) return;
+    const clave = etiqueta.toLocaleLowerCase("es-GT");
+    if (claves.has(clave)) return;
+    claves.add(clave);
+    atributosAdicionalesPartes.push(etiqueta + ": " + texto);
+  };
+
+  agregar("Material", material);
+  agregar("G\u00e9nero", genero);
+
+  const atributosRaw =
+    d.atributosAdicionales ??
+    d.AtributosAdicionales ??
+    d.atributos ??
+    d.Atributos;
+  const adicionales = normalizarAtributosAdicionales(atributosRaw);
+  if (adicionales) {
+    Object.entries(adicionales).forEach(([clave, valor]) => {
+      const etiqueta =
+        clave.toLocaleLowerCase("es-GT") === "genero"
+          ? "G\u00e9nero"
+          : clave.charAt(0).toLocaleUpperCase("es-GT") + clave.slice(1);
+      agregar(etiqueta, valor);
+    });
+  }
+
+  if (!adicionales && typeof atributosRaw === "string") {
+    const texto = atributosRaw.trim();
+    if (texto) atributosAdicionalesPartes.push(texto);
+  }
+
+  const atributosAdicionales = atributosAdicionalesPartes.join(" \u00b7 ");
+  const atributosAdicionalesCorto = truncarTexto(atributosAdicionales);
+
+  return {
+    id: d.idDetalleCompra ?? d.IdDetalleCompra ?? d.idVariante ?? d.IdVariante,
+    productoVariante,
+    detalleColorTalla: detalleColorTalla || null,
+    presentacion: String(presentacion).trim() || null,
+    atributosAdicionales: atributosAdicionales || null,
+    atributosAdicionalesCorto: atributosAdicionalesCorto || null,
+    codigo: codigo || "\u2014",
+    cantidad,
+    precioUnitario,
+    precioFinal,
+    total,
+  };
+}
+
+const DetalleCompraDialog = ({ open, onOpenChange, idCompra }) => {
+  const compraQ = useCompraDetalleQuery(idCompra, {
+    enabled: open && Number(idCompra) > 0,
+  });
+  const compraDetalle = useMemo(
+    () => (compraQ.data ? mapCompraApiToListRow(compraQ.data) : null),
+    [compraQ.data]
+  );
+  const cargando = compraQ.isLoading || (!compraQ.data && compraQ.isFetching);
+  const compra = compraDetalle ?? {
+    id: idCompra ?? "?",
+    estado: "Cargando",
+    items: [],
+    proveedor: { nombre: "" },
+    total: 0,
+  };
+  const itemsTabla = useMemo(() => {
+    const data = compraQ.data;
+    const detalles = data?.detalles ?? data?.Detalles ?? [];
+    const estado = data?.estadoCompra ?? data?.EstadoCompra;
+    return Array.isArray(detalles)
+      ? detalles.map((detalle) => mapLineaDetalle(detalle, estado))
+      : [];
+  }, [compraQ.data]);
+  const compraParaPdf = useMemo(
+    () => (compraDetalle ? { ...compraDetalle, items: itemsTabla } : null),
+    [compraDetalle, itemsTabla]
+  );
+
   const [generandoPdf, setGenerandoPdf] = useState(false);
 
   if (!compra) return null;
@@ -103,7 +233,18 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
-          {compra.items.length === 0 ? (
+          {cargando ? (
+            <div className="space-y-2 rounded-xl border border-slate-100 p-4" aria-label="Cargando detalle de compra">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : compraQ.isError ? (
+            <div className="rounded-lg border border-destructive/30 p-4 text-sm text-(--color-rojo)">
+              {getApiErrorMessage(compraQ.error, "No se pudo cargar el detalle de la compra.")}
+            </div>
+          ) : itemsTabla.length === 0 ? (
             <p className="text-sm text-slate-500 py-8 text-center">
               No hay líneas de detalle para esta compra.
             </p>
@@ -112,49 +253,69 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50 hover:bg-slate-50">
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600">
+                    <TableHead className="min-w-[240px] text-[0px] uppercase font-bold text-slate-600"><span className="text-[10px]">Producto / variante</span>
                       Descripción
                     </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600">
+                    <TableHead className="min-w-[320px] text-[0px] uppercase font-bold text-slate-600"><span className="text-[10px]">Atributos</span>
                       Color
                     </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600">
+                    <TableHead className="min-w-[110px] text-[0px] uppercase font-bold text-slate-600"><span className="text-[10px]">{"C\u00f3digo"}</span>
                       Talla
                     </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600">
+                    <TableHead className="text-right text-[0px] uppercase font-bold text-slate-600"><span className="text-[10px]">Cantidad</span>
                       SKU
                     </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600">
+                    <TableHead className="text-right text-[0px] uppercase font-bold text-slate-600"><span className="text-[10px]">P. unit.</span>
                       Código
                     </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600 text-right">
+                    <TableHead className="text-right text-[0px] uppercase font-bold text-slate-600"><span className="text-[10px]">Final</span>
                       Cant.
                     </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600 text-right">
+                    <TableHead className="text-right text-[0px] uppercase font-bold text-slate-600"><span className="text-[10px]">Total</span>
                       {esRecibida ? "P. unit. final" : "P. unit. est."}
                     </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-slate-600 text-right">
+                    <TableHead className="hidden text-[10px] uppercase font-bold text-slate-600 text-right">
                       Total
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {compra.items.map((row, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium text-slate-800">
-                        {row.descripcion}
+                  {itemsTabla.map((row, i) => (
+                    <TableRow key={row.id ?? i}>
+                      <TableCell>
+                        <p className="font-medium text-slate-800">
+                          {row.productoVariante}
+                        </p>
+                        {row.detalleColorTalla ? (
+                          <p className="mt-0.5 text-xs font-normal text-slate-500">
+                            {row.detalleColorTalla}
+                          </p>
+                        ) : null}
                       </TableCell>
-                      <TableCell>{row.color}</TableCell>
-                      <TableCell>{row.talla}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.sku}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {row.codigoBarras}
+                      <TableCell className="text-xs leading-relaxed text-slate-600" title={row.atributosAdicionales ?? undefined}>
+                        <div className="flex flex-col gap-0.5">
+                          {row.presentacion ? (
+                            <span>{"Presentaci\u00f3n: "}{row.presentacion}</span>
+                          ) : null}
+                          {row.atributosAdicionales ? (
+                            <span title={row.atributosAdicionales}>
+                              {"Atributos: "}{row.atributosAdicionalesCorto}
+                            </span>
+                          ) : null}
+                          {!row.presentacion && !row.atributosAdicionales ? (
+                            <span className="text-slate-400">{"\u2014"}</span>
+                          ) : null}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right">{row.cantidad}</TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="font-mono text-xs">{row.codigo}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.cantidad}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmtQ(row.precioUnitario)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.precioFinal == null ? "\u2014" : fmtQ(row.precioFinal)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">{fmtQ(row.total)}</TableCell>
+                      <TableCell className="hidden text-right tabular-nums">
                         {fmtQ(row.precioUnitario)}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
+                      <TableCell className="hidden text-right tabular-nums font-medium">
                         {fmtQ(row.totalLinea ?? row.cantidad * row.precioUnitario)}
                       </TableCell>
                     </TableRow>
@@ -194,6 +355,7 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
 
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/80 shrink-0">
           <div className="flex flex-wrap gap-2">
+            {!cargando && compraParaPdf ? (
             <Button
               size="sm"
               className="gap-1.5 bg-(--color-pagina) hover:bg-(--color-borde-button) text-white"
@@ -202,7 +364,7 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
               onClick={async () => {
                 try {
                   setGenerandoPdf(true);
-                  await generarDetalleCompraPdf(compra);
+                  await generarDetalleCompraPdf(compraParaPdf);
                 } catch (e) {
                   console.error(e);
                 } finally {
@@ -213,6 +375,7 @@ const DetalleCompraDialog = ({ open, onOpenChange, compra }) => {
               <Download className="size-4" />
               {generandoPdf ? "Generando..." : "Descargar PDF"}
             </Button>
+            ) : null}
           </div>
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             Cerrar
