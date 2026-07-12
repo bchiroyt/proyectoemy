@@ -45,6 +45,127 @@ export function tieneNombreVarianteDuplicado(variantes = [], options = {}) {
   return false;
 }
 
+const CAMPOS_DIFERENCIALES_VARIANTE = [
+  { key: "presentacion", label: "presentacion" },
+  { key: "talla", label: "talla" },
+  { key: "color", label: "color" },
+  { key: "atributos", label: "atributos" },
+];
+
+function unirListaNatural(items = [], conector = "y") {
+  if (items.length <= 1) return items[0] || "";
+  if (items.length === 2) return `${items[0]} y ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} ${conector} ${items[items.length - 1]}`;
+}
+
+function normalizarTextoComparacion(valor) {
+  return quitarAcentosDeVocales(String(valor ?? "").trim()).toLocaleLowerCase("es-GT");
+}
+
+function normalizarTextoCampoVariante(valor) {
+  const texto = String(valor ?? "").trim();
+  return texto && texto.toUpperCase() !== "N/A" ? texto : "";
+}
+
+function normalizarValorAtributosComparacion(variante) {
+  const valor = variante?.atributosAdicionales ?? variante?.AtributosAdicionales;
+  if (valor == null) return "";
+
+  if (typeof valor === "string") {
+    const texto = valor.trim();
+    if (!texto) return "";
+    const parsed = parsearAtributosDesdeString(texto);
+    return normalizarTextoComparacion(
+      parsed ? formatearAtributosAdicionales(parsed) : texto
+    );
+  }
+
+  if (typeof valor === "object" && !Array.isArray(valor)) {
+    return normalizarTextoComparacion(formatearAtributosAdicionales(valor));
+  }
+
+  return "";
+}
+
+function obtenerCamposDiferencialesUsados(variante) {
+  const valores = {
+    presentacion: normalizarTextoComparacion(
+      normalizarTextoCampoVariante(
+        variante?.presentacion ??
+          variante?.Presentacion ??
+          variante?.idPresentacion ??
+          variante?.IdPresentacion ??
+          variante?.presentacionNombre ??
+          variante?.PresentacionNombre
+      )
+    ),
+    talla: normalizarTextoComparacion(
+      normalizarTextoCampoVariante(
+        variante?.talla ??
+          variante?.Talla ??
+          variante?.idTalla ??
+          variante?.IdTalla ??
+          variante?.tallaNombre ??
+          variante?.TallaNombre
+      )
+    ),
+    color: normalizarTextoComparacion(normalizarTextoCampoVariante(variante?.color ?? variante?.Color)),
+    atributos: normalizarValorAtributosComparacion(variante),
+  };
+
+  return CAMPOS_DIFERENCIALES_VARIANTE
+    .filter((campo) => valores[campo.key])
+    .map((campo) => ({ ...campo, value: valores[campo.key] }));
+}
+
+function mismaCombinacionDiferenciales(a, b) {
+  const camposA = obtenerCamposDiferencialesUsados(a);
+  const camposB = obtenerCamposDiferencialesUsados(b);
+  if (camposA.length === 0 || camposA.length !== camposB.length) return false;
+
+  return camposA.every((campoA) => {
+    const campoB = camposB.find((campo) => campo.key === campoA.key);
+    return campoB?.value === campoA.value;
+  });
+}
+
+export function getMensajeCombinacionVarianteDuplicada(
+  varianteObjetivo,
+  variantes = [],
+  options = {}
+) {
+  const ignorarIdVariante = options.ignorarIdVariante != null ? Number(options.ignorarIdVariante) : null;
+  const duplicada = (variantes || []).find((variante) => {
+    if (variante === varianteObjetivo) return false;
+
+    const idVariante = Number(variante?.idVariante ?? variante?.IdVariante);
+    if (
+      ignorarIdVariante != null &&
+      Number.isFinite(idVariante) &&
+      idVariante === ignorarIdVariante
+    ) {
+      return false;
+    }
+
+    return mismaCombinacionDiferenciales(varianteObjetivo, variante);
+  });
+
+  if (!duplicada) return "";
+
+  const camposRepetidos = obtenerCamposDiferencialesUsados(varianteObjetivo);
+  const labelsRepetidos = camposRepetidos.map((campo) => campo.label);
+  const labelsSugeridos = CAMPOS_DIFERENCIALES_VARIANTE
+    .filter((campo) => !camposRepetidos.some((repetido) => repetido.key === campo.key))
+    .map((campo) => campo.label);
+
+  const combinacion = unirListaNatural(labelsRepetidos);
+  const sugerencias = labelsSugeridos.length
+    ? ` Debe agregar un diferencial como: ${unirListaNatural(labelsSugeridos, "o")}.`
+    : " Debe cambiar al menos uno de los diferenciales de la variante.";
+
+  return `Ya existe una variante con la misma combinacion de ${combinacion}.${sugerencias}`;
+}
+
 /** Normaliza atributosAdicionales desde API (objeto o string JSON). */
 const CLAVES_ENTIDAD_ATRIBUTOS = new Set([
   "id",

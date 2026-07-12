@@ -47,6 +47,7 @@ import {
 import {
   atributosAdicionalesATexto,
   CLASES_ETIQUETA_VARIANTE,
+  getMensajeCombinacionVarianteDuplicada,
   normalizarNombreVarianteParaComparar,
   obtenerEtiquetasVariante,
   parsearAtributosAdicionalesDesdeTexto,
@@ -735,6 +736,25 @@ const ModalDetalleProducto = ({
       : "";
   };
 
+  const getMensajeCombinacionDuplicadaDetalle = (varianteObjetivo, idVarianteIgnorada = null) =>
+    getMensajeCombinacionVarianteDuplicada(varianteObjetivo, estadoProducto?.variantes || [], {
+      ignorarIdVariante: idVarianteIgnorada,
+    });
+
+  const buildVarianteEdicionCandidata = () => ({
+    presentacion: presentacionInput,
+    talla: tallaInput,
+    color: colorInput,
+    atributosAdicionales: atributosAdicionalesInput,
+  });
+
+  const buildNuevaVarianteCandidata = () => ({
+    presentacion: formNuevaVariante.presentacion,
+    talla: formNuevaVariante.talla,
+    color: formNuevaVariante.color,
+    atributosAdicionales: formNuevaVariante.atributosAdicionales,
+  });
+
   const verificarCambios = (v) => {
     const valoresOriginales = obtenerValoresOriginalesVariante(v);
     const precioVentaNormalizado = normalizarTextoNumeroEditable(precioVentaInput);
@@ -822,6 +842,23 @@ const ModalDetalleProducto = ({
           : null;
       } catch (error) {
         setErrorEdicion(error.message || "Los atributos adicionales no son un JSON válido.");
+        return;
+      }
+    }
+
+    const cambioDiferenciales =
+      presentacionInput !== valoresOriginales.presentacion ||
+      tallaInput !== valoresOriginales.talla ||
+      colorInput !== valoresOriginales.color ||
+      atributosAdicionalesInput !== valoresOriginales.atributosAdicionales;
+    if (cambioDiferenciales) {
+      const mensajeCombinacionDuplicada = getMensajeCombinacionDuplicadaDetalle(
+        buildVarianteEdicionCandidata(),
+        idNumerico
+      );
+      if (mensajeCombinacionDuplicada) {
+        setErrorEdicion(mensajeCombinacionDuplicada);
+        mostrarAviso("error", mensajeCombinacionDuplicada);
         return;
       }
     }
@@ -969,7 +1006,10 @@ const ModalDetalleProducto = ({
       finalizarModoEdicion(MODOS_EDICION_DETALLE_PRODUCTO.EDITAR_VARIANTE);
     } catch (error) {
       console.error("Error al actualizar la variante:", error);
-      const message = getApiErrorMessage(error, "No se pudo actualizar la variante.");
+      const apiMessage = getApiErrorMessage(error, "No se pudo actualizar la variante.");
+      const message = apiMessage.toLowerCase().includes("misma combin")
+        ? getMensajeCombinacionDuplicadaDetalle(buildVarianteEdicionCandidata(), idNumerico) || apiMessage
+        : apiMessage;
       setErrorEdicion(message);
       mostrarAviso("error", message);
     } finally {
@@ -1029,6 +1069,13 @@ const ModalDetalleProducto = ({
       return;
     }
 
+    const mensajeCombinacionDuplicada = getMensajeCombinacionDuplicadaDetalle(buildNuevaVarianteCandidata());
+    if (mensajeCombinacionDuplicada) {
+      setErrorNuevaVariante(mensajeCombinacionDuplicada);
+      mostrarAviso("error", mensajeCombinacionDuplicada);
+      return;
+    }
+
     try {
       setGuardandoNuevaVariante(true);
       setErrorNuevaVariante("");
@@ -1069,7 +1116,10 @@ const ModalDetalleProducto = ({
       }
     } catch (error) {
       console.error("Error al crear variante:", error);
-      const message = getApiErrorMessage(error, "No se pudo crear la variante.");
+      const apiMessage = getApiErrorMessage(error, "No se pudo crear la variante.");
+      const message = apiMessage.toLowerCase().includes("misma combin")
+        ? getMensajeCombinacionDuplicadaDetalle(buildNuevaVarianteCandidata()) || apiMessage
+        : apiMessage;
       setErrorNuevaVariante(message);
       mostrarAviso("error", message);
     } finally {
@@ -1439,8 +1489,8 @@ const ModalDetalleProducto = ({
               </div>
 
               {/* CONTENEDOR DE VARIANTES */}
-              <div className="flex flex-col overflow-hidden p-6 md:p-8">
-                <div className="mb-4 shrink-0 flex items-center justify-between">
+              <div className="flex flex-col overflow-hidden p-4 sm:p-5 md:p-8">
+                <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
                   <span className="text-pink-600 font-bold text-sm border-b-2 border-pink-500 pb-2 inline-block">
                     Variantes ({estadoProducto.variantes?.length || 0})
                   </span>
@@ -1455,13 +1505,13 @@ const ModalDetalleProducto = ({
                   </Button>
                 </div>
 
-                <div className="max-h-[52vh] overflow-y-auto overscroll-contain pr-2 lg:max-h-[56vh]">
+                <div className="max-h-[52vh] overflow-y-auto overscroll-contain pr-1 sm:pr-2 lg:max-h-[56vh]">
                   <div className="space-y-3 pb-2">
                     {mostrandoNuevaVariante && (
                       <Card className="border-2 border-pink-200 shadow-md bg-pink-50/30 overflow-hidden mb-4">
-                        <CardContent className="p-4">
-                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-8">
-                            <div className="lg:col-span-1">
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+                            <div className="min-w-0 xl:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Talla</label>
                               <div className="relative">
                                 {!formNuevaVariante.talla ? (
@@ -1480,7 +1530,7 @@ const ModalDetalleProducto = ({
                                 </select>
                               </div>
                             </div>
-                            <div className="lg:col-span-1">
+                            <div className="min-w-0 xl:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Presentación</label>
                               <div className="relative">
                                 {!formNuevaVariante.presentacion ? (
@@ -1499,7 +1549,7 @@ const ModalDetalleProducto = ({
                                 </select>
                               </div>
                             </div>
-                            <div className="lg:col-span-1">
+                            <div className="min-w-0 xl:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Color</label>
                               <Input
                                 className="h-8 text-xs"
@@ -1508,7 +1558,7 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, color: e.target.value })}
                               />
                             </div>
-                            <div className="lg:col-span-2">
+                            <div className="min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-2">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Nombre variante</label>
                               <Input
                                 className="h-8 text-xs"
@@ -1517,7 +1567,7 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, nombreVariante: e.target.value })}
                               />
                             </div>
-                            <div className="lg:col-span-2">
+                            <div className="min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-2">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Atributos adicionales</label>
                               <Input
                                 className="h-8 text-xs focus-visible:ring-pink-500"
@@ -1526,7 +1576,7 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, atributosAdicionales: e.target.value })}
                               />
                             </div>
-                            <div className="lg:col-span-1">
+                            <div className="min-w-0 xl:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Cód. Barras</label>
                               <Input
                                 className="h-8 text-xs"
@@ -1535,7 +1585,7 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, codigoBarras: e.target.value })}
                               />
                             </div>
-                            <div className="lg:col-span-1">
+                            <div className="min-w-0 xl:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">
                                 Precio Venta <span className="text-red-500">*</span>
                               </label>
@@ -1550,7 +1600,7 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, precioVenta: e.target.value })}
                               />
                             </div>
-                            <div className="lg:col-span-1">
+                            <div className="min-w-0 xl:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">
                                 P. Mayor
                               </label>
@@ -1564,7 +1614,7 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, precioVentaMayor: e.target.value })}
                               />
                             </div>
-                            <div className="lg:col-span-1">
+                            <div className="min-w-0 xl:col-span-1">
                               <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">
                                 Stock mín.
                               </label>
@@ -1579,7 +1629,7 @@ const ModalDetalleProducto = ({
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, stockMinimo: e.target.value })}
                               />
                             </div>
-                            <div className="lg:col-span-1 flex items-end justify-end">
+                            <div className="flex min-w-0 items-end justify-end sm:col-span-2 md:col-span-1 xl:col-span-1">
                               <Button
                                 size="sm"
                                 onClick={handleGuardarNuevaVariante}
@@ -1618,12 +1668,12 @@ const ModalDetalleProducto = ({
 
                       return (
                         <Card key={keyVariante} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
-                          <CardContent className="p-4">
+                          <CardContent className="p-3 sm:p-4">
                             <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0 flex-1">
                                 {esModoEdicion ? (
-                                  <div className="grid min-w-0 gap-1.5 md:grid-cols-2 lg:grid-cols-10">
-                                    <div className="rounded-md border border-pink-200 bg-pink-50/40 p-1.5 lg:col-span-3">
+                                  <div className="grid min-w-0 gap-1.5 sm:grid-cols-2 xl:grid-cols-10">
+                                    <div className="rounded-md border border-pink-200 bg-pink-50/40 p-1.5 sm:col-span-2 xl:col-span-3">
                                       <label className="mb-0.5 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-pink-700">
                                         <Edit2 className="h-2.5 w-2.5" />
                                         Nombre variante
@@ -1635,7 +1685,7 @@ const ModalDetalleProducto = ({
                                         onChange={(e) => setNombreVarianteInput(e.target.value)}
                                       />
                                     </div>
-                                    <div className="rounded-md border border-slate-200 bg-slate-50/70 p-1.5 lg:col-span-3">
+                                    <div className="rounded-md border border-slate-200 bg-slate-50/70 p-1.5 sm:col-span-2 xl:col-span-3">
                                       <label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500">
                                         Atributos
                                       </label>
@@ -1646,7 +1696,7 @@ const ModalDetalleProducto = ({
                                         onChange={(e) => setAtributosAdicionalesInput(e.target.value)}
                                       />
                                     </div>
-                                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/70 p-1.5 lg:col-span-2">
+                                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/70 p-1.5 xl:col-span-2">
                                       <label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500">
                                         Precio venta
                                       </label>
@@ -1657,7 +1707,7 @@ const ModalDetalleProducto = ({
                                         onChange={(e) => setPrecioVentaInput(e.target.value)}
                                       />
                                     </div>
-                                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/70 p-1.5 lg:col-span-2">
+                                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/70 p-1.5 xl:col-span-2">
                                       <label
                                         className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500"
                                         title="Precio mayor"
@@ -1692,10 +1742,10 @@ const ModalDetalleProducto = ({
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-12 xl:items-center">
                               {/* ATRIBUTOS */}
                               {!esModoEdicion ? (
-                                <div className="lg:col-span-2">
+                                <div className="min-w-0 md:col-span-2 xl:col-span-2">
                                   <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                     Atributos
                                   </p>
@@ -1709,14 +1759,14 @@ const ModalDetalleProducto = ({
                               ) : null}
 
                               {/* ESPECIFICACIONES */}
-                              <div className={esModoEdicion ? "lg:col-span-3" : "lg:col-span-2"}>
+                              <div className={esModoEdicion ? "min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-3" : "min-w-0 md:col-span-2 xl:col-span-2"}>
                                 {!esModoEdicion ? (
                                   <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                     Presentación / Talla
                                   </p>
                                 ) : null}
                                 {esModoEdicion ? (
-                                  <div className="grid gap-1.5 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+                                  <div className="grid gap-1.5 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                                     <div className="min-w-0 space-y-1">
                                       <label
                                         htmlFor={`presentacion-variante-${keyVariante}`}
@@ -1792,7 +1842,7 @@ const ModalDetalleProducto = ({
                               </div>
 
                               {/* COLOR */}
-                              <div className="lg:col-span-1">
+                              <div className="min-w-0 xl:col-span-1">
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                   Color
                                 </p>
@@ -1813,7 +1863,7 @@ const ModalDetalleProducto = ({
                               </div>
 
                               {/* CÓDIGO DE BARRAS */}
-                              <div className="lg:col-span-2">
+                              <div className="min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-2">
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                   Código Barras
                                 </p>
@@ -1832,7 +1882,7 @@ const ModalDetalleProducto = ({
                                     {/* Lista de secundarios editables */}
                                     <div className="space-y-1">
                                       {codigosSecundariosInput.map((code, sIdx) => (
-                                        <div key={sIdx} className="flex items-center gap-1.5 pl-2">
+                                        <div key={sIdx} className="flex min-w-0 items-center gap-1.5 pl-2">
                                           <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded flex-1 truncate">
                                             {code}
                                           </span>
@@ -1851,7 +1901,7 @@ const ModalDetalleProducto = ({
                                     </div>
                                     
                                     {/* Input para añadir secundarios */}
-                                    <div className="flex gap-1">
+                                    <div className="flex min-w-0 gap-1">
                                       <Input
                                         id={`input-secundario-${v.idVariante}`}
                                         placeholder="Código secundario..."
@@ -1877,7 +1927,7 @@ const ModalDetalleProducto = ({
                                   </div>
                                 ) : (
                                   <div className="flex flex-col gap-1.5">
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex min-w-0 items-center gap-1.5">
                                       <Barcode className="w-4 h-4 text-slate-400 shrink-0" />
                                       <span className="text-xs font-mono truncate text-slate-700 font-semibold">
                                         {v.codigoPrincipal || "Sin código"}
@@ -1886,8 +1936,8 @@ const ModalDetalleProducto = ({
                                     {(v.codigosExternos || [])
                                       .filter(c => !c.esPrincipal && c.codigo !== v.codigoPrincipal)
                                       .map((c, i) => (
-                                        <div key={i} className="flex items-center gap-1.5 pl-5">
-                                          <span className="text-[10px] font-mono text-slate-500 bg-slate-50 border border-slate-100 px-1 py-0.5 rounded">
+                                        <div key={i} className="flex min-w-0 items-center gap-1.5 pl-5">
+                                          <span className="max-w-full truncate text-[10px] font-mono text-slate-500 bg-slate-50 border border-slate-100 px-1 py-0.5 rounded">
                                             {c.codigo}
                                           </span>
                                         </div>
@@ -1897,7 +1947,7 @@ const ModalDetalleProducto = ({
                               </div>
 
                               {/* STOCK */}
-                              <div className={esModoEdicion ? "lg:col-span-2" : "lg:col-span-1"}>
+                              <div className={esModoEdicion ? "min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-2" : "min-w-0 xl:col-span-1"}>
                                 {esModoEdicion ? (
                                   <div className="grid grid-cols-2 gap-2">
                                     <div className="min-w-0">
@@ -1945,7 +1995,7 @@ const ModalDetalleProducto = ({
                               </div>
 
                               {/* COSTO PROMEDIO */}
-                              <div className="lg:col-span-1">
+                              <div className="min-w-0 xl:col-span-1">
                                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                   Costo Prom.
                                 </p>
@@ -1956,7 +2006,7 @@ const ModalDetalleProducto = ({
 
                               {/* PRECIO DE VENTA */}
                               {!esModoEdicion ? (
-                                <div className="lg:col-span-1">
+                                <div className="min-w-0 xl:col-span-1">
                                   <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
                                     Precio venta
                                   </p>
@@ -1968,7 +2018,7 @@ const ModalDetalleProducto = ({
 
                               {/* PRECIO VENTA MAYOR */}
                               {!esModoEdicion ? (
-                                <div className="lg:col-span-1">
+                                <div className="min-w-0 xl:col-span-1">
                                   <p
                                     className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1"
                                     title="Precio mayorista"
@@ -1982,7 +2032,7 @@ const ModalDetalleProducto = ({
                               ) : null}
 
                               {/* BOTONES ACCIÓN */}
-                              <div className={esModoEdicion ? "lg:col-span-3 flex justify-end" : "lg:col-span-1 flex justify-end"}>
+                              <div className={esModoEdicion ? "flex min-w-0 justify-start sm:col-span-2 md:col-span-4 xl:col-span-3 xl:justify-end" : "flex min-w-0 justify-start sm:col-span-2 md:col-span-4 xl:col-span-1 xl:justify-end"}>
                                 {esModoEdicion ? (
                                   <div className="flex flex-wrap justify-end gap-1.5">
                                     <Button

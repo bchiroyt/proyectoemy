@@ -11,6 +11,7 @@ import { obtenerTallas, crearTalla } from "@/services/tallas";
 import { crearProducto } from "@/services/productos";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import {
+  getMensajeCombinacionVarianteDuplicada,
   normalizarNombreVarianteParaComparar,
   parsearAtributosAdicionalesDesdeTexto,
   tieneNombreVarianteDuplicado,
@@ -357,7 +358,6 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         !!v.talla ||
         !!v.presentacion ||
         !!v.color.trim() ||
-        !!v.nombreVariante.trim() ||
         !!v.atributosAdicionales.trim();
       const precioInvalido = v.precioVenta !== "" && Number(v.precioVenta) < 0;
       const costoInvalido = v.precioCompra !== "" && Number(v.precioCompra) < 0;
@@ -386,6 +386,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     return nombreMostrar
       ? `Ya existe una variante con el nombre "${nombreMostrar}". Usa otro nombre de variante.`
       : "No se permiten variantes con el mismo nombre. Usa nombres de variante diferentes.";
+  };
+
+  const getMensajeCombinacionVarianteDuplicadaLocal = () => {
+    for (const variante of variantes) {
+      const mensaje = getMensajeCombinacionVarianteDuplicada(variante, variantes);
+      if (mensaje) return mensaje;
+    }
+
+    return "";
   };
 
   const handleAgregarVariante = () => {
@@ -451,6 +460,12 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       return;
     }
 
+    const mensajeCombinacionDuplicada = getMensajeCombinacionVarianteDuplicadaLocal();
+    if (mensajeCombinacionDuplicada) {
+      mostrarAviso("error", mensajeCombinacionDuplicada);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -497,7 +512,10 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
     } catch (error) {
       console.error(error);
-      const msgError = getApiErrorMessage(error, "Error interno al intentar crear el producto.");
+      const apiMessage = getApiErrorMessage(error, "Error interno al intentar crear el producto.");
+      const msgError = apiMessage.toLowerCase().includes("misma combin")
+        ? getMensajeCombinacionVarianteDuplicadaLocal() || apiMessage
+        : apiMessage;
       mostrarAviso("error", msgError);
     } finally {
       setLoading(false);
@@ -664,9 +682,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
 
                       <div className="text-xs font-bold text-gray-500 uppercase cursor-default flex justify-between">
                         <span>Variante #{index + 1}</span>
-                        {(!v.talla && !v.presentacion && !v.color.trim() && !v.nombreVariante.trim() && !v.atributosAdicionales.trim()) && (
+                        {(!v.talla && !v.presentacion && !v.color.trim() && !v.atributosAdicionales.trim()) && (
                           <span className="text-(--color-rojo) normal-case font-normal text-xs animate-pulse">
-                            * Requiere Talla, Presentación, Color, Nombre variante o Atributos
+                            * Requiere Talla, Presentación, Color o Atributos
                           </span>
                         )}
                       </div>
