@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useAuthStore } from "@/context/useAuthStore";
+import { esErrorPermiso, mensajePermisoAmigable } from "@/lib/permisoErrors";
 
 const fromEnv = import.meta.env.VITE_API_BASE_URL?.trim?.() ?? "";
 
@@ -52,12 +53,19 @@ apiClient.interceptors.response.use(
 
 export function getApiErrorMessage(err, fallback = "Error de conexión con el servidor.") {
   const data = err?.response?.data;
-  if (typeof data === "string" && data.trim()) return data;
+  const rawFromData = typeof data === "string" && data.trim() ? data : null;
   const msg =
+    rawFromData ||
     pickMessage(data) ||
     err?.message ||
     fallback;
-  return String(msg);
+  const texto = String(msg);
+
+  if (esErrorPermiso(err) || esErrorPermiso(texto)) {
+    return mensajePermisoAmigable(texto);
+  }
+
+  return texto;
 }
 
 function pickMessage(data) {

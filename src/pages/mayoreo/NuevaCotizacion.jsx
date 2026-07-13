@@ -23,6 +23,7 @@ import { valorInputCantidad, valorInputCosto } from "@/lib/compraVarianteUtils";
 import { cn } from "@/lib/utils";
 import Toast from "@/components/ui/Toast";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -213,13 +214,14 @@ export default function NuevaCotizacion() {
 
   if (esEdicion && cotizacionQ.isError) {
     return (
-      <div className="p-8 text-center space-y-4">
-        <p className="text-sm text-(--color-rojo)">
-          {cotizacionQ.error?.message || "No se pudo cargar la cotización"}
-        </p>
-        <Button variant="outline" onClick={intentarIrAMayoreo}>
-          Volver al listado
-        </Button>
+      <div className="flex flex-1 items-center justify-center p-8">
+        <EstadoErrorCarga
+          error={cotizacionQ.error}
+          nombreModulo="Cotizaciones"
+          fallbackGenerico="No se pudo cargar la cotización."
+          onReintentar={() => cotizacionQ.refetch()}
+          onVolver={intentarIrAMayoreo}
+        />
       </div>
     );
   }

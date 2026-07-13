@@ -22,6 +22,7 @@ import { etiquetaEstadoVenta, enriquecerTicketEncabezado } from "@/lib/ventaMapp
 import { useAuthStore } from "@/context/useAuthStore";
 import { fmtQ } from "@/lib/cajaMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { useVentaTicketQuery } from "@/hooks/queries/useVentaQueries";
 import { useReembolsoComprobanteQuery } from "@/hooks/queries/useReembolsoQueries";
 import { TicketVentaPreview } from "@/pages/pos/components/TicketVentaPreview";
@@ -94,9 +95,13 @@ export function HistorialTransaccionesDialog({ open, onOpenChange }) {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : ventasQ.isError ? (
-            <div className="rounded-lg border border-destructive/30 bg-red-50 p-4 text-sm text-(--color-rojo)">
-              {getApiErrorMessage(ventasQ.error, "No se pudo cargar el historial de transacciones.")}
-            </div>
+            <EstadoErrorCarga
+              compact
+              error={ventasQ.error}
+              nombreModulo="historial de transacciones"
+              fallbackGenerico="No se pudo cargar el historial de transacciones."
+              onReintentar={() => ventasQ.refetch()}
+            />
           ) : (
             <ScrollArea className="h-full min-h-0 flex-1 rounded-lg border border-border bg-(--color-blanco) shadow-sm">
               <Table>

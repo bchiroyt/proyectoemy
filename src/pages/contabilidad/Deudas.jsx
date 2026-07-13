@@ -6,6 +6,7 @@ import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
 import { obtenerFechaGuatemala } from "@/lib/deudaAbonoValidations";
 import { Skeleton } from "@/components/ui/skeleton";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 const PAGE_SIZE = 15;
 
@@ -393,21 +394,13 @@ const Deudas = () => {
                 </tr>
               ))
             ) : errorCarga ? (
-              <tr>
-                <td colSpan="9" className="p-10 text-center">
-                  <div className="mx-auto flex max-w-lg flex-col items-center gap-3 text-(--color-rojo-obscuro)">
-                    <AlertCircle className="h-7 w-7 text-(--color-rojo)" />
-                    <p className="text-sm">{errorCarga}</p>
-                    <button
-                      type="button"
-                      onClick={cargarDeudas}
-                      className="rounded-xl border border-(--color-borde-button) bg-(--color-pagina) px-4 py-2 text-sm font-medium text-(--color-blanco) hover:bg-(--color-rosa-hover) hover:text-(--color-negro)"
-                    >
-                      Reintentar
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              <EstadoErrorCarga
+                colSpan={9}
+                mensaje={errorCarga}
+                nombreModulo="Deudas"
+                fallbackGenerico="No se pudieron cargar las deudas."
+                onReintentar={cargarDeudas}
+              />
             ) : deudasPagina.length === 0 ? (
               <tr>
                 <td colSpan="9" className="p-12 text-center text-(--color-gris-claro) font-medium">

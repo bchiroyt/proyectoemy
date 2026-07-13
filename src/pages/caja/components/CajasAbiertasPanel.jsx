@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { LayoutDashboard, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { NipDialog } from "@/pages/caja/components/NipDialog";
 import { fmtQ } from "@/lib/cajaMappers";
 import Toast from "@/components/ui/Toast";
@@ -82,9 +83,12 @@ export function CajasAbiertasPanel({ searchQuery = "", page = 1, setPage }) {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : isError ? (
-          <div className="rounded-lg border border-destructive/30 bg-(--color-blanco) p-4 text-sm text-(--color-rojo)">
-            {getApiErrorMessage(error, "No se pudieron cargar las cajas abiertas.")}
-          </div>
+          <EstadoErrorCarga
+            error={error}
+            nombreModulo="Cajas"
+            fallbackGenerico="No se pudieron cargar las cajas abiertas."
+            onReintentar={() => refetch()}
+          />
         ) : (
           <ScrollArea className="w-full rounded-lg border border-border bg-(--color-blanco) shadow-sm">
             <div className="min-w-[800px]">

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 import {
   obtenerCategorias,
@@ -20,6 +21,7 @@ const GestionCategorias = () => {
 
   const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(null);
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -43,6 +45,8 @@ const GestionCategorias = () => {
     setLoading(true);
 
     try {
+      setErrorCarga(null);
+
       const data = await obtenerCategorias({
         Page: page,
         PageSize: PAGE_SIZE,
@@ -54,9 +58,10 @@ const GestionCategorias = () => {
       setTotalRecords(data.totalRecords || 0);
     } catch (error) {
       console.error(error);
-
-      setErrorMensaje("Error al cargar categorías");
-      setErrorModal(true);
+      setErrorCarga(error);
+      setCategorias([]);
+      setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -208,6 +213,14 @@ const GestionCategorias = () => {
                     Cargando...
                   </td>
                 </tr>
+              ) : errorCarga ? (
+                <EstadoErrorCarga
+                  colSpan={5}
+                  error={errorCarga}
+                  nombreModulo="Categorías"
+                  fallbackGenerico="No se pudieron cargar las categorías."
+                  onReintentar={fetchCategorias}
+                />
               ) : categorias.length > 0 ? (
                 categorias.map((cat, index) => {
                   const esActivo = (cat.estado ?? cat.activo ?? true) !== false;

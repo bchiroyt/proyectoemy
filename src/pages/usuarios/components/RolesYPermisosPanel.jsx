@@ -7,6 +7,7 @@ import { useActualizarPermisosRolMutation, usePermisosCatalogoQuery, useRolPermi
 useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
 import { validateActualizarPermisosRol } from "@/lib/seguridadValidations";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { buildPermisoRows, buildPermisosRolPayload, permisosMapFromServer, permisosMapsEqual,
   permisosRolPayloadEqual, permKey, sortAcciones } from "@/pages/usuarios/permisosMatrix";
 import { CopiarRolDialog } from "./CopiarRolDialog";
@@ -178,7 +179,14 @@ export function RolesYPermisosPanel() {
               <Skeleton className="h-9 w-full" />
             </div>
           ) : loadErr ? (
-            <p className="p-4 text-sm text-(--color-rojo)">{getApiErrorMessage(loadErr)}</p>
+            <div className="p-4">
+              <EstadoErrorCarga
+                compact
+                error={loadErr}
+                nombreModulo="Roles"
+                fallbackGenerico="No se pudieron cargar los roles."
+              />
+            </div>
           ) : (
             <ScrollArea className="h-[min(50vh,400px)]">
               <RolesListaCompacta
@@ -217,7 +225,13 @@ export function RolesYPermisosPanel() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : permsQ.isError ? (
-            <p className="text-sm text-(--color-rojo)">{getApiErrorMessage(permsQ.error)}</p>
+            <EstadoErrorCarga
+              compact
+              error={permsQ.error}
+              nombreModulo="permisos del rol"
+              fallbackGenerico="No se pudieron cargar los permisos."
+              onReintentar={() => permsQ.refetch()}
+            />
           ) : !rows.length ? (
             <p className="text-sm text-muted-foreground">
               El catálogo de permisos está vacío o la API no devolvió módulos/acciones. Verifica

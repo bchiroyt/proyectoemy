@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import Toast from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 function SeccionTitulo({ children }) {
   return (
@@ -232,13 +233,14 @@ export default function FinalizarCotizacion() {
 
   if (cotizacionQ.isError || !cotizacion) {
     return (
-      <div className="p-8 text-center space-y-4">
-        <p className="text-sm text-(--color-rojo)">
-          {cotizacionQ.error?.message || "Cotización no encontrada"}
-        </p>
-        <Button variant="outline" onClick={intentarIrAMayoreo}>
-          Volver al listado
-        </Button>
+      <div className="flex flex-1 items-center justify-center p-8">
+        <EstadoErrorCarga
+          error={cotizacionQ.error || "Cotización no encontrada"}
+          nombreModulo="Cotizaciones"
+          fallbackGenerico="Cotización no encontrada."
+          onReintentar={cotizacionQ.isError ? () => cotizacionQ.refetch() : undefined}
+          onVolver={intentarIrAMayoreo}
+        />
       </div>
     );
   }

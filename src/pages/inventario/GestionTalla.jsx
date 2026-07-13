@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 import {
   obtenerTallas,
@@ -20,6 +21,7 @@ const GestionTallas = () => {
 
   const [tallas, setTallas] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(null);
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -40,6 +42,8 @@ const GestionTallas = () => {
     setLoading(true);
 
     try {
+      setErrorCarga(null);
+
       const data = await obtenerTallas({
         Page: page,
         PageSize: PAGE_SIZE,
@@ -51,6 +55,10 @@ const GestionTallas = () => {
       setTotalRecords(data.totalRecords || 0);
     } catch (error) {
       console.error("Error al cargar tallas:", error);
+      setErrorCarga(error);
+      setTallas([]);
+      setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -192,6 +200,14 @@ const GestionTallas = () => {
                     Cargando tallas...
                   </td>
                 </tr>
+              ) : errorCarga ? (
+                <EstadoErrorCarga
+                  colSpan={5}
+                  error={errorCarga}
+                  nombreModulo="Tallas"
+                  fallbackGenerico="No se pudieron cargar las tallas."
+                  onReintentar={fetchTallas}
+                />
               ) : tallas.length > 0 ? (
                 tallas.map((t, index) => (
                   <tr

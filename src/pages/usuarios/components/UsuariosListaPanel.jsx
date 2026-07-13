@@ -8,6 +8,7 @@ import { Edit2, Shield, UserX } from "lucide-react";
 import { useRolesQuery } from "@/hooks/queries/useSeguridadQueries";
 import { useAuthStore } from "@/context/useAuthStore";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { filtrarUsuariosVisibles } from "@/lib/usuarioUtils";
 import { AsignarRolesUsuarioDialog } from "./AsignarRolesUsuarioDialog";
 import { EditarUsuarioDialog } from "./EditarUsuarioDialog";
@@ -92,9 +93,11 @@ export function UsuariosListaPanel({
           <Skeleton className="h-10 w-full" />
         </div>
       ) : isError ? (
-        <div className="rounded-lg border border-destructive/30 bg-(--color-blanco) p-4 text-sm text-(--color-rojo)">
-          {getApiErrorMessage(error, "No se pudieron cargar los usuarios.")}
-        </div>
+        <EstadoErrorCarga
+          error={error}
+          nombreModulo="Usuarios"
+          fallbackGenerico="No se pudieron cargar los usuarios."
+        />
       ) : (
         <ScrollArea className="w-full rounded-lg border border-border bg-(--color-blanco) shadow-sm">
           <div className="min-w-[1100px]">

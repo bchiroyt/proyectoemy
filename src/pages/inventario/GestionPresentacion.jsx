@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 import {
   obtenerPresentaciones,
@@ -20,6 +21,7 @@ const GestionPresentacion = () => {
 
   const [presentaciones, setPresentaciones] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(null);
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -40,6 +42,8 @@ const GestionPresentacion = () => {
     setLoading(true);
 
     try {
+      setErrorCarga(null);
+
       const data = await obtenerPresentaciones({
         Page: page,
         PageSize: PAGE_SIZE,
@@ -51,6 +55,10 @@ const GestionPresentacion = () => {
       setTotalRecords(data.totalRecords || 0);
     } catch (error) {
       console.error("Error al obtener presentaciones:", error);
+      setErrorCarga(error);
+      setPresentaciones([]);
+      setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -198,6 +206,14 @@ const GestionPresentacion = () => {
                     Cargando presentaciones...
                   </td>
                 </tr>
+              ) : errorCarga ? (
+                <EstadoErrorCarga
+                  colSpan={5}
+                  error={errorCarga}
+                  nombreModulo="Presentaciones"
+                  fallbackGenerico="No se pudieron cargar las presentaciones."
+                  onReintentar={fetchPresentaciones}
+                />
               ) : presentaciones.length > 0 ? (
                 presentaciones.map((p, index) => {
                   const esActivo = (p.estado ?? p.activo ?? true) !== false;

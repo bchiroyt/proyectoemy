@@ -15,6 +15,7 @@ import Toast from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import ModalConfirmacion from "@/pages/inventario/components/ModalConfirmacion";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 /** Tabs de Mayoreo → estado del API (o sin filtro). */
 function estadoApiDesdeFiltro(filtroEstado) {
@@ -199,10 +200,13 @@ export default function Mayoreo() {
             <p className="text-sm">Cargando historial de cotizaciones…</p>
           </div>
         ) : cotizacionesQ.isError ? (
-          <div className="flex flex-col items-center justify-center flex-1 py-16 px-6 text-center">
-            <p className="text-sm text-(--color-rojo) font-medium">
-              {cotizacionesQ.error?.message || "No se pudo cargar el historial de cotizaciones"}
-            </p>
+          <div className="flex flex-1 items-center justify-center px-6 py-10">
+            <EstadoErrorCarga
+              error={cotizacionesQ.error}
+              nombreModulo="Mayoreo / Cotizaciones"
+              fallbackGenerico="No se pudo cargar el historial de cotizaciones."
+              onReintentar={() => cotizacionesQ.refetch()}
+            />
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 py-16 text-(--color-gris-letra)">

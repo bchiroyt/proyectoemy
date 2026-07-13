@@ -12,6 +12,7 @@ import {
   normalizarEstadoStock,
 } from "@/lib/nivelesStockMappers";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { Skeleton } from "@/components/ui/skeleton";
 import Toast from "@/components/ui/Toast";
 import { generarInformeNivelStockPdf } from "@/lib/pdfExport";
@@ -334,11 +335,13 @@ const ReporteStock = () => {
                 </tr>
               ))
             ) : nivelesStockQ.isError ? (
-              <tr className="border-t border-slate-100">
-                <td colSpan={6} className="p-6 text-center text-red-600">
-                  {nivelesStockQ.error?.message || "No se pudieron cargar los niveles de stock."}
-                </td>
-              </tr>
+              <EstadoErrorCarga
+                colSpan={6}
+                error={nivelesStockQ.error}
+                nombreModulo="niveles de stock"
+                fallbackGenerico="No se pudieron cargar los niveles de stock."
+                onReintentar={() => nivelesStockQ.refetch()}
+              />
             ) : data.length === 0 ? (
               <tr className="border-t border-slate-100">
                 <td colSpan={6} className="p-6 text-center text-gray-500">

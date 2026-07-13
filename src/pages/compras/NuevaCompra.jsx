@@ -18,6 +18,7 @@ import {
 } from "@/hooks/queries/useComprasQueries";
 import { CompraDatosGenerales } from "@/pages/compras/components/CompraDatosGenerales";
 import { CompraLineasProductos } from "@/pages/compras/components/CompraLineasProductos";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -578,7 +579,12 @@ const NuevaCompra = () => {
       </div>
 
       {loadErrEdit ? (
-        <p className="text-sm text-(--color-rojo) py-4">{getApiErrorMessage(compraQ.error)}</p>
+        <EstadoErrorCarga
+          error={compraQ.error}
+          nombreModulo="Compras"
+          fallbackGenerico="No se pudo cargar la compra."
+          onReintentar={() => compraQ.refetch()}
+        />
       ) : null}
 
       {formError ? (

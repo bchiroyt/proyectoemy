@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import DetalleCompraDialog from "./components/DetalleCompraDialog";
 import RecibirCompraDialog from "./components/RecibirCompraDialog";
 import {
@@ -187,9 +188,12 @@ const Compras = () => {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : listQ.isError ? (
-          <div className="rounded-lg border border-destructive/30 bg-(--color-blanco) p-4 text-sm text-(--color-rojo)">
-            {getApiErrorMessage(listQ.error, "No se pudieron cargar las compras.")}
-          </div>
+          <EstadoErrorCarga
+            error={listQ.error}
+            nombreModulo="Compras"
+            fallbackGenerico="No se pudieron cargar las compras."
+            onReintentar={() => listQ.refetch()}
+          />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-(--color-gris-claro-2) bg-(--color-blanco) shadow-sm">
             <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">

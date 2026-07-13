@@ -5,6 +5,7 @@ import { useNavigationStore } from "@/context/useNavigationStore";
 
 import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 import {
   obtenerUbicaciones,
@@ -21,6 +22,7 @@ const GestionUbicaciones = () => {
 
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(null);
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -41,6 +43,7 @@ const GestionUbicaciones = () => {
   const fetchUbicaciones = useCallback(async () => {
     try {
       setLoading(true);
+      setErrorCarga(null);
 
       const data = await obtenerUbicaciones({
         Page: page,
@@ -53,6 +56,10 @@ const GestionUbicaciones = () => {
       setTotalRecords(data.totalRecords || 0);
     } catch (error) {
       console.error("Error al cargar ubicaciones:", error);
+      setErrorCarga(error);
+      setUbicaciones([]);
+      setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -205,6 +212,14 @@ const GestionUbicaciones = () => {
                     Cargando ubicaciones...
                   </td>
                 </tr>
+              ) : errorCarga ? (
+                <EstadoErrorCarga
+                  colSpan={5}
+                  error={errorCarga}
+                  nombreModulo="Ubicaciones"
+                  fallbackGenerico="No se pudieron cargar las ubicaciones."
+                  onReintentar={fetchUbicaciones}
+                />
               ) : ubicaciones.length > 0 ? (
                 ubicaciones.map((u, index) => (
                   <tr

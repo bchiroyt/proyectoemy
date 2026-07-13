@@ -6,6 +6,7 @@ import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
 import { obtenerFechaGuatemala, validateCrearDeudaAbono } from "@/lib/deudaAbonoValidations";
 import { Skeleton } from "@/components/ui/skeleton";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 const PAGE_SIZE = 15;
 
@@ -362,21 +363,13 @@ const Pagos = () => {
                 </tr>
               ))
             ) : errorCarga ? (
-              <tr>
-                <td colSpan="9" className="p-10 text-center">
-                  <div className="mx-auto flex max-w-lg flex-col items-center gap-3 text-(--color-rojo-obscuro)">
-                    <AlertCircle className="h-7 w-7 text-(--color-rojo)" />
-                    <p className="text-sm">{errorCarga}</p>
-                    <button
-                      type="button"
-                      onClick={cargarPreparacion}
-                      className="rounded-xl border border-(--color-borde-button) bg-(--color-pagina) px-4 py-2 text-sm font-medium text-(--color-blanco) hover:bg-(--color-rosa-hover) hover:text-(--color-negro)"
-                    >
-                      Reintentar
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              <EstadoErrorCarga
+                colSpan={9}
+                mensaje={errorCarga}
+                nombreModulo="Pagos / Abonos"
+                fallbackGenerico="No se pudieron cargar las deudas disponibles."
+                onReintentar={cargarPreparacion}
+              />
             ) : deudasPagina.length === 0 ? (
               <tr>
                 <td colSpan="9" className="p-12 text-center text-(--color-gris-claro) font-medium">
@@ -516,23 +509,18 @@ const Pagos = () => {
                         </tr>
                       ))
                     ) : errorHistorial ? (
-                      <tr>
-                        <td colSpan="5" className="p-10 text-center">
-                          <div className="mx-auto flex max-w-lg flex-col items-center gap-3 text-(--color-rojo-obscuro)">
-                            <AlertCircle className="h-7 w-7 text-(--color-rojo)" />
-                            <p className="text-sm">{errorHistorial}</p>
-                            {deudaHistorial?.idDeuda ? (
-                              <button
-                                type="button"
-                                onClick={() => cargarHistorialAbonos(deudaHistorial)}
-                                className="rounded-xl border border-(--color-borde-button) bg-(--color-pagina) px-4 py-2 text-sm font-medium text-(--color-blanco) hover:bg-(--color-rosa-hover) hover:text-(--color-negro)"
-                              >
-                                Reintentar
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
+                      <EstadoErrorCarga
+                        colSpan={5}
+                        compact
+                        mensaje={errorHistorial}
+                        nombreModulo="historial de abonos"
+                        fallbackGenerico="No se pudo cargar el historial de abonos."
+                        onReintentar={
+                          deudaHistorial?.idDeuda
+                            ? () => cargarHistorialAbonos(deudaHistorial)
+                            : undefined
+                        }
+                      />
                     ) : abonosHistorial.length === 0 ? (
                       <tr>
                         <td colSpan="5" className="p-10 text-center text-(--color-gris-claro) font-medium">

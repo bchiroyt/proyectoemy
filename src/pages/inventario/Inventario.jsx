@@ -11,6 +11,7 @@ import {
 import { useNavigationStore } from "@/context/useNavigationStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { unwrapProductosBuscar } from "@/lib/productoUtils";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 const PAGE_SIZE = 15;
 
@@ -19,6 +20,7 @@ const Inventario = () => {
   const [openModal, setOpenModal] = useState(false);
   const [productos, setProductos] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(null);
   const [page, setPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -38,6 +40,7 @@ const Inventario = () => {
   const fetchProductos = useCallback(async () => {
     try {
       setLoadingProductos(true);
+      setErrorCarga(null);
 
       if (debouncedQuery.trim() !== "") {
         const res = await buscarProductosInventario(debouncedQuery);
@@ -58,6 +61,7 @@ const Inventario = () => {
       }
     } catch (error) {
       console.error("Error obteniendo productos/variantes:", error);
+      setErrorCarga(error);
       setProductos([]);
       setTotalRecords(0);
       setTotalPages(1);
@@ -172,11 +176,22 @@ const Inventario = () => {
             <div className="shrink-0">
               <Modulos />
             </div>
-            <TablaProductos
-              productos={productos}
-              loading={loadingProductos}
-              onRefresh={fetchProductos}
-            />
+            {errorCarga ? (
+              <div className="flex flex-1 items-center justify-center p-6">
+                <EstadoErrorCarga
+                  error={errorCarga}
+                  nombreModulo="Inventario"
+                  fallbackGenerico="No se pudieron cargar los productos."
+                  onReintentar={fetchProductos}
+                />
+              </div>
+            ) : (
+              <TablaProductos
+                productos={productos}
+                loading={loadingProductos}
+                onRefresh={fetchProductos}
+              />
+            )}
           </>
         )}
       </div>

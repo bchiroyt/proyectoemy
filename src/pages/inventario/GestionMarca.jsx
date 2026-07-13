@@ -6,6 +6,7 @@ import { useNavigationStore } from "@/context/useNavigationStore";
 import ModalCatalogoInventario from "./components/ModalCatalogoInventario";
 import ModalConfirmacion from "./components/ModalConfirmacion";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 import {
   obtenerMarcas,
@@ -22,6 +23,7 @@ const GestionMarcas = () => {
 
   const [marcas, setMarcas] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(null);
 
   const [openModal, setOpenModal] = useState(false);
   const [marcaEditar, setMarcaEditar] = useState(null);
@@ -43,6 +45,7 @@ const GestionMarcas = () => {
   const fetchMarcas = useCallback(async () => {
     try {
       setLoading(true);
+      setErrorCarga(null);
 
       const data = await obtenerMarcas({
         Page: page,
@@ -55,6 +58,10 @@ const GestionMarcas = () => {
       setTotalRecords(data.totalRecords || 0);
     } catch (error) {
       console.error("Error al cargar marcas:", error);
+      setErrorCarga(error);
+      setMarcas([]);
+      setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -204,6 +211,14 @@ const GestionMarcas = () => {
                     Cargando marcas...
                   </td>
                 </tr>
+              ) : errorCarga ? (
+                <EstadoErrorCarga
+                  colSpan={5}
+                  error={errorCarga}
+                  nombreModulo="Marcas"
+                  fallbackGenerico="No se pudieron cargar las marcas."
+                  onReintentar={fetchMarcas}
+                />
               ) : marcas.length > 0 ? (
                 marcas.map((m, index) => (
                   <tr

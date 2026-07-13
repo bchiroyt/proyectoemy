@@ -13,6 +13,7 @@ import { filtrarBilletes, initCantidades, parseMontoMonedas } from "@/lib/cajaUt
 import { getApiErrorMessage } from "@/lib/apiClient";
 import Toast from "@/components/ui/Toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 const AperturaCaja = () => {
   const setTitulo = useNavigationStore((state) => state.setTitulo);
@@ -137,9 +138,13 @@ const AperturaCaja = () => {
           {denomQ.isLoading ? (
             <Skeleton className="h-64 w-full rounded-xl" />
           ) : denomQ.isError ? (
-            <p className="text-(--color-rojo) text-sm">
-              {getApiErrorMessage(denomQ.error, "No se pudieron cargar las denominaciones.")}
-            </p>
+            <EstadoErrorCarga
+              compact
+              error={denomQ.error}
+              nombreModulo="apertura de caja"
+              fallbackGenerico="No se pudieron cargar las denominaciones."
+              onReintentar={() => denomQ.refetch()}
+            />
           ) : !puedeContar ? (
             <p className="text-sm text-(--color-gris-letra) py-6 text-center">
               No hay denominaciones activas configuradas en el sistema.

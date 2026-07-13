@@ -7,6 +7,7 @@ import { useNavigationStore } from "@/context/useNavigationStore";
 import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
 import { validateCrearGasto } from "@/lib/gastoValidations";
 import Paginacion from "@/components/shared/Paginacion";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 const PAGE_SIZE = 15;
 
@@ -488,25 +489,13 @@ const Gastos = () => {
               {cargandoPreparacion ? (
                 <FormularioGastoSkeleton />
               ) : errorPreparacion ? (
-                <div
-                  role="alert"
-                  className="space-y-4 rounded-xl border border-(--color-rojo)/30 bg-(--color-pagina-4) p-5 text-center"
-                >
-                  <AlertCircle className="mx-auto h-8 w-8 text-(--color-rojo)" />
-                  <div className="space-y-1">
-                    <p className="font-semibold text-(--color-rojo-obscuro)">
-                      No se pudo cargar el formulario
-                    </p>
-                    <p className="text-sm text-(--color-gris-letra)">{errorPreparacion}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={cargarPreparacionGasto}
-                    className="rounded-xl border border-(--color-borde-button) bg-(--color-pagina) px-5 py-2.5 text-sm font-medium text-(--color-blanco) transition-colors hover:bg-(--color-rosa-hover) hover:text-(--color-negro)"
-                  >
-                    Reintentar
-                  </button>
-                </div>
+                <EstadoErrorCarga
+                  compact
+                  mensaje={errorPreparacion}
+                  nombreModulo="Gastos"
+                  fallbackGenerico="No se pudieron cargar los datos del formulario."
+                  onReintentar={cargarPreparacionGasto}
+                />
               ) : (
                 <>
               {errorRegistro ? (

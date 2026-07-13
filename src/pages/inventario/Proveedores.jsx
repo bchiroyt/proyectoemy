@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, Search, Phone, Mail, MapPin, Loader2, X, CheckCircle, 
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 // IMPORTAMOS TU CLIENTE CONFIGURADO
 import { apiClient } from "@/lib/apiClient";
@@ -16,6 +17,7 @@ const Proveedores = () => {
   const [proveedores, setProveedores] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(null);
 
   // SISTEMA DE TOAST IDÉNTICO A MODALNUEVOPRODUCTO
   const [notificacion, setNotificacion] = useState({ mostrar: false, tipo: "", mensaje: "" });
@@ -53,6 +55,7 @@ const Proveedores = () => {
   const cargarProveedores = async () => {
     try {
       setCargando(true);
+      setErrorCarga(null);
       
       // NOTA: Agregamos parámetros comunes (ej. todos: true, o activo: null) 
       // para que el backend sepa que queremos ver la lista completa sin filtrar.
@@ -70,6 +73,8 @@ const Proveedores = () => {
       }
     } catch (error) {
       console.error("Error al cargar proveedores:", error);
+      setErrorCarga(error);
+      setProveedores([]);
       mostrarAviso("error", "No se pudo conectar con el servidor para cargar los proveedores.");
     } finally {
       setCargando(false);
@@ -234,6 +239,15 @@ const Proveedores = () => {
           <div className="flex flex-col items-center justify-center p-20 space-y-3">
             <Loader2 className="w-7 h-7 animate-spin text-green-600" />
             <p className="text-xs text-gray-400 font-medium">Consultando proveedores con el servidor...</p>
+          </div>
+        ) : errorCarga ? (
+          <div className="flex items-center justify-center p-10 sm:p-16">
+            <EstadoErrorCarga
+              error={errorCarga}
+              nombreModulo="Proveedores"
+              fallbackGenerico="No se pudieron cargar los proveedores."
+              onReintentar={cargarProveedores}
+            />
           </div>
         ) : (
           <table className="w-full text-sm">

@@ -11,10 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useCajaMovimientosQuery } from "@/hooks/queries/useCajaQueries";
 import { fmtQ } from "@/lib/cajaMappers";
-import { getApiErrorMessage } from "@/lib/apiClient";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 
 export function MovimientosCajaTable({ idCaja }) {
-  const { data, isLoading, isError, error } = useCajaMovimientosQuery(idCaja, {
+  const { data, isLoading, isError, error, refetch } = useCajaMovimientosQuery(idCaja, {
     enabled: idCaja > 0,
   });
 
@@ -31,9 +31,13 @@ export function MovimientosCajaTable({ idCaja }) {
 
   if (isError) {
     return (
-      <p className="text-sm text-(--color-rojo) p-3">
-        {getApiErrorMessage(error, "No se pudieron cargar los movimientos.")}
-      </p>
+      <EstadoErrorCarga
+        compact
+        error={error}
+        nombreModulo="movimientos de caja"
+        fallbackGenerico="No se pudieron cargar los movimientos."
+        onReintentar={() => refetch()}
+      />
     );
   }
 

@@ -33,6 +33,7 @@ import {
 import { usePosTicketsStore, LIMITE_TICKETS_ESPERA } from "@/context/usePosTicketsStore";
 import Toast from "@/components/ui/Toast";
 import BuscadorPrincipal from "@/components/shared/BuscadorPricipal";
+import { EstadoErrorCarga } from "@/components/shared/EstadoErrorCarga";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
@@ -888,10 +889,13 @@ const VentasPOS = () => {
               )}
 
               {catalogoQ.isError && (
-                <div className="text-center py-12 px-4 max-w-md mx-auto">
-                  <p className="text-(--color-rojo-obscuro) text-sm font-medium">
-                    {catalogoQ.error?.message ?? "No se pudo cargar el catálogo."}
-                  </p>
+                <div className="flex justify-center py-10 px-4">
+                  <EstadoErrorCarga
+                    error={catalogoQ.error}
+                    nombreModulo="el catálogo de ventas"
+                    fallbackGenerico="No se pudo cargar el catálogo."
+                    onReintentar={() => catalogoQ.refetch()}
+                  />
                 </div>
               )}
 
