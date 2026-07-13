@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { AlertTriangle, ArrowLeft, FileDown } from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
-import { useNivelesStockQuery } from "@/hooks/queries/useNivelesStockQueries";
+import { useNivelesStockCompletoQuery } from "@/hooks/queries/useNivelesStockQueries";
 import { fetchNivelesStockExportar } from "@/services/nivelesStockService";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import {
@@ -15,9 +13,6 @@ import Paginacion from "@/components/shared/Paginacion";
 import { Skeleton } from "@/components/ui/skeleton";
 import Toast from "@/components/ui/Toast";
 import { generarInformeNivelStockPdf } from "@/lib/pdfExport";
-
-const PRODUCT_IMAGE_PLACEHOLDER =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 const SIDEBAR_COLOR_HEX = "#E8307E";
 const PAGE_SIZE = 15;
@@ -88,15 +83,14 @@ const ReporteStock = () => {
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [exportError, setExportError] = useState("");
   const [toast, setToast] = useState({ open: false, message: "", type: "warning" });
-  const nivelesStockQ = useNivelesStockQuery({ page, pageSize: PAGE_SIZE });
+  const nivelesStockQ = useNivelesStockCompletoQuery();
   const tablaLoading = nivelesStockQ.isLoading || nivelesStockQ.isFetching;
 
   useEffect(() => {
     setTitulo("Niveles de Stock");
   }, [setTitulo]);
 
-  const nivelesStockResp = nivelesStockQ.data ?? {};
-  const nivelesStock = nivelesStockResp.items ?? [];
+  const nivelesStock = nivelesStockQ.data?.items ?? [];
   const nivelesConPolitica = useMemo(
     () => nivelesStock.filter((item) => !esSinPoliticaStock(item)),
     [nivelesStock]
@@ -118,15 +112,13 @@ const ReporteStock = () => {
       }),
     [nivelesSinPolitica, nivelesStock, proveedorFiltro, estadoFiltro]
   );
-  const pageSize = nivelesStockResp.pageSize ?? PAGE_SIZE;
-  const totalRecords = nivelesStockResp.totalRecords ?? data.length;
-  const totalPages = Math.max(
-    1,
-    nivelesStockResp.totalPages ?? Math.ceil(totalRecords / pageSize)
-  );
-  const from = totalRecords === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(from + pageSize - 1, totalRecords);
-  const sinRegistrosParaReporte = data.length === 0;
+  const totalRecords = data.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  const pageActual = Math.min(page, totalPages);
+  const from = totalRecords === 0 ? 0 : (pageActual - 1) * PAGE_SIZE + 1;
+  const to = Math.min(from + PAGE_SIZE - 1, totalRecords);
+  const dataPagina = data.slice(from > 0 ? from - 1 : 0, to);
+  const sinRegistrosParaReporte = totalRecords === 0;
 
   const generarPDF = async () => {
     if (sinRegistrosParaReporte) return;
@@ -250,10 +242,10 @@ const ReporteStock = () => {
             from={from}
             to={to}
             total={totalRecords}
-            onPrev={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disablePrev={page <= 1}
-            disableNext={page >= totalPages}
+            onPrev={() => setPage(Math.max(1, pageActual - 1))}
+            onNext={() => setPage(Math.min(totalPages, pageActual + 1))}
+            disablePrev={pageActual <= 1}
+            disableNext={pageActual >= totalPages}
             isLoading={tablaLoading}
           />
 
@@ -286,7 +278,7 @@ const ReporteStock = () => {
           <p className="mt-1 text-xs text-slate-500">
             {estadoFiltro === "sin-politica"
               ? "Productos sin politica registrada de stock minimo."
-              : "Se muestran todos los productos de la pagina actual, incluso los que no tienen politica de stock."}
+              : "La paginacion se calcula sobre los registros que coinciden con el filtro actual."}
           </p>
         </div>
 
@@ -308,12 +300,9 @@ const ReporteStock = () => {
               Array.from({ length: 6 }).map((_, index) => (
                 <tr key={`stock-skeleton-${index}`} className="border-t border-slate-100">
                   <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-12 w-12 shrink-0 rounded-lg" />
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <Skeleton className="h-4 w-48" />
-                        <Skeleton className="h-3 w-64" />
-                      </div>
+                    <div className="min-w-0 space-y-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3 w-64" />
                     </div>
                   </td>
                   <td className="px-4 py-4">
@@ -339,26 +328,19 @@ const ReporteStock = () => {
                   {nivelesStockQ.error?.message || "No se pudieron cargar los niveles de stock."}
                 </td>
               </tr>
-            ) : data.length === 0 ? (
+            ) : dataPagina.length === 0 ? (
               <tr className="border-t border-slate-100">
                 <td colSpan={6} className="p-6 text-center text-gray-500">
                   No hay productos para los filtros seleccionados.
                 </td>
               </tr>
-            ) : data.map((item) => (
+            ) : dataPagina.map((item) => (
               <tr key={item.id} className={`border-t border-slate-100 ${getEstadoStockVisual(item).row}`}>
                 <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={item.imagen || PRODUCT_IMAGE_PLACEHOLDER}
-                      alt="Imagen del producto"
-                      className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-gray-300 bg-gray-50 object-cover"
-                    />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-gray-900">{item.producto}</div>
-                      <div className="text-xs text-gray-500">
-                        {buildVarianteStockDetalle(item).join(" / ")}
-                      </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-gray-900">{item.producto}</div>
+                    <div className="text-xs text-gray-500">
+                      {buildVarianteStockDetalle(item).join(" / ")}
                     </div>
                   </div>
                 </td>
