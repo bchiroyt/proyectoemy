@@ -802,6 +802,7 @@ const ModalDetalleProducto = ({
     presentacion: formNuevaVariante.presentacion,
     talla: formNuevaVariante.talla,
     color: formNuevaVariante.color,
+    nombreVariante: formNuevaVariante.nombreVariante,
     atributosAdicionales: formNuevaVariante.atributosAdicionales,
   });
 
@@ -841,7 +842,7 @@ const ModalDetalleProducto = ({
     const estados = getEstadoDiferencialesVariantes([
       ...(estadoProducto?.variantes || []),
       buildNuevaVarianteCandidata(),
-    ]);
+    ], { incluirNombreVariante: true });
     return estados[estados.length - 1] || null;
   }, [
     mostrandoNuevaVariante,
@@ -849,6 +850,7 @@ const ModalDetalleProducto = ({
     formNuevaVariante.presentacion,
     formNuevaVariante.talla,
     formNuevaVariante.color,
+    formNuevaVariante.nombreVariante,
     formNuevaVariante.atributosAdicionales,
   ]);
 
@@ -1166,7 +1168,11 @@ const ModalDetalleProducto = ({
       return;
     }
 
-    const mensajeCombinacionDuplicada = getMensajeCombinacionDuplicadaDetalle(buildNuevaVarianteCandidata());
+    const mensajeCombinacionDuplicada = getMensajeCombinacionVarianteDuplicada(
+      buildNuevaVarianteCandidata(),
+      estadoProducto?.variantes || [],
+      { incluirNombreVariante: true }
+    );
     if (mensajeCombinacionDuplicada) {
       setErrorNuevaVariante(mensajeCombinacionDuplicada);
       mostrarAviso("error", mensajeCombinacionDuplicada);
@@ -1215,7 +1221,11 @@ const ModalDetalleProducto = ({
       console.error("Error al crear variante:", error);
       const apiMessage = getApiErrorMessage(error, "No se pudo crear la variante.");
       const message = apiMessage.toLowerCase().includes("misma combin")
-        ? getMensajeCombinacionDuplicadaDetalle(buildNuevaVarianteCandidata()) || apiMessage
+        ? getMensajeCombinacionVarianteDuplicada(
+          buildNuevaVarianteCandidata(),
+          estadoProducto?.variantes || [],
+          { incluirNombreVariante: true }
+        ) || apiMessage
         : apiMessage;
       setErrorNuevaVariante(message);
       mostrarAviso("error", message);
@@ -1328,6 +1338,7 @@ const ModalDetalleProducto = ({
   const clasesNuevaTalla = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "talla");
   const clasesNuevaColor = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "color");
   const clasesNuevaAtributos = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "atributos");
+  const clasesNuevaNombreVariante = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "nombreVariante");
 
   if (!open) return null;
 
@@ -1680,9 +1691,9 @@ const ModalDetalleProducto = ({
                               />
                             </div>
                             <div className="min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-2">
-                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Nombre variante</label>
+                              <label className={`mb-1 block text-[10px] font-bold uppercase tracking-wider ${clasesNuevaNombreVariante.label}`}>Nombre variante</label>
                               <Input
-                                className="h-8 text-xs"
+                                className={`h-8 text-xs ${clasesNuevaNombreVariante.input}`}
                                 placeholder="Ej. Edición limitada"
                                 value={formNuevaVariante.nombreVariante}
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, nombreVariante: e.target.value })}

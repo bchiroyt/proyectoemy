@@ -280,6 +280,110 @@ const varianteTieneCambios = (variante) =>
     return valorActual !== valorInicial;
   });
 
+const CAMPOS_DIFERENCIALES_EDITABLES = new Set([
+  "presentacion",
+  "talla",
+  "color",
+  "nombreVariante",
+  "atributosAdicionales",
+]);
+
+const campoAfectaDiferencialVariante = (campo) => CAMPOS_DIFERENCIALES_EDITABLES.has(campo);
+
+const varianteTieneEspecificacionDiferencial = (variante) =>
+  Boolean(
+    variante?.talla ||
+      variante?.presentacion ||
+      String(variante?.nombreVariante ?? "").trim() ||
+      String(variante?.color ?? "").trim() ||
+      String(variante?.atributosAdicionales ?? "").trim()
+  );
+
+function getNombreVarianteNormalizado(variante) {
+  return normalizarNombreVarianteParaComparar(variante?.nombreVariante);
+}
+
+function getInfoNombreVarianteDuplicadoVisible(variantes = [], ultimoIndex = null) {
+  const getDuplicadasParaIndex = (index) => {
+    const nombre = getNombreVarianteNormalizado(variantes[index]);
+    if (!nombre) return [];
+
+    return variantes
+      .map((variante, idx) => (idx !== index && getNombreVarianteNormalizado(variante) === nombre ? idx : null))
+      .filter((idx) => idx != null);
+  };
+
+  if (ultimoIndex != null && variantes[ultimoIndex]) {
+    const duplicateIndices = getDuplicadasParaIndex(ultimoIndex);
+    if (duplicateIndices.length) {
+      return { index: ultimoIndex, duplicateIndices };
+    }
+  }
+
+  for (let index = variantes.length - 1; index >= 0; index -= 1) {
+    const duplicateIndices = getDuplicadasParaIndex(index);
+    if (duplicateIndices.length) {
+      return { index, duplicateIndices };
+    }
+  }
+
+  return null;
+}
+
+function getIndiceVariantePendiente(variantes = [], estados = [], ultimoIndex = null, nombreDuplicadoInfo = null) {
+  if (nombreDuplicadoInfo?.index != null) return nombreDuplicadoInfo.index;
+
+  if (ultimoIndex != null && variantes[ultimoIndex]) {
+    if (!varianteTieneEspecificacionDiferencial(variantes[ultimoIndex])) return ultimoIndex;
+    if (estados[ultimoIndex]?.isDuplicate) return ultimoIndex;
+  }
+
+  for (let index = variantes.length - 1; index >= 0; index -= 1) {
+    if (!varianteTieneEspecificacionDiferencial(variantes[index])) return index;
+    if (estados[index]?.isDuplicate) return index;
+  }
+
+  return null;
+}
+
+function neutralizarEstadoDiferencialVariante(estado = {}) {
+  return {
+    ...estado,
+    duplicateIndices: [],
+    duplicateKeys: [],
+    suggestedKeys: [],
+    isDuplicate: false,
+  };
+}
+
+function getIndiceVarianteDuplicadaVisible(estados = [], ultimoIndex = null) {
+  if (ultimoIndex != null && estados[ultimoIndex]?.isDuplicate) {
+    return ultimoIndex;
+  }
+
+  for (let index = estados.length - 1; index >= 0; index -= 1) {
+    if (estados[index]?.isDuplicate) return index;
+  }
+
+  return null;
+}
+
+function aplicarDuplicadoNombreVarianteVisible(estados = [], nombreDuplicadoInfo = null) {
+  if (nombreDuplicadoInfo?.index == null) return estados;
+
+  return estados.map((estado, index) =>
+    index === nombreDuplicadoInfo.index
+      ? {
+        ...neutralizarEstadoDiferencialVariante(estado),
+        duplicateIndices: nombreDuplicadoInfo.duplicateIndices,
+        duplicateKeys: ["nombreVariante"],
+        suggestedKeys: [],
+        isDuplicate: true,
+      }
+      : estado
+  );
+}
+
 const formatFileSize = (bytes) => {
   const size = Number(bytes ?? 0);
   if (!Number.isFinite(size) || size <= 0) return "0 KB";
@@ -307,6 +411,8 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [presentaciones, setPresentaciones] = useState([]);
   const [tallas, setTallas] = useState([]);
   const [variantes, setVariantes] = useState([{ ...VARIANTE_VACIA }]);
+  const [ultimaVarianteEditadaIndex, setUltimaVarianteEditadaIndex] = useState(null);
+  const bloqueoAgregarVarianteRef = useRef(false);
 
   const [openMarcaModal, setOpenMarcaModal] = useState(false);
   const [openCategoriaModal, setOpenCategoriaModal] = useState(false);
@@ -314,9 +420,46 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [openTallaModal, setOpenTallaModal] = useState(false);
   const [activeVariantIndex, setActiveVariantIndex] = useState(null);
   const estadosDiferenciales = useMemo(
-    () => getEstadoDiferencialesVariantes(variantes),
+    () => getEstadoDiferencialesVariantes(variantes, { incluirNombreVariante: true }),
     [variantes]
   );
+  const nombreVarianteDuplicadoVisible = useMemo(
+    () => getInfoNombreVarianteDuplicadoVisible(variantes, ultimaVarianteEditadaIndex),
+    [ultimaVarianteEditadaIndex, variantes]
+  );
+  const indiceVariantePendiente = useMemo(
+    () =>
+      getIndiceVariantePendiente(
+        variantes,
+        estadosDiferenciales,
+        ultimaVarianteEditadaIndex,
+        nombreVarianteDuplicadoVisible
+      ),
+    [estadosDiferenciales, nombreVarianteDuplicadoVisible, ultimaVarianteEditadaIndex, variantes]
+  );
+  const indiceVarianteDuplicadaVisible = useMemo(
+    () =>
+      nombreVarianteDuplicadoVisible?.index ??
+      getIndiceVarianteDuplicadaVisible(estadosDiferenciales, ultimaVarianteEditadaIndex),
+    [estadosDiferenciales, nombreVarianteDuplicadoVisible, ultimaVarianteEditadaIndex]
+  );
+  const estadosDiferencialesVisibles = useMemo(
+    () => {
+      const estadosVisibles = estadosDiferenciales.map((estado, index) =>
+        index === indiceVarianteDuplicadaVisible
+          ? estado
+          : neutralizarEstadoDiferencialVariante(estado)
+      );
+
+      return aplicarDuplicadoNombreVarianteVisible(estadosVisibles, nombreVarianteDuplicadoVisible);
+    },
+    [estadosDiferenciales, indiceVarianteDuplicadaVisible, nombreVarianteDuplicadoVisible]
+  );
+  const agregarVarianteBloqueado = indiceVariantePendiente != null;
+
+  useEffect(() => {
+    bloqueoAgregarVarianteRef.current = agregarVarianteBloqueado;
+  }, [agregarVarianteBloqueado]);
 
   const mostrarAviso = (tipo, mensaje) => {
     setNotificacion({ mostrar: true, tipo, mensaje });
@@ -395,6 +538,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
       const tieneEspecificacion =
         !!v.talla ||
         !!v.presentacion ||
+        !!v.nombreVariante.trim() ||
         !!v.color.trim() ||
         !!v.atributosAdicionales.trim();
       const precioInvalido = v.precioVenta !== "" && Number(v.precioVenta) < 0;
@@ -427,8 +571,19 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   };
 
   const getMensajeCombinacionVarianteDuplicadaLocal = () => {
+    if (indiceVarianteDuplicadaVisible != null) {
+      const mensajePendiente = getMensajeCombinacionVarianteDuplicada(
+        variantes[indiceVarianteDuplicadaVisible],
+        variantes,
+        { incluirNombreVariante: true }
+      );
+      if (mensajePendiente) return mensajePendiente;
+    }
+
     for (const variante of variantes) {
-      const mensaje = getMensajeCombinacionVarianteDuplicada(variante, variantes);
+      const mensaje = getMensajeCombinacionVarianteDuplicada(variante, variantes, {
+        incluirNombreVariante: true,
+      });
       if (mensaje) return mensaje;
     }
 
@@ -436,30 +591,61 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   };
 
   const handleAgregarVariante = () => {
-    const primeraVariante = variantes[0];
-    if (primeraVariante) {
-      setVariantes([
-        ...variantes,
+    if (agregarVarianteBloqueado || bloqueoAgregarVarianteRef.current) return;
+
+    bloqueoAgregarVarianteRef.current = true;
+    const nuevoIndex = variantes.length;
+    setVariantes((prev) => {
+      const estadosActuales = getEstadoDiferencialesVariantes(prev, { incluirNombreVariante: true });
+      const nombreDuplicadoActual = getInfoNombreVarianteDuplicadoVisible(
+        prev,
+        ultimaVarianteEditadaIndex
+      );
+      const pendienteActual = getIndiceVariantePendiente(
+        prev,
+        estadosActuales,
+        ultimaVarianteEditadaIndex,
+        nombreDuplicadoActual
+      );
+
+      if (pendienteActual != null) return prev;
+
+      const primeraVariante = prev[0];
+      if (primeraVariante) {
+        return [
+          ...prev,
+          {
+            ...VARIANTE_VACIA,
+            talla: primeraVariante.talla,
+            presentacion: primeraVariante.presentacion,
+            precioVenta: primeraVariante.precioVenta,
+            precioCompra: primeraVariante.precioCompra,
+            stockMinimo: primeraVariante.stockMinimo,
+            precioVentaMayor: primeraVariante.precioVentaMayor,
+            color: "",
+            codigoBarras: "",
+          },
+        ];
+      }
+
+      return [
+        ...prev,
         {
           ...VARIANTE_VACIA,
-          talla: primeraVariante.talla,
-          presentacion: primeraVariante.presentacion,
-          precioVenta: primeraVariante.precioVenta,
-          precioCompra: primeraVariante.precioCompra,
-          stockMinimo: primeraVariante.stockMinimo,
-          precioVentaMayor: primeraVariante.precioVentaMayor,
-          color: "",
-          codigoBarras: "",
         },
-      ]);
-    } else {
-      setVariantes([...variantes, { ...VARIANTE_VACIA }]);
-    }
+      ];
+    });
+    setUltimaVarianteEditadaIndex(nuevoIndex);
   };
 
   const handleEliminarVariante = (index) => {
     if (variantes.length > 1) {
       setVariantes(variantes.filter((_, i) => i !== index));
+      setUltimaVarianteEditadaIndex((prev) => {
+        if (prev == null) return prev;
+        if (prev === index) return null;
+        return prev > index ? prev - 1 : prev;
+      });
     }
   };
 
@@ -467,6 +653,9 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     const nuevasVariantes = [...variantes];
     nuevasVariantes[index][campo] = valor;
     setVariantes(nuevasVariantes);
+    if (campoAfectaDiferencialVariante(campo)) {
+      setUltimaVarianteEditadaIndex(index);
+    }
   };
 
   const resetForm = () => {
@@ -483,6 +672,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
     setNotificacion({ mostrar: false, tipo: "", mensaje: "" });
     setOpenConfirmarSalida(false);
     setVariantes([{ ...VARIANTE_VACIA }]);
+    setUltimaVarianteEditadaIndex(null);
   };
 
   const handleClose = () => {
@@ -608,7 +798,8 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
             <button
               type="button"
               onClick={handleAgregarVariante}
-              className="absolute right-6 flex items-center gap-1 bg-(--color-pagina-2) text-white px-4 py-2 rounded-lg text-sm font-semibold hover:brightness-90 active:scale-95 transition-all cursor-pointer shadow-sm animate-in fade-in zoom-in duration-200"
+              disabled={agregarVarianteBloqueado}
+              className="absolute right-6 flex items-center gap-1 bg-(--color-pagina-2) text-white px-4 py-2 rounded-lg text-sm font-semibold hover:brightness-90 active:scale-95 transition-all cursor-pointer shadow-sm animate-in fade-in zoom-in duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:active:scale-100"
             >
               <Plus className="w-4 h-4" /> Añadir variante
             </button>
@@ -705,17 +896,19 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
               {/* Removido el sub-header antiguo que contenía el botón de añadir variante anterior */}
               <div className="space-y-6">
                 {variantes.map((v, index) => {
-                  const estadoDiferencial = estadosDiferenciales[index] || {};
+                  const estadoDiferencial = estadosDiferencialesVisibles[index] || {};
                   const clasesPresentacion = getClasesCampoDiferencial(estadoDiferencial, "presentacion");
                   const clasesTalla = getClasesCampoDiferencial(estadoDiferencial, "talla");
                   const clasesColor = getClasesCampoDiferencial(estadoDiferencial, "color");
                   const clasesAtributos = getClasesCampoDiferencial(estadoDiferencial, "atributos");
+                  const clasesNombreVariante = getClasesCampoDiferencial(estadoDiferencial, "nombreVariante");
                   const duplicadasTexto = (estadoDiferencial.duplicateIndices || [])
                     .map((idx) => `#${idx + 1}`)
                     .join(", ");
                   const sugerenciasTexto = (estadoDiferencial.suggestedKeys || [])
                     .map(getLabelCampoDiferencial)
                     .join(", ");
+                  const nombreVarianteDuplicado = estadoDiferencial.duplicateKeys?.includes("nombreVariante");
 
                   return (
                     <div
@@ -741,21 +934,24 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                             Duplicada con variante {duplicadasTexto}
                           </span>
                         ) : null}
-                        {(!estadoDiferencial.isDuplicate && !v.talla && !v.presentacion && !v.color.trim() && !v.atributosAdicionales.trim()) && (
+                        {(!estadoDiferencial.isDuplicate && !v.talla && !v.presentacion && !v.nombreVariante.trim() && !v.color.trim() && !v.atributosAdicionales.trim()) && (
                           <span className="text-(--color-rojo) normal-case font-normal text-xs animate-pulse">
-                            * Requiere Talla, Presentación, Color o Atributos
+                            * Requiere Talla, Presentación, Nombre variante, Color o Atributos
                           </span>
                         )}
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem_6.5rem] gap-3">
                         <div className="space-y-1 md:min-w-0">
-                          <label className="text-xs font-semibold text-gray-600 block">Nombre variante</label>
+                          <label className={cn("block text-xs font-semibold", clasesNombreVariante.label)}>Nombre variante</label>
                           <input
                             value={v.nombreVariante}
                             onChange={(e) => handleCambioVariante(index, "nombreVariante", e.target.value)}
                             placeholder="Ej. Edición limitada"
-                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                            className={cn(
+                              "w-full rounded-lg border bg-(--color-blanco) p-3 outline-none transition-colors",
+                              clasesNombreVariante.input
+                            )}
                           />
                         </div>
 
@@ -803,8 +999,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                       </div>
 
                       {estadoDiferencial.isDuplicate ? (
-                        <p className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800">
-                          Agrega un diferencial en {sugerenciasTexto || "otro campo"} para separar esta variante.
+                        <p className={cn(
+                          "rounded-lg border bg-white px-3 py-2 text-xs font-medium",
+                          nombreVarianteDuplicado
+                            ? "border-red-300 text-red-800"
+                            : "border-amber-300 text-amber-800"
+                        )}>
+                          {nombreVarianteDuplicado
+                            ? "Ya existe una variante con ese nombre. Usa otro nombre de variante."
+                            : `Agrega un diferencial en ${sugerenciasTexto || "otro campo"} para separar esta variante.`}
                         </p>
                       ) : null}
 
@@ -1015,6 +1218,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                 const nuevasVariantes = [...variantes];
                 nuevasVariantes[activeVariantIndex].presentacion = idFinal;
                 setVariantes(nuevasVariantes);
+                setUltimaVarianteEditadaIndex(activeVariantIndex);
               }
             }
           } catch (error) {
@@ -1048,6 +1252,7 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                 const nuevasVariantes = [...variantes];
                 nuevasVariantes[activeVariantIndex].talla = idFinal;
                 setVariantes(nuevasVariantes);
+                setUltimaVarianteEditadaIndex(activeVariantIndex);
               }
             }
           } catch (error) {

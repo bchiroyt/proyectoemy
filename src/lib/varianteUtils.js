@@ -52,6 +52,14 @@ export const CAMPOS_DIFERENCIALES_VARIANTE = [
   { key: "atributos", label: "atributos" },
 ];
 
+const CAMPO_NOMBRE_VARIANTE_DIFERENCIAL = { key: "nombreVariante", label: "nombre variante" };
+
+function getCamposDiferencialesVariante(options = {}) {
+  return options.incluirNombreVariante
+    ? [CAMPO_NOMBRE_VARIANTE_DIFERENCIAL, ...CAMPOS_DIFERENCIALES_VARIANTE]
+    : CAMPOS_DIFERENCIALES_VARIANTE;
+}
+
 function unirListaNatural(items = [], conector = "y") {
   if (items.length <= 1) return items[0] || "";
   if (items.length === 2) return `${items[0]} y ${items[1]}`;
@@ -87,8 +95,9 @@ function normalizarValorAtributosComparacion(variante) {
   return "";
 }
 
-function obtenerCamposDiferencialesUsados(variante) {
+function obtenerCamposDiferencialesUsados(variante, options = {}) {
   const valores = {
+    nombreVariante: normalizarTextoComparacion(pickNombreVariante(variante)),
     presentacion: normalizarTextoComparacion(
       normalizarTextoCampoVariante(
         variante?.presentacion ??
@@ -113,7 +122,7 @@ function obtenerCamposDiferencialesUsados(variante) {
     atributos: normalizarValorAtributosComparacion(variante),
   };
 
-  return CAMPOS_DIFERENCIALES_VARIANTE
+  return getCamposDiferencialesVariante(options)
     .filter((campo) => valores[campo.key])
     .map((campo) => ({ ...campo, value: valores[campo.key] }));
 }
@@ -123,9 +132,10 @@ function crearFirmaDiferenciales(campos = []) {
   return campos.map((campo) => `${campo.key}:${campo.value}`).join("|");
 }
 
-export function getEstadoDiferencialesVariantes(variantes = []) {
+export function getEstadoDiferencialesVariantes(variantes = [], options = {}) {
+  const camposDiferenciales = getCamposDiferencialesVariante(options);
   const normalizadas = (variantes || []).map((variante, index) => {
-    const campos = obtenerCamposDiferencialesUsados(variante);
+    const campos = obtenerCamposDiferencialesUsados(variante, options);
     const usedKeys = campos.map((campo) => campo.key);
     const signature = crearFirmaDiferenciales(campos);
 
@@ -156,7 +166,7 @@ export function getEstadoDiferencialesVariantes(variantes = []) {
     const isDuplicate = duplicateIndices.length > 0;
     const duplicateKeys = isDuplicate ? item.usedKeys : [];
     const suggestedKeys = isDuplicate
-      ? CAMPOS_DIFERENCIALES_VARIANTE
+      ? camposDiferenciales
           .filter((campo) => !item.usedKeys.includes(campo.key))
           .map((campo) => campo.key)
       : [];
@@ -172,12 +182,13 @@ export function getEstadoDiferencialesVariantes(variantes = []) {
 }
 
 export function getLabelCampoDiferencial(key) {
-  return CAMPOS_DIFERENCIALES_VARIANTE.find((campo) => campo.key === key)?.label || key;
+  const campos = [CAMPO_NOMBRE_VARIANTE_DIFERENCIAL, ...CAMPOS_DIFERENCIALES_VARIANTE];
+  return campos.find((campo) => campo.key === key)?.label || key;
 }
 
-function mismaCombinacionDiferenciales(a, b) {
-  const camposA = obtenerCamposDiferencialesUsados(a);
-  const camposB = obtenerCamposDiferencialesUsados(b);
+function mismaCombinacionDiferenciales(a, b, options = {}) {
+  const camposA = obtenerCamposDiferencialesUsados(a, options);
+  const camposB = obtenerCamposDiferencialesUsados(b, options);
   if (camposA.length === 0 || camposA.length !== camposB.length) return false;
 
   return camposA.every((campoA) => {
@@ -204,14 +215,14 @@ export function getMensajeCombinacionVarianteDuplicada(
       return false;
     }
 
-    return mismaCombinacionDiferenciales(varianteObjetivo, variante);
+    return mismaCombinacionDiferenciales(varianteObjetivo, variante, options);
   });
 
   if (!duplicada) return "";
 
-  const camposRepetidos = obtenerCamposDiferencialesUsados(varianteObjetivo);
+  const camposRepetidos = obtenerCamposDiferencialesUsados(varianteObjetivo, options);
   const labelsRepetidos = camposRepetidos.map((campo) => campo.label);
-  const labelsSugeridos = CAMPOS_DIFERENCIALES_VARIANTE
+  const labelsSugeridos = getCamposDiferencialesVariante(options)
     .filter((campo) => !camposRepetidos.some((repetido) => repetido.key === campo.key))
     .map((campo) => campo.label);
 
