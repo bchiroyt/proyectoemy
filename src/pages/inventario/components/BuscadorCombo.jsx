@@ -12,6 +12,8 @@ export default function BuscadorCombo({
   onLoadData,
   onAddNew,
   limit = 5,
+  className = "",
+  inputClassName = "",
 }) {
   const selectedItem = useMemo(() => {
     return (items || []).find((item) => String(item?.[idField]) === String(value));
@@ -114,7 +116,7 @@ export default function BuscadorCombo({
   };
 
   return (
-    <div ref={containerRef} className="relative flex-1">
+    <div ref={containerRef} className={cn("relative flex-1", className)}>
       <div className="flex gap-2">
         <div className="relative flex-1 flex items-center">
           <input
@@ -127,7 +129,10 @@ export default function BuscadorCombo({
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className="w-full border p-3 pr-10 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors bg-white text-sm text-gray-700"
+            className={cn(
+              "w-full border p-3 pr-10 rounded-lg outline-none focus:border-gray-400 hover:border-gray-300 transition-colors bg-white text-sm text-gray-700",
+              inputClassName
+            )}
             autoComplete="off"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-gray-400">
