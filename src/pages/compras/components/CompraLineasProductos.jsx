@@ -62,17 +62,20 @@ function resolverStockVariante(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function nombreDisplayCompra(item) {
+function nombreBaseProducto(item) {
   return (
-    pickNombreVariante(item) ||
     item?.productoNombre ||
     item?.ProductoNombre ||
     item?.nombreProducto ||
     item?.NombreProducto ||
     item?.nombre ||
     item?.Nombre ||
-    "Producto"
+    ""
   );
+}
+
+function nombreDisplayCompra(item) {
+  return pickNombreVariante(item) || nombreBaseProducto(item) || "Producto";
 }
 
 function EtiquetasVarianteCompactas({ item, className = "" }) {
@@ -103,7 +106,9 @@ function VarianteOpcion({ v, onElegir }) {
   const idVariante = v.idVariante ?? v.IdVariante;
   const disp = v.disponibleParaCompra ?? v.DisponibleParaCompra;
   const motivo = v.motivoNoDisponible ?? v.MotivoNoDisponible;
-  const nombre = nombreDisplayCompra(v);
+  const nombreBase = nombreBaseProducto(v);
+  const nombreVariante = pickNombreVariante(v) || "";
+  const tituloPrincipal = nombreVariante || nombreBase || "Producto";
   const sku = v.sku ?? v.Sku ?? "";
   const stock = resolverStockVariante(v);
   const sinId = idVariante == null || Number(idVariante) <= 0;
@@ -129,13 +134,18 @@ function VarianteOpcion({ v, onElegir }) {
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="truncate font-medium text-(--color-negro)">{nombre}</p>
+          <p className="truncate font-medium text-(--color-negro)">{tituloPrincipal}</p>
           <EtiquetasVarianteCompactas item={v} />
           {sinId ? (
             <span className="text-[10px] font-bold uppercase text-(--color-rojo)">Sin id variante</span>
           ) : null}
         </div>
         <div className="shrink-0 flex flex-col items-end text-right gap-0.5">
+          {nombreVariante ? (
+            <span className="max-w-[10rem] truncate text-[11px] font-medium text-(--color-gris-letra)">
+              {nombreBase || "—"}
+            </span>
+          ) : null}
           <span className="font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
           <span className={cn("text-[10px] font-bold", stock > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
             Stock: {stock}
@@ -425,6 +435,11 @@ export function CompraLineasProductos({
                       <p className="text-xs font-medium leading-tight text-(--color-negro)">
                         {nombreDisplayCompra(row)}
                       </p>
+                      {pickNombreVariante(row) && nombreBaseProducto(row) ? (
+                        <p className="truncate text-[10px] text-(--color-gris-letra)">
+                          {nombreBaseProducto(row)}
+                        </p>
+                      ) : null}
                       <EtiquetasVarianteCompactas item={row} />
                       <div className="flex flex-wrap items-center gap-x-2 text-[10px]">
                         {row.stockActual !== undefined && row.stockActual !== null ? (
