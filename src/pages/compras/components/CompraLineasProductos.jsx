@@ -108,7 +108,7 @@ function VarianteOpcion({ v, onElegir }) {
   const motivo = v.motivoNoDisponible ?? v.MotivoNoDisponible;
   const nombreBase = nombreBaseProducto(v);
   const nombreVariante = pickNombreVariante(v) || "";
-  const tituloPrincipal = nombreVariante || nombreBase || "Producto";
+  const tituloPrincipal = nombreBase || nombreVariante || "Producto";
   const sku = v.sku ?? v.Sku ?? "";
   const stock = resolverStockVariante(v);
   const sinId = idVariante == null || Number(idVariante) <= 0;
@@ -128,7 +128,7 @@ function VarianteOpcion({ v, onElegir }) {
         if (!deshabilitado) onElegir(v);
       }}
       className={cn(
-        "w-full min-w-0 text-left px-3 py-2 text-sm border-b border-(--color-gris-claro-2) transition-colors last:border-0",
+        "w-full min-w-0 text-left px-3 py-1.5 text-sm border-b border-(--color-gris-claro-2) transition-colors last:border-0",
         deshabilitado ? "cursor-not-allowed opacity-50" : "hover:bg-(--color-pagina-4)"
       )}
     >
@@ -140,13 +140,18 @@ function VarianteOpcion({ v, onElegir }) {
             <span className="text-[10px] font-bold uppercase text-(--color-rojo)">Sin id variante</span>
           ) : null}
         </div>
-        <div className="shrink-0 flex flex-col items-end text-right gap-0.5">
-          {nombreVariante ? (
-            <span className="max-w-[10rem] truncate text-[11px] font-medium text-(--color-gris-letra)">
-              {nombreBase || "—"}
-            </span>
-          ) : null}
-          <span className="font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
+        <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+          <div className="flex max-w-[24rem] items-center justify-end gap-1.5">
+            <span className="shrink-0 font-mono text-[11px] text-(--color-gris-letra)">{sku}</span>
+            {nombreVariante ? (
+              <span
+                className="min-w-0 max-w-[18rem] truncate rounded border border-slate-200 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-tight text-slate-700"
+                title={nombreVariante}
+              >
+                {nombreVariante}
+              </span>
+            ) : null}
+          </div>
           <span className={cn("text-[10px] font-bold", stock > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
             Stock: {stock}
           </span>

@@ -789,12 +789,14 @@ const ModalDetalleProducto = ({
   const getMensajeCombinacionDuplicadaDetalle = (varianteObjetivo, idVarianteIgnorada = null) =>
     getMensajeCombinacionVarianteDuplicada(varianteObjetivo, estadoProducto?.variantes || [], {
       ignorarIdVariante: idVarianteIgnorada,
+      incluirNombreVariante: true,
     });
 
   const buildVarianteEdicionCandidata = () => ({
     presentacion: presentacionInput,
     talla: tallaInput,
     color: colorInput,
+    nombreVariante: nombreVarianteInput,
     atributosAdicionales: atributosAdicionalesInput,
   });
 
@@ -809,7 +811,7 @@ const ModalDetalleProducto = ({
   const variantesProducto = estadoProducto?.variantes || [];
 
   const estadosDiferencialesDetalle = useMemo(
-    () => getEstadoDiferencialesVariantes(estadoProducto?.variantes || []),
+    () => getEstadoDiferencialesVariantes(estadoProducto?.variantes || [], { incluirNombreVariante: true }),
     [estadoProducto?.variantes]
   );
 
@@ -827,13 +829,14 @@ const ModalDetalleProducto = ({
       return variante;
     });
 
-    return getEstadoDiferencialesVariantes(candidatas);
+    return getEstadoDiferencialesVariantes(candidatas, { incluirNombreVariante: true });
   }, [
     editandoId,
     estadoProducto?.variantes,
     presentacionInput,
     tallaInput,
     colorInput,
+    nombreVarianteInput,
     atributosAdicionalesInput,
   ]);
 
@@ -949,6 +952,7 @@ const ModalDetalleProducto = ({
       presentacionInput !== valoresOriginales.presentacion ||
       tallaInput !== valoresOriginales.talla ||
       colorInput !== valoresOriginales.color ||
+      nombreVarianteInput !== valoresOriginales.nombreVariante ||
       atributosAdicionalesInput !== valoresOriginales.atributosAdicionales;
     if (cambioDiferenciales) {
       const mensajeCombinacionDuplicada = getMensajeCombinacionDuplicadaDetalle(

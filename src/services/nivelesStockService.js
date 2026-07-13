@@ -4,11 +4,12 @@ import { unwrapNivelesStock, unwrapNivelesStockExportar } from "@/lib/nivelesSto
 
 export async function fetchNivelesStock(params = {}) {
   try {
-    const { page = 1, pageSize = 15 } = params;
+    const { page = 1, pageSize = 15, estadoStock = "TODOS" } = params;
     const { data } = await apiClient.get("/api/niveles-stock", {
       params: {
         page,
         pageSize,
+        estadoStock,
       },
     });
     console.info("[NivelesStock] Respuesta cruda de /api/niveles-stock:", data);
