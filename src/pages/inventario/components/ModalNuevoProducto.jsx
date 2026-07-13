@@ -12,6 +12,8 @@ import { crearProducto } from "@/services/productos";
 import { getApiErrorMessage } from "@/lib/apiClient";
 import {
   getMensajeCombinacionVarianteDuplicada,
+  getEstadoDiferencialesVariantes,
+  getLabelCampoDiferencial,
   normalizarNombreVarianteParaComparar,
   parsearAtributosAdicionalesDesdeTexto,
   tieneNombreVarianteDuplicado,
@@ -239,6 +241,38 @@ const VARIANTE_VACIA = {
   codigoBarras: "",
 };
 
+const CLASES_DIFERENCIAL_VARIANTE = {
+  duplicado: {
+    label: "text-red-700",
+    input: "border-red-300 text-red-900 focus:border-red-500 focus:ring-2 focus:ring-red-100 hover:border-red-400",
+  },
+  usado: {
+    label: "text-emerald-700",
+    input:
+      "border-emerald-300 text-emerald-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 hover:border-emerald-400",
+  },
+  sugerido: {
+    label: "text-amber-700",
+    input:
+      "border-amber-300 text-amber-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 hover:border-amber-400",
+  },
+  neutral: {
+    label: "text-gray-600",
+    input: "focus:border-gray-400 hover:border-gray-300",
+  },
+};
+
+function getEstadoCampoDiferencial(estado, key) {
+  if (estado?.duplicateKeys?.includes(key)) return "duplicado";
+  if (estado?.isDuplicate && estado?.suggestedKeys?.includes(key)) return "sugerido";
+  if (estado?.usedKeys?.includes(key)) return "usado";
+  return "neutral";
+}
+
+function getClasesCampoDiferencial(estado, key) {
+  return CLASES_DIFERENCIAL_VARIANTE[getEstadoCampoDiferencial(estado, key)];
+}
+
 const varianteTieneCambios = (variante) =>
   Object.keys(VARIANTE_VACIA).some((campo) => {
     const valorActual = String(variante?.[campo] ?? "").trim();
@@ -279,6 +313,10 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
   const [openPresentacionModal, setOpenPresentacionModal] = useState(false);
   const [openTallaModal, setOpenTallaModal] = useState(false);
   const [activeVariantIndex, setActiveVariantIndex] = useState(null);
+  const estadosDiferenciales = useMemo(
+    () => getEstadoDiferencialesVariantes(variantes),
+    [variantes]
+  );
 
   const mostrarAviso = (tipo, mensaje) => {
     setNotificacion({ mostrar: true, tipo, mensaje });
@@ -667,8 +705,23 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
               {/* Removido el sub-header antiguo que contenía el botón de añadir variante anterior */}
               <div className="space-y-6">
                 {variantes.map((v, index) => {
+                  const estadoDiferencial = estadosDiferenciales[index] || {};
+                  const clasesPresentacion = getClasesCampoDiferencial(estadoDiferencial, "presentacion");
+                  const clasesTalla = getClasesCampoDiferencial(estadoDiferencial, "talla");
+                  const clasesColor = getClasesCampoDiferencial(estadoDiferencial, "color");
+                  const clasesAtributos = getClasesCampoDiferencial(estadoDiferencial, "atributos");
+                  const duplicadasTexto = (estadoDiferencial.duplicateIndices || [])
+                    .map((idx) => `#${idx + 1}`)
+                    .join(", ");
+                  const sugerenciasTexto = (estadoDiferencial.suggestedKeys || [])
+                    .map(getLabelCampoDiferencial)
+                    .join(", ");
+
                   return (
-                    <div key={index} className="bg-gray-50 p-5 rounded-xl border border-gray-200 relative space-y-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div
+                      key={index}
+                      className="relative space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-5 pr-12 shadow-sm transition-shadow hover:shadow-md"
+                    >
 
                       {variantes.length > 1 && (
                         <button
@@ -680,9 +733,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         </button>
                       )}
 
-                      <div className="text-xs font-bold text-gray-500 uppercase cursor-default flex justify-between">
+                      <div className="flex flex-wrap items-start justify-between gap-2 text-xs font-bold uppercase text-gray-500 cursor-default">
                         <span>Variante #{index + 1}</span>
-                        {(!v.talla && !v.presentacion && !v.color.trim() && !v.atributosAdicionales.trim()) && (
+                        {estadoDiferencial.isDuplicate ? (
+                          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-red-200 bg-white px-2 py-1 text-[11px] font-semibold normal-case text-red-700">
+                            <AlertCircle className="h-3 w-3 shrink-0" />
+                            Duplicada con variante {duplicadasTexto}
+                          </span>
+                        ) : null}
+                        {(!estadoDiferencial.isDuplicate && !v.talla && !v.presentacion && !v.color.trim() && !v.atributosAdicionales.trim()) && (
                           <span className="text-(--color-rojo) normal-case font-normal text-xs animate-pulse">
                             * Requiere Talla, Presentación, Color o Atributos
                           </span>
@@ -743,9 +802,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         </div>
                       </div>
 
+                      {estadoDiferencial.isDuplicate ? (
+                        <p className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800">
+                          Agrega un diferencial en {sugerenciasTexto || "otro campo"} para separar esta variante.
+                        </p>
+                      ) : null}
+
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1 relative">
-                          <label className="text-xs font-semibold text-gray-600 block">Presentación</label>
+                          <label className={cn("block text-xs font-semibold", clasesPresentacion.label)}>Presentación</label>
                           <BuscadorCombo
                             placeholder="Seleccionar presentación..."
                             value={v.presentacion}
@@ -759,10 +824,11 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                               setOpenPresentacionModal(true);
                             }}
                             limit={3}
+                            inputClassName={clasesPresentacion.input}
                           />
                         </div>
                         <div className="space-y-1 relative">
-                          <label className="text-xs font-semibold text-gray-600 block">Talla</label>
+                          <label className={cn("block text-xs font-semibold", clasesTalla.label)}>Talla</label>
                           <BuscadorCombo
                             placeholder="Seleccionar talla..."
                             value={v.talla}
@@ -776,16 +842,20 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                               setOpenTallaModal(true);
                             }}
                             limit={3}
+                            inputClassName={clasesTalla.input}
                           />
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-600 block">Color</label>
+                          <label className={cn("block text-xs font-semibold", clasesColor.label)}>Color</label>
                           <input
                             value={v.color}
                             onChange={(e) => handleCambioVariante(index, "color", e.target.value)}
                             placeholder="Color"
-                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                            className={cn(
+                              "w-full rounded-lg border bg-(--color-blanco) p-3 outline-none transition-colors",
+                              clasesColor.input
+                            )}
                           />
                         </div>
                       </div>
@@ -802,12 +872,15 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
                         </div>
 
                         <div className="space-y-1 md:col-span-2">
-                          <label className="text-xs font-semibold text-gray-600 block">Atributos adicionales</label>
+                          <label className={cn("block text-xs font-semibold", clasesAtributos.label)}>Atributos adicionales</label>
                           <input
                             value={v.atributosAdicionales}
                             onChange={(e) => handleCambioVariante(index, "atributosAdicionales", e.target.value)}
                             placeholder="Ej. Algodón, costuras reforzadas"
-                            className="w-full border p-3 rounded-lg bg-(--color-blanco) outline-none focus:border-gray-400 hover:border-gray-300 transition-colors"
+                            className={cn(
+                              "w-full rounded-lg border bg-(--color-blanco) p-3 outline-none transition-colors",
+                              clasesAtributos.input
+                            )}
                           />
                         </div>
                       </div>

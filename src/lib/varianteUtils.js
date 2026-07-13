@@ -45,7 +45,7 @@ export function tieneNombreVarianteDuplicado(variantes = [], options = {}) {
   return false;
 }
 
-const CAMPOS_DIFERENCIALES_VARIANTE = [
+export const CAMPOS_DIFERENCIALES_VARIANTE = [
   { key: "presentacion", label: "presentacion" },
   { key: "talla", label: "talla" },
   { key: "color", label: "color" },
@@ -116,6 +116,63 @@ function obtenerCamposDiferencialesUsados(variante) {
   return CAMPOS_DIFERENCIALES_VARIANTE
     .filter((campo) => valores[campo.key])
     .map((campo) => ({ ...campo, value: valores[campo.key] }));
+}
+
+function crearFirmaDiferenciales(campos = []) {
+  if (!campos.length) return "";
+  return campos.map((campo) => `${campo.key}:${campo.value}`).join("|");
+}
+
+export function getEstadoDiferencialesVariantes(variantes = []) {
+  const normalizadas = (variantes || []).map((variante, index) => {
+    const campos = obtenerCamposDiferencialesUsados(variante);
+    const usedKeys = campos.map((campo) => campo.key);
+    const signature = crearFirmaDiferenciales(campos);
+
+    return {
+      index,
+      variante,
+      signature,
+      usedKeys,
+      hasDifferentials: usedKeys.length > 0,
+      duplicateIndices: [],
+      duplicateKeys: [],
+      suggestedKeys: [],
+      isDuplicate: false,
+    };
+  });
+
+  const grupos = new Map();
+  for (const item of normalizadas) {
+    if (!item.signature) continue;
+    const existentes = grupos.get(item.signature) || [];
+    existentes.push(item.index);
+    grupos.set(item.signature, existentes);
+  }
+
+  return normalizadas.map((item) => {
+    const grupo = item.signature ? grupos.get(item.signature) || [] : [];
+    const duplicateIndices = grupo.filter((idx) => idx !== item.index);
+    const isDuplicate = duplicateIndices.length > 0;
+    const duplicateKeys = isDuplicate ? item.usedKeys : [];
+    const suggestedKeys = isDuplicate
+      ? CAMPOS_DIFERENCIALES_VARIANTE
+          .filter((campo) => !item.usedKeys.includes(campo.key))
+          .map((campo) => campo.key)
+      : [];
+
+    return {
+      ...item,
+      duplicateIndices,
+      duplicateKeys,
+      suggestedKeys,
+      isDuplicate,
+    };
+  });
+}
+
+export function getLabelCampoDiferencial(key) {
+  return CAMPOS_DIFERENCIALES_VARIANTE.find((campo) => campo.key === key)?.label || key;
 }
 
 function mismaCombinacionDiferenciales(a, b) {

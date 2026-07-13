@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Barcode,
   Edit2,
@@ -48,6 +48,8 @@ import {
   atributosAdicionalesATexto,
   CLASES_ETIQUETA_VARIANTE,
   getMensajeCombinacionVarianteDuplicada,
+  getEstadoDiferencialesVariantes,
+  getLabelCampoDiferencial,
   normalizarNombreVarianteParaComparar,
   obtenerEtiquetasVariante,
   parsearAtributosAdicionalesDesdeTexto,
@@ -66,6 +68,54 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 const CLASES_ETIQUETA_VARIANTE_LOCAL = CLASES_ETIQUETA_VARIANTE;
+
+const CLASES_DIFERENCIAL_DETALLE = {
+  duplicado: {
+    label: "text-red-700",
+    input: "border-red-300 text-red-900 focus-visible:border-red-500 focus-visible:ring-red-100",
+    panel: "border-red-300 bg-white",
+  },
+  usado: {
+    label: "text-emerald-700",
+    input: "border-emerald-300 text-emerald-900 focus-visible:border-emerald-500 focus-visible:ring-emerald-100",
+    panel: "border-emerald-300 bg-white",
+  },
+  sugerido: {
+    label: "text-amber-700",
+    input: "border-amber-300 text-amber-900 focus-visible:border-amber-500 focus-visible:ring-amber-100",
+    panel: "border-amber-300 bg-white",
+  },
+  neutral: {
+    label: "text-slate-500",
+    input: "border-slate-300 bg-white focus-visible:ring-pink-500",
+    panel: "border-slate-200 bg-white",
+  },
+};
+
+function getEstadoCampoDiferencialDetalle(estado, key) {
+  if (estado?.duplicateKeys?.includes(key)) return "duplicado";
+  if (estado?.isDuplicate && estado?.suggestedKeys?.includes(key)) return "sugerido";
+  if (estado?.usedKeys?.includes(key)) return "usado";
+  return "neutral";
+}
+
+function getClasesDiferencialDetalle(estado, key) {
+  return CLASES_DIFERENCIAL_DETALLE[getEstadoCampoDiferencialDetalle(estado, key)];
+}
+
+function getClasesEspecificacionDetalle(estado) {
+  const keys = ["presentacion", "talla"];
+  if (keys.some((key) => estado?.duplicateKeys?.includes(key))) {
+    return CLASES_DIFERENCIAL_DETALLE.duplicado;
+  }
+  if (estado?.isDuplicate && keys.some((key) => estado?.suggestedKeys?.includes(key))) {
+    return CLASES_DIFERENCIAL_DETALLE.sugerido;
+  }
+  if (keys.some((key) => estado?.usedKeys?.includes(key))) {
+    return CLASES_DIFERENCIAL_DETALLE.usado;
+  }
+  return CLASES_DIFERENCIAL_DETALLE.neutral;
+}
 
 const normalizarTextoNumeroEditable = (...valores) => {
   for (const valor of valores) {
@@ -755,6 +805,53 @@ const ModalDetalleProducto = ({
     atributosAdicionales: formNuevaVariante.atributosAdicionales,
   });
 
+  const variantesProducto = estadoProducto?.variantes || [];
+
+  const estadosDiferencialesDetalle = useMemo(
+    () => getEstadoDiferencialesVariantes(estadoProducto?.variantes || []),
+    [estadoProducto?.variantes]
+  );
+
+  const estadosDiferencialesEdicion = useMemo(() => {
+    if (editandoId == null) return null;
+
+    const candidatas = (estadoProducto?.variantes || []).map((variante) => {
+      const idVariante = Number(variante?.idVariante ?? variante?.IdVariante);
+      if (Number.isFinite(idVariante) && idVariante === Number(editandoId)) {
+        return {
+          ...variante,
+          ...buildVarianteEdicionCandidata(),
+        };
+      }
+      return variante;
+    });
+
+    return getEstadoDiferencialesVariantes(candidatas);
+  }, [
+    editandoId,
+    estadoProducto?.variantes,
+    presentacionInput,
+    tallaInput,
+    colorInput,
+    atributosAdicionalesInput,
+  ]);
+
+  const estadoDiferencialNuevaVariante = useMemo(() => {
+    if (!mostrandoNuevaVariante) return null;
+    const estados = getEstadoDiferencialesVariantes([
+      ...(estadoProducto?.variantes || []),
+      buildNuevaVarianteCandidata(),
+    ]);
+    return estados[estados.length - 1] || null;
+  }, [
+    mostrandoNuevaVariante,
+    estadoProducto?.variantes,
+    formNuevaVariante.presentacion,
+    formNuevaVariante.talla,
+    formNuevaVariante.color,
+    formNuevaVariante.atributosAdicionales,
+  ]);
+
   const verificarCambios = (v) => {
     const valoresOriginales = obtenerValoresOriginalesVariante(v);
     const precioVentaNormalizado = normalizarTextoNumeroEditable(precioVentaInput);
@@ -1221,6 +1318,17 @@ const ModalDetalleProducto = ({
     }
   };
 
+  const nuevaVarianteDuplicadasTexto = (estadoDiferencialNuevaVariante?.duplicateIndices || [])
+    .map((idx) => `#${idx + 1}`)
+    .join(", ");
+  const nuevaVarianteSugerenciasTexto = (estadoDiferencialNuevaVariante?.suggestedKeys || [])
+    .map(getLabelCampoDiferencial)
+    .join(", ");
+  const clasesNuevaPresentacion = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "presentacion");
+  const clasesNuevaTalla = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "talla");
+  const clasesNuevaColor = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "color");
+  const clasesNuevaAtributos = getClasesDiferencialDetalle(estadoDiferencialNuevaVariante, "atributos");
+
   if (!open) return null;
 
   return (
@@ -1508,17 +1616,30 @@ const ModalDetalleProducto = ({
                 <div className="max-h-[52vh] overflow-y-auto overscroll-contain pr-1 sm:pr-2 lg:max-h-[56vh]">
                   <div className="space-y-3 pb-2">
                     {mostrandoNuevaVariante && (
-                      <Card className="border-2 border-pink-200 shadow-md bg-pink-50/30 overflow-hidden mb-4">
+                      <Card
+                        className="mb-4 overflow-hidden border-2 border-pink-200 bg-pink-50/30 shadow-md"
+                      >
                         <CardContent className="p-3 sm:p-4">
+                          {estadoDiferencialNuevaVariante?.isDuplicate ? (
+                            <div className="mb-3 inline-flex max-w-full items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                              Duplicada con variante {nuevaVarianteDuplicadasTexto}
+                            </div>
+                          ) : null}
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+                            {estadoDiferencialNuevaVariante?.isDuplicate ? (
+                              <p className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800 sm:col-span-2 md:col-span-4 xl:col-span-8">
+                                Agrega un diferencial en {nuevaVarianteSugerenciasTexto || "otro campo"} para separar esta variante.
+                              </p>
+                            ) : null}
                             <div className="min-w-0 xl:col-span-1">
-                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Talla</label>
+                              <label className={`mb-1 block text-[10px] font-bold uppercase tracking-wider ${clasesNuevaTalla.label}`}>Talla</label>
                               <div className="relative">
                                 {!formNuevaVariante.talla ? (
                                   <CircleSlash className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                                 ) : null}
                                 <select
-                                  className={`w-full h-8 text-xs rounded-md border-slate-200 focus:ring-pink-500 ${!formNuevaVariante.talla ? "pl-7 text-slate-500" : ""}`.trim()}
+                                  className={`h-8 w-full rounded-md border p-1.5 text-xs outline-none transition-colors ${clasesNuevaTalla.input} ${!formNuevaVariante.talla ? "pl-7 text-slate-500" : ""}`.trim()}
                                   value={formNuevaVariante.talla}
                                   onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, talla: e.target.value })}
                                   disabled={cargandoCatalogos}
@@ -1531,13 +1652,13 @@ const ModalDetalleProducto = ({
                               </div>
                             </div>
                             <div className="min-w-0 xl:col-span-1">
-                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Presentación</label>
+                              <label className={`mb-1 block text-[10px] font-bold uppercase tracking-wider ${clasesNuevaPresentacion.label}`}>Presentación</label>
                               <div className="relative">
                                 {!formNuevaVariante.presentacion ? (
                                   <CircleSlash className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                                 ) : null}
                                 <select
-                                  className={`w-full h-8 text-xs rounded-md border-slate-200 focus:ring-pink-500 ${!formNuevaVariante.presentacion ? "pl-7 text-slate-500" : ""}`.trim()}
+                                  className={`h-8 w-full rounded-md border p-1.5 text-xs outline-none transition-colors ${clasesNuevaPresentacion.input} ${!formNuevaVariante.presentacion ? "pl-7 text-slate-500" : ""}`.trim()}
                                   value={formNuevaVariante.presentacion}
                                   onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, presentacion: e.target.value })}
                                   disabled={cargandoCatalogos}
@@ -1550,9 +1671,9 @@ const ModalDetalleProducto = ({
                               </div>
                             </div>
                             <div className="min-w-0 xl:col-span-1">
-                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Color</label>
+                              <label className={`mb-1 block text-[10px] font-bold uppercase tracking-wider ${clasesNuevaColor.label}`}>Color</label>
                               <Input
-                                className="h-8 text-xs"
+                                className={`h-8 text-xs ${clasesNuevaColor.input}`}
                                 placeholder="Ej. Rojo"
                                 value={formNuevaVariante.color}
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, color: e.target.value })}
@@ -1568,9 +1689,9 @@ const ModalDetalleProducto = ({
                               />
                             </div>
                             <div className="min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-2">
-                              <label className="text-[10px] uppercase text-slate-500 font-bold tracking-wider mb-1 block">Atributos adicionales</label>
+                              <label className={`mb-1 block text-[10px] font-bold uppercase tracking-wider ${clasesNuevaAtributos.label}`}>Atributos adicionales</label>
                               <Input
-                                className="h-8 text-xs focus-visible:ring-pink-500"
+                                className={`h-8 text-xs ${clasesNuevaAtributos.input}`}
                                 placeholder="Ej. Algodón, costuras reforzadas"
                                 value={formNuevaVariante.atributosAdicionales}
                                 onChange={(e) => setFormNuevaVariante({ ...formNuevaVariante, atributosAdicionales: e.target.value })}
@@ -1650,7 +1771,7 @@ const ModalDetalleProducto = ({
                       </Card>
                     )}
 
-                    {estadoProducto.variantes?.map((v, index) => {
+                    {variantesProducto.map((v, index) => {
                       const idActual = Number(v.idVariante);
                       const idVarianteValido = Number.isFinite(idActual) && idActual > 0;
                       const keyVariante = idVarianteValido ? idActual : `variante-${index}`;
@@ -1665,9 +1786,26 @@ const ModalDetalleProducto = ({
                       const nombreVarianteMostrar = normalizarTextoVariante(
                         esModoEdicion ? nombreVarianteInput : (v.nombreVariante ?? v.NombreVariante)
                       );
+                      const estadoDiferencial = esModoEdicion
+                        ? estadosDiferencialesEdicion?.[index]
+                        : estadosDiferencialesDetalle[index];
+                      const clasesPresentacion = getClasesDiferencialDetalle(estadoDiferencial, "presentacion");
+                      const clasesTalla = getClasesDiferencialDetalle(estadoDiferencial, "talla");
+                      const clasesEspecificacion = getClasesEspecificacionDetalle(estadoDiferencial);
+                      const clasesColor = getClasesDiferencialDetalle(estadoDiferencial, "color");
+                      const clasesAtributos = getClasesDiferencialDetalle(estadoDiferencial, "atributos");
+                      const duplicadasTexto = (estadoDiferencial?.duplicateIndices || [])
+                        .map((idx) => `#${idx + 1}`)
+                        .join(", ");
+                      const sugerenciasTexto = (estadoDiferencial?.suggestedKeys || [])
+                        .map(getLabelCampoDiferencial)
+                        .join(", ");
 
                       return (
-                        <Card key={keyVariante} className="border border-slate-100 shadow-sm overflow-hidden bg-white">
+                        <Card
+                          key={keyVariante}
+                          className="overflow-hidden border border-slate-100 bg-white shadow-sm"
+                        >
                           <CardContent className="p-3 sm:p-4">
                             <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0 flex-1">
@@ -1685,12 +1823,12 @@ const ModalDetalleProducto = ({
                                         onChange={(e) => setNombreVarianteInput(e.target.value)}
                                       />
                                     </div>
-                                    <div className="rounded-md border border-slate-200 bg-slate-50/70 p-1.5 sm:col-span-2 xl:col-span-3">
-                                      <label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                                    <div className={`rounded-md border p-1.5 sm:col-span-2 xl:col-span-3 ${clasesAtributos.panel}`}>
+                                      <label className={`mb-0.5 block text-[9px] font-bold uppercase tracking-wider ${clasesAtributos.label}`}>
                                         Atributos
                                       </label>
                                       <Input
-                                        className="h-8 bg-white text-xs shadow-sm focus-visible:ring-pink-500"
+                                        className={`h-8 text-xs shadow-sm ${clasesAtributos.input}`}
                                         placeholder="Atributos adicionales (Ej. Algodón)"
                                         value={atributosAdicionalesInput}
                                         onChange={(e) => setAtributosAdicionalesInput(e.target.value)}
@@ -1741,12 +1879,18 @@ const ModalDetalleProducto = ({
                                 </p>
                               </div>
                             </div>
+                            {estadoDiferencial?.isDuplicate ? (
+                              <div className="mb-3 inline-flex max-w-full items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700">
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                Duplicada con variante {duplicadasTexto}
+                              </div>
+                            ) : null}
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-12 xl:items-center">
                               {/* ATRIBUTOS */}
                               {!esModoEdicion ? (
                                 <div className="min-w-0 md:col-span-2 xl:col-span-2">
-                                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                  <p className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${clasesAtributos.label}`}>
                                     Atributos
                                   </p>
                                   <div className="space-y-1.5">
@@ -1758,10 +1902,16 @@ const ModalDetalleProducto = ({
                                 </div>
                               ) : null}
 
+                              {estadoDiferencial?.isDuplicate ? (
+                                <p className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800 sm:col-span-2 md:col-span-4 xl:col-span-12">
+                                  Agrega un diferencial en {sugerenciasTexto || "otro campo"} para separar esta variante.
+                                </p>
+                              ) : null}
+
                               {/* ESPECIFICACIONES */}
                               <div className={esModoEdicion ? "min-w-0 sm:col-span-2 md:col-span-2 xl:col-span-3" : "min-w-0 md:col-span-2 xl:col-span-2"}>
                                 {!esModoEdicion ? (
-                                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                  <p className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${clasesEspecificacion.label}`}>
                                     Presentación / Talla
                                   </p>
                                 ) : null}
@@ -1770,13 +1920,13 @@ const ModalDetalleProducto = ({
                                     <div className="min-w-0 space-y-1">
                                       <label
                                         htmlFor={`presentacion-variante-${keyVariante}`}
-                                        className="block text-[9px] font-bold uppercase tracking-wider text-slate-500"
+                                        className={`block text-[9px] font-bold uppercase tracking-wider ${clasesPresentacion.label}`}
                                       >
                                         Presentación
                                       </label>
                                       <select
                                         id={`presentacion-variante-${keyVariante}`}
-                                        className="h-9 w-full rounded-md border border-slate-300 bg-white p-1.5 text-xs shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        className={`h-9 w-full rounded-md border p-1.5 text-xs shadow-sm outline-none transition-colors ${clasesPresentacion.input}`}
                                         value={presentacionInput}
                                         onChange={(e) => setPresentacionInput(e.target.value)}
                                         disabled={cargandoCatalogos || presentaciones.length === 0}
@@ -1800,13 +1950,13 @@ const ModalDetalleProducto = ({
                                     <div className="min-w-0 space-y-1">
                                       <label
                                         htmlFor={`talla-variante-${keyVariante}`}
-                                        className="block text-[9px] font-bold uppercase tracking-wider text-slate-500"
+                                        className={`block text-[9px] font-bold uppercase tracking-wider ${clasesTalla.label}`}
                                       >
                                         Talla
                                       </label>
                                       <select
                                         id={`talla-variante-${keyVariante}`}
-                                        className="h-9 w-full rounded-md border border-slate-300 bg-white p-1.5 text-xs shadow-sm outline-none transition-colors hover:border-pink-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        className={`h-9 w-full rounded-md border p-1.5 text-xs shadow-sm outline-none transition-colors ${clasesTalla.input}`}
                                         value={tallaInput}
                                         onChange={(e) => setTallaInput(e.target.value)}
                                         disabled={cargandoCatalogos || tallas.length === 0}
@@ -1843,12 +1993,12 @@ const ModalDetalleProducto = ({
 
                               {/* COLOR */}
                               <div className="min-w-0 xl:col-span-1">
-                                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">
+                                <p className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${clasesColor.label}`}>
                                   Color
                                 </p>
                                 {esModoEdicion ? (
                                   <Input
-                                    className="h-8 text-xs focus-visible:ring-pink-500"
+                                    className={`h-8 text-xs ${clasesColor.input}`}
                                     value={colorInput}
                                     onChange={(e) => setColorInput(e.target.value)}
                                   />

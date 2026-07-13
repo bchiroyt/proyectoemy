@@ -133,7 +133,7 @@ export const completarProductosConImagen = async (productos = []) => {
 
 // AGREGAR VARIANTES A PRODUCTO EXISTENTE
 export const agregarVariantesAProducto = async (idProducto, variantes) => {
-  const res = await apiClient.post(`/api/productos/${idProducto}/variantes`, { variantes });
+  const res = await apiClient.patch(`/api/productos/${idProducto}/variantes`, { variantes });
   throwIfEnvelopeFailed(res.data, "No se pudo crear la variante.");
   return res.data;
 };
