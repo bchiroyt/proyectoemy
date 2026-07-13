@@ -29,6 +29,11 @@ function truncLabel(text, max = 16) {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
+/** Etiquetas de rango del API suelen venir con "$"; mostrar quetzales. */
+function etiquetaRangoQ(rango) {
+  return String(rango || "").replace(/\$/g, "Q");
+}
+
 function fmtPct(valor) {
   const n = Number(valor) || 0;
   const pct = n > 0 && n <= 1 ? n * 100 : n;
@@ -63,12 +68,15 @@ export default function CatalogoCharts({
     fill: COLORES[i % COLORES.length],
   }));
 
-  const dataRango = rangosPrecio.map((r) => ({
-    name: truncLabel(r.rango, 14),
-    fullName: r.rango,
-    cantidad: r.cantidad,
-    porcentaje: r.porcentaje,
-  }));
+  const dataRango = rangosPrecio.map((r) => {
+    const rango = etiquetaRangoQ(r.rango);
+    return {
+      name: truncLabel(rango, 14),
+      fullName: rango,
+      cantidad: r.cantidad,
+      porcentaje: r.porcentaje,
+    };
+  });
 
   const hayCat = dataCat.length > 0;
   const hayMarca = dataMarca.length > 0;

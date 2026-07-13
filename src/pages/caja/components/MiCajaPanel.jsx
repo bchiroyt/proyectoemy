@@ -49,13 +49,13 @@ export function MiCajaPanel() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
+            {/**<Button
               variant="outline"
               className="border-(--color-gris-claro-2) text-(--color-gris-letra)"
               onClick={() => setArqueoOpen(true)}
             >
               Arqueo parcial
-            </Button>
+            </Button>*/}
             <Button
               className="bg-(--color-rojo) hover:bg-(--color-rojo-obscuro) text-(--color-blanco)"
               onClick={() => navigate("/pos/cierre")}

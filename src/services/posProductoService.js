@@ -5,7 +5,7 @@ function normalizarCodigo(valor) {
 }
 
 /** Códigos de barras / externos de una variante (sin SKU). */
-function codigosBarrasDeProducto(producto) {
+export function codigosBarrasDeProducto(producto) {
   const codigos = [];
   if (producto?.codigoBarras) codigos.push(producto.codigoBarras);
   const externos = producto?.codigosExternos ?? [];
@@ -14,6 +14,20 @@ function codigosBarrasDeProducto(producto) {
     else if (item?.codigo) codigos.push(item.codigo);
   }
   return codigos.map(normalizarCodigo).filter(Boolean);
+}
+
+/** True si el criterio coincide con un código de barras (nunca con SKU). */
+export function productoCoincideCodigoBarras(producto, criterio) {
+  const qNorm = normalizarCodigo(criterio);
+  if (!qNorm) return false;
+  return codigosBarrasDeProducto(producto).some(
+    (codigo) => codigo === qNorm || codigo.includes(qNorm) || qNorm.includes(codigo)
+  );
+}
+
+/** Filtra el catálogo dejando solo coincidencias por código de barras. */
+export function filtrarCatalogoPorCodigoBarras(items, criterio) {
+  return (items ?? []).filter((p) => productoCoincideCodigoBarras(p, criterio));
 }
 
 /**

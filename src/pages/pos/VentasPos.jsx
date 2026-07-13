@@ -853,7 +853,7 @@ const VentasPOS = () => {
           </div>
 
           {!modoReembolso && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
               {categoriasFiltro.map((c) => (
                 <button
                   key={c.id}
@@ -863,7 +863,7 @@ const VentasPOS = () => {
                     setPagina(1);
                   }}
                   className={cn(
-                    "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                    "shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
                     categoriaId === c.id
                       ? "bg-(--color-pagina) text-(--color-blanco)"
                       : "bg-(--color-gris-claro-2) text-foreground hover:opacity-90"

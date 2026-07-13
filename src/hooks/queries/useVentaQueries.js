@@ -1,6 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { crearVenta, fetchVentaCatalogo, fetchVentaTicket } from "@/services/ventaService";
 import { fetchHistorialTransacciones } from "@/services/historialTransaccionesService";
+import { obtenerCategorias } from "@/services/categorias";
+import { slugCategoria } from "@/lib/ventaMappers";
 
 export const QK_VENTA_CATALOGO = "ventas";
 export const QK_VENTA_CATEGORIAS = "ventas-categorias";
@@ -18,22 +20,27 @@ export function useVentaCatalogoQuery(
   });
 }
 
-/** Lista de categorías distintas para filtros del POS (una sola carga, cache largo). */
+/** Categorías activas del inventario para filtros del POS. */
 export function useVentaCategoriasQuery(options = {}) {
   return useQuery({
     queryKey: [QK_VENTA_CATEGORIAS],
     queryFn: async () => {
-      const { items } = await fetchVentaCatalogo({ page: 1, pageSize: 100 });
+      const data = await obtenerCategorias({ Activo: true, Page: 1, PageSize: 500 });
+      const items = data?.items ?? data?.Items ?? [];
       const seen = new Map();
-      for (const p of items) {
-        const label = (p.categoria || "").trim();
+      for (const raw of items) {
+        const label = String(raw?.nombre ?? raw?.Nombre ?? "").trim();
         if (!label) continue;
-        const id = p.categoriaSlug || label;
+        const idNum = raw?.idCategoria ?? raw?.IdCategoria;
+        const id =
+          idNum != null && idNum !== ""
+            ? String(idNum)
+            : slugCategoria(label);
         if (!seen.has(id)) seen.set(id, { id, label });
       }
       return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, "es"));
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60_000,
     ...options,
   });
 }

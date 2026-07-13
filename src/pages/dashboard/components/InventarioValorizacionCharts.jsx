@@ -30,6 +30,11 @@ function truncLabel(text, max = 16) {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
+/** Etiquetas de rango del API suelen venir con "$"; mostrar quetzales. */
+function etiquetaRangoQ(rango) {
+  return String(rango || "").replace(/\$/g, "Q");
+}
+
 function fmtPct(valor) {
   const n = Number(valor) || 0;
   const pct = n > 0 && n <= 1 ? n * 100 : n;
@@ -64,13 +69,16 @@ export default function InventarioValorizacionCharts({
     fill: COLORES[i % COLORES.length],
   }));
 
-  const dataRango = rangosCosto.map((r) => ({
-    name: truncLabel(r.rango, 14),
-    fullName: r.rango,
-    valorCosto: r.valorCosto,
-    variantes: r.variantes,
-    porcentaje: r.porcentajeDelCapital,
-  }));
+  const dataRango = rangosCosto.map((r) => {
+    const rango = etiquetaRangoQ(r.rango);
+    return {
+      name: truncLabel(rango, 14),
+      fullName: rango,
+      valorCosto: r.valorCosto,
+      variantes: r.variantes,
+      porcentaje: r.porcentajeDelCapital,
+    };
+  });
 
   return (
     <div className={cn("grid gap-4 lg:grid-cols-3", className)}>

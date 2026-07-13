@@ -5,6 +5,7 @@ import { useNavigationStore } from "@/context/useNavigationStore";
 import { useSalidaSinGuardar } from "@/hooks/useSalidaSinGuardar";
 import { ModalConfirmarSalida } from "@/components/shared/ModalConfirmarSalida";
 import { useVentaCatalogoQuery } from "@/hooks/queries/useVentaQueries";
+import { filtrarCatalogoPorCodigoBarras } from "@/services/posProductoService";
 import {
   useActualizarCotizacionMutation,
   useCotizacionDetalleQuery,
@@ -98,9 +99,14 @@ export default function NuevaCotizacion() {
 
   const catalogoQ = useVentaCatalogoQuery({
     page: 1,
-    pageSize: 10,
+    pageSize: 25,
     criterio: debouncedCriterio,
   });
+
+  const resultadosBusqueda = useMemo(
+    () => filtrarCatalogoPorCodigoBarras(catalogoQ.data?.items, debouncedCriterio),
+    [catalogoQ.data?.items, debouncedCriterio]
+  );
 
   const crearM = useCrearCotizacionMutation();
   const actualizarM = useActualizarCotizacionMutation();
@@ -299,22 +305,23 @@ export default function NuevaCotizacion() {
             <BuscadorPrincipal
               value={criterio}
               onChange={(e) => setCriterio(e.target.value)}
-              placeholder="Busque por nombre de variante — clic para agregar"
+              placeholder="Busque por código de barras — clic para agregar"
               className="w-full"
               autoFocus={!esEdicion}
             />
             {criterio.trim() && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-(--color-blanco) border border-(--color-pos-borde-suave) shadow-lg rounded-lg max-h-60 overflow-y-auto z-10">
-                {catalogoQ.isFetching && !(catalogoQ.data?.items?.length > 0) ? (
-                  <p className="p-3 text-xs text-(--color-gris-letra)">Buscando variantes...</p>
-                ) : !(catalogoQ.data?.items?.length > 0) ? (
+                {catalogoQ.isFetching && resultadosBusqueda.length === 0 ? (
+                  <p className="p-3 text-xs text-(--color-gris-letra)">Buscando por código de barras...</p>
+                ) : resultadosBusqueda.length === 0 ? (
                   <p className="p-3 text-xs text-(--color-gris-letra)">
-                    Sin resultados para «{criterio.trim()}»
+                    Sin resultados por código de barras para «{criterio.trim()}»
                   </p>
                 ) : (
-                  catalogoQ.data.items.map((prod) => {
-                    const nombreVariante = prod.nombreVariante || "Sin variante";
-                    const nombreProducto = prod.nombreProducto || "—";
+                  resultadosBusqueda.map((prod) => {
+                    const nombreVariante = prod.nombreVariante || "";
+                    const nombreProducto = prod.nombreProducto || prod.nombre || "";
+                    const tituloPrincipal = nombreVariante || nombreProducto || "Sin nombre";
                     const extras = [prod.color, prod.talla].filter(Boolean).join(" · ");
                     const stock = prod.stockActual ?? 0;
 
@@ -327,7 +334,7 @@ export default function NuevaCotizacion() {
                       >
                         <div className="min-w-0">
                           <p className="font-semibold text-sm text-(--color-negro) truncate">
-                            {nombreVariante}
+                            {tituloPrincipal}
                           </p>
                           {extras ? (
                             <p className="text-[10px] text-(--color-gris-letra) mt-0.5 truncate">
@@ -342,9 +349,11 @@ export default function NuevaCotizacion() {
                           </p>
                         </div>
                         <div className="flex flex-col items-end shrink-0 gap-1">
-                          <span className="text-xs font-medium text-(--color-gris-letra) text-right">
-                            {nombreProducto}
-                          </span>
+                          {nombreVariante ? (
+                            <span className="text-xs font-medium text-(--color-gris-letra) text-right">
+                              {nombreProducto || "—"}
+                            </span>
+                          ) : null}
                           <span
                             className={cn(
                               "text-[10px] font-bold",
@@ -396,7 +405,9 @@ export default function NuevaCotizacion() {
                 {carrito.map((item) => (
                   <tr key={item.idVariante} className="hover:bg-(--color-pagina-4)">
                     <td className="px-4 py-3">
-                      <p className="font-semibold">{item.nombre}</p>
+                      <p className="font-semibold">
+                        {item.nombreVariante || item.nombreProducto || item.nombre}
+                      </p>
                       {!esEdicion && item.precio != null && (
                         <p className="text-xs text-(--color-gris-letra)">
                           Ref. menudeo: Q {Number(item.precio).toFixed(2)}
