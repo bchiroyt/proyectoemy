@@ -1,5 +1,6 @@
 import { pick, toNumberOrNull, unwrapList } from "@/lib/apiNormalizer";
 import { roundVenta, brutoLinea, mapVentaCreada } from "@/lib/ventaMappers";
+import { pickNombreVariante } from "@/lib/varianteUtils";
 
 export function mapCotizacionDetalle(raw) {
   if (!raw) return null;
@@ -8,10 +9,18 @@ export function mapCotizacionDetalle(raw) {
   );
   if (idCotizacionDetalle == null) return null;
 
+  const nombreProducto =
+    pick(raw, "nombreProducto", "NombreProducto", "productoNombre", "ProductoNombre") ?? "";
+  const nombreVariante =
+    pickNombreVariante(raw) ??
+    pickNombreVariante(pick(raw, "variante", "Variante") ?? {}) ??
+    "";
+
   return {
     idCotizacionDetalle,
     idVariante: toNumberOrNull(pick(raw, "idVariante", "IdVariante")),
-    nombreProducto: pick(raw, "nombreProducto", "NombreProducto") ?? "",
+    nombreProducto,
+    nombreVariante,
     presentacion: pick(raw, "presentacion", "Presentacion") ?? "",
     cantidad: Number(pick(raw, "cantidad", "Cantidad") ?? 0),
     precioUnitarioNegociado: Number(
@@ -52,7 +61,16 @@ export function unwrapCotizacionesHistorialPaged(resp) {
   const mensaje = pick(resp, "mensaje", "Mensaje") ?? "";
   const inner = pick(resp, "data", "Data") ?? resp;
   const itemsRaw = pick(inner, "items", "Items") ?? inner;
-  const items = unwrapList(itemsRaw).map(mapCotizacion).filter(Boolean);
+  const items = unwrapList(itemsRaw)
+    .map(mapCotizacion)
+    .filter(Boolean)
+    .toSorted((a, b) => {
+      const idDiff = (b.idCotizacion ?? 0) - (a.idCotizacion ?? 0);
+      if (idDiff !== 0) return idDiff;
+      const fa = a.fechaEmision ? new Date(a.fechaEmision).getTime() : 0;
+      const fb = b.fechaEmision ? new Date(b.fechaEmision).getTime() : 0;
+      return fb - fa;
+    });
   const pageSource = inner ?? resp;
   const page = Number(pick(pageSource, "page", "Page") ?? 1) || 1;
   const pageSize = Number(pick(pageSource, "pageSize", "PageSize") ?? 10) || 10;
@@ -90,16 +108,18 @@ export function mapDetalleCotizacionACarrito(detalle) {
   const idVariante = toNumberOrNull(detalle.idVariante);
   if (idVariante == null) return null;
 
-  const nombreBase = detalle.nombreProducto || "Producto";
+  const nombreProducto = detalle.nombreProducto || "Producto";
+  const nombreVariante = String(detalle.nombreVariante ?? "").trim();
   const presentacion = detalle.presentacion?.trim();
-  const nombre = presentacion ? `${nombreBase} · ${presentacion}` : nombreBase;
+  const nombre = nombreVariante || nombreProducto;
   const precioNegociado = Number(detalle.precioUnitarioNegociado ?? 0);
 
   return {
     id: idVariante,
     idVariante,
     nombre,
-    nombreProducto: nombreBase,
+    nombreProducto,
+    nombreVariante: nombreVariante || null,
     presentacion: presentacion || null,
     cantidad: Number(detalle.cantidad) || 1,
     cantidadText: String(Number(detalle.cantidad) || 1),

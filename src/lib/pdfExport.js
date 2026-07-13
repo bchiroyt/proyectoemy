@@ -762,3 +762,158 @@ export const generarInformeCajaPeriodoPdf = async ({
 
   doc.save(`informe_caja_${rangoArchivo}.pdf`);
 };
+
+/**
+ * Detalle de una cotización (mayoreo) — productos / líneas.
+ */
+export const generarDetalleCotizacionPdf = async (cotizacion) => {
+  if (!cotizacion?.idCotizacion) {
+    throw new Error("Cotización inválida para generar PDF.");
+  }
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+
+  const formatearFechaCorta = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString("es-GT", { dateStyle: "short", timeStyle: "short" });
+  };
+
+  const etiquetaEstado = (estado) => {
+    const valor = String(estado ?? "").trim().toUpperCase();
+    if (valor === "PENDIENTE") return "Cotizacion";
+    if (valor === "CONVERTIDA") return "Finalizada";
+    if (valor === "VENCIDA") return "Vencida";
+    if (valor === "ANULADA") return "Anulada";
+    return estado || "—";
+  };
+
+  try {
+    const logoDataUrl = await cargarImagenComoDataUrl(logoImg);
+    doc.addImage(logoDataUrl, "PNG", marginX, 10, 28, 20);
+  } catch (error) {
+    console.warn("[pdfExport] No se pudo insertar el logo en el PDF:", error);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(17, 24, 39);
+  doc.text("MODA Y VARIEDADES EMY", 47, 17);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...GRAY_TEXT);
+  doc.text("Mayoreo y Cotizaciones", 47, 24);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(17, 24, 39);
+  doc.text("COTIZACION", pageWidth - marginX, 17, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...GRAY_TEXT);
+  doc.text(
+    `#${cotizacion.idCotizacion} · ${etiquetaEstado(cotizacion.estado)}`,
+    pageWidth - marginX,
+    23,
+    { align: "right" }
+  );
+  doc.text(
+    `Emision: ${formatearFechaCorta(cotizacion.fechaEmision)}`,
+    pageWidth - marginX,
+    28,
+    { align: "right" }
+  );
+
+  doc.setDrawColor(...SIDEBAR_COLOR);
+  doc.setLineWidth(1);
+  doc.line(marginX, 35, pageWidth - marginX, 35);
+
+  let y = 42;
+  const filaInfo = (label, valor) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(17, 24, 39);
+    doc.text(label, marginX, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(String(valor || "—"), marginX + 28, y);
+    y += 6;
+  };
+
+  filaInfo("Cliente:", cotizacion.nombreCliente || "—");
+  filaInfo("Vendedor:", cotizacion.nombreUsuario || "—");
+  filaInfo("Vence:", formatearFechaCorta(cotizacion.fechaVencimiento));
+
+  const detalles = Array.isArray(cotizacion.detalles) ? cotizacion.detalles : [];
+
+  autoTable(doc, {
+    startY: y + 2,
+    margin: { left: marginX, right: marginX },
+    head: [["PRODUCTO", "PRESENTACION", "CANT.", "PRECIO U.", "SUBTOTAL"]],
+    body:
+      detalles.length > 0
+        ? detalles.map((d) => [
+            d.nombreVariante || d.nombreProducto || "—",
+            d.presentacion || "—",
+            String(d.cantidad ?? 0),
+            fmtQPdf(d.precioUnitarioNegociado),
+            fmtQPdf(d.subtotal),
+          ])
+        : [["Sin productos en esta cotizacion", "—", "0", fmtQPdf(0), fmtQPdf(0)]],
+    styles: {
+      font: "helvetica",
+      fontSize: 8,
+      cellPadding: 2.2,
+      overflow: "linebreak",
+      textColor: [31, 41, 55],
+      lineColor: [229, 231, 235],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SIDEBAR_COLOR,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+    },
+    alternateRowStyles: {
+      fillColor: [249, 250, 251],
+    },
+    columnStyles: {
+      0: { cellWidth: 70 },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 18, halign: "right" },
+      3: { cellWidth: 28, halign: "right" },
+      4: { cellWidth: 28, halign: "right" },
+    },
+    didDrawPage: () => {
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY_LIGHT);
+      doc.text(
+        `Pagina ${doc.internal.getNumberOfPages()} · Cotizacion #${cotizacion.idCotizacion}`,
+        pageWidth - marginX,
+        doc.internal.pageSize.getHeight() - 8,
+        { align: "right" }
+      );
+    },
+  });
+
+  const finalY = doc.lastAutoTable?.finalY ?? y + 10;
+  const totalCalculado = detalles.reduce(
+    (acc, d) => acc + (Number(d.subtotal) || 0),
+    0
+  );
+  const total =
+    Number(cotizacion.total) > 0 ? Number(cotizacion.total) : totalCalculado;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(17, 24, 39);
+  doc.text("Total:", pageWidth - marginX - 40, finalY + 12);
+  doc.text(fmtQPdf(total), pageWidth - marginX, finalY + 12, { align: "right" });
+
+  doc.save(`cotizacion_${cotizacion.idCotizacion}.pdf`);
+};

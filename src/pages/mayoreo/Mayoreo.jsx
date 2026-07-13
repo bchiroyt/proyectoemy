@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Briefcase, Loader2, Ban, BadgeCheck, RefreshCw, Pencil, Search } from "lucide-react";
+import { Plus, Briefcase, Loader2, Ban, BadgeCheck, Pencil, Search, Download } from "lucide-react";
 import { useNavigationStore } from "@/context/useNavigationStore";
 import {
   useAnularCotizacionMutation,
@@ -9,6 +9,8 @@ import {
 import { etiquetaEstadoCotizacion } from "@/lib/cotizacionMappers";
 import { fmtQ } from "@/lib/cajaMappers";
 import { getApiErrorMessage } from "@/lib/apiClient";
+import { generarDetalleCotizacionPdf } from "@/lib/pdfExport";
+import { fetchCotizacionPorId } from "@/services/cotizacionService";
 import Toast from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import ModalConfirmacion from "@/pages/inventario/components/ModalConfirmacion";
@@ -51,6 +53,7 @@ export default function Mayoreo() {
   const [busqueda, setBusqueda] = useState("");
   const [criterioDebounced, setCriterioDebounced] = useState("");
   const [page, setPage] = useState(1);
+  const [exportandoId, setExportandoId] = useState(null);
   const PAGE_SIZE = 10;
 
   const cotizacionesQ = useCotizacionesHistorialQuery({
@@ -104,6 +107,26 @@ export default function Mayoreo() {
     setBusqueda(e.target.value);
   };
 
+  const handleExportPdfCotizacion = async (idCotizacion) => {
+    setExportandoId(idCotizacion);
+    try {
+      const res = await fetchCotizacionPorId(idCotizacion);
+      const cotizacion = res?.data;
+      if (!cotizacion) {
+        throw new Error("No se encontró la cotización.");
+      }
+      await generarDetalleCotizacionPdf(cotizacion);
+    } catch (error) {
+      setToast({
+        open: true,
+        message: getApiErrorMessage(error, "No se pudo generar el PDF de la cotización."),
+        type: "error",
+      });
+    } finally {
+      setExportandoId(null);
+    }
+  };
+
   const items = cotizacionesQ.data?.items ?? [];
   const totalRecords = cotizacionesQ.data?.totalCount ?? 0;
   const totalPages = Math.max(1, cotizacionesQ.data?.totalPages ?? 1);
@@ -115,16 +138,7 @@ export default function Mayoreo() {
 
       {/* Filtros y Búsqueda */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-(--color-blanco) p-4 rounded-xl border border-(--color-pos-borde-suave) shadow-sm">
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => cotizacionesQ.refetch()}
-            disabled={cotizacionesQ.isFetching}
-            className="border-(--color-pagina) text-(--color-pagina)"
-          >
-            <RefreshCw className={`size-4 mr-2 ${cotizacionesQ.isFetching ? "animate-spin" : ""}`} />
-            Actualizar
-          </Button>
+        <div className="flex gap-2 flex-wrap">
           <Button asChild className="bg-(--color-pagina) hover:bg-(--color-pagina-hover) text-(--color-blanco)">
             <Link to="/mayoreo/nueva">
               <Plus className="size-4 mr-2" />
@@ -220,57 +234,75 @@ export default function Mayoreo() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-(--color-pos-borde-suave)">
-                  {items.map((c) => (
-                    <tr key={c.idCotizacion} className="hover:bg-(--color-pagina-4)/50">
-                      <td className="px-4 py-3 font-semibold">#{c.idCotizacion}</td>
-                      <td className="px-4 py-3">{c.nombreCliente || "—"}</td>
-                      <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaEmision)}</td>
-                      <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaVencimiento)}</td>
-                      <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtQ(c.total)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getBadgeClasses(c.estado)}`}>
-                          {etiquetaEstadoCotizacion(c.estado)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2 flex-wrap min-h-8">
-                          {String(c.estado ?? "").toUpperCase() === "PENDIENTE" ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => navigate(`/mayoreo/${c.idCotizacion}/editar`)}
-                                className="h-8 border-(--color-pagina) text-(--color-pagina)"
-                              >
-                                <Pencil className="size-3.5 mr-1" />
-                                Editar
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => navigate(`/mayoreo/${c.idCotizacion}/finalizar`)}
-                                className="bg-(--color-pagina-2) hover:bg-(--color-esmeralda-hover) text-(--color-blanco) h-8"
-                              >
-                                <BadgeCheck className="size-3.5 mr-1" />
-                                Finalizar
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAnularClick(c)}
-                                disabled={anularM.isPending}
-                                className="h-8 text-(--color-rojo) border-(--color-rojo)/30 hover:bg-(--color-rojo-fondo)"
-                              >
-                                <Ban className="size-3.5 mr-1" />
-                                Anular
-                              </Button>
-                            </>
-                          ) : (
-                            <span className="text-xs text-(--color-gris-letra) select-none px-2">—</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {items.map((c, index) => {
+                    const esPendiente = String(c.estado ?? "").toUpperCase() === "PENDIENTE";
+                    const exportandoEsta = exportandoId === c.idCotizacion;
+                    const numeroFila = from + index;
+
+                    return (
+                      <tr key={c.idCotizacion} className="hover:bg-(--color-pagina-4)/50">
+                        <td className="px-4 py-3 font-semibold tabular-nums">{numeroFila}</td>
+                        <td className="px-4 py-3">{c.nombreCliente || "—"}</td>
+                        <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaEmision)}</td>
+                        <td className="px-4 py-3 text-(--color-gris-letra)">{formatearFecha(c.fechaVencimiento)}</td>
+                        <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtQ(c.total)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getBadgeClasses(c.estado)}`}>
+                            {etiquetaEstadoCotizacion(c.estado)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2 flex-wrap min-h-8">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleExportPdfCotizacion(c.idCotizacion)}
+                              disabled={exportandoId != null}
+                              className="h-8 border-(--color-pagina) text-(--color-pagina)"
+                            >
+                              {exportandoEsta ? (
+                                <Loader2 className="size-3.5 mr-1 animate-spin" />
+                              ) : (
+                                <Download className="size-3.5 mr-1" />
+                              )}
+                              PDF
+                            </Button>
+                            {esPendiente ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => navigate(`/mayoreo/${c.idCotizacion}/editar`)}
+                                  className="h-8 border-(--color-pagina) text-(--color-pagina)"
+                                >
+                                  <Pencil className="size-3.5 mr-1" />
+                                  Editar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => navigate(`/mayoreo/${c.idCotizacion}/finalizar`)}
+                                  className="bg-(--color-pagina-2) hover:bg-(--color-esmeralda-hover) text-(--color-blanco) h-8"
+                                >
+                                  <BadgeCheck className="size-3.5 mr-1" />
+                                  Finalizar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAnularClick(c)}
+                                  disabled={anularM.isPending}
+                                  className="h-8 text-(--color-rojo) border-(--color-rojo)/30 hover:bg-(--color-rojo-fondo)"
+                                >
+                                  <Ban className="size-3.5 mr-1" />
+                                  Anular
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

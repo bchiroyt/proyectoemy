@@ -299,61 +299,24 @@ export default function FinalizarCotizacion() {
         <span className="w-16 hidden sm:block" />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-(--color-blanco) border border-(--color-pos-borde-suave) rounded-lg p-4">
-              <p className="text-xs font-bold text-(--color-gris-letra) uppercase mb-2">Detalle</p>
-              <ul className="space-y-2 text-sm max-h-48 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-hidden p-4">
+        <div className="max-w-5xl mx-auto h-full min-h-0 grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className="lg:col-span-2 min-h-0 flex flex-col">
+            <div className="bg-(--color-blanco) border border-(--color-pos-borde-suave) rounded-lg p-4 flex flex-col min-h-0 flex-1">
+              <p className="text-xs font-bold text-(--color-gris-letra) uppercase mb-2 shrink-0">Detalle</p>
+              <ul className="space-y-2 text-sm overflow-y-auto flex-1 min-h-0">
                 {cotizacion.detalles.map((d) => (
                   <li key={d.idCotizacionDetalle} className="flex justify-between gap-2">
-                    <span className="truncate">
-                      {d.nombreProducto}
-                      {d.presentacion ? ` · ${d.presentacion}` : ""} × {d.cantidad}
+                    <span className="truncate" title={d.nombreVariante || d.nombreProducto || undefined}>
+                      {d.nombreVariante || d.nombreProducto || "Producto"} × {d.cantidad}
                     </span>
                     <span className="font-semibold tabular-nums shrink-0">{fmtQ(d.subtotal)}</span>
                   </li>
                 ))}
               </ul>
-              <div className="border-t border-(--color-pos-borde-suave) mt-3 pt-3 flex justify-between font-black text-(--color-pagina)">
+              <div className="border-t border-(--color-pos-borde-suave) mt-3 pt-3 flex justify-between font-black text-(--color-pagina) shrink-0">
                 <span>Total</span>
                 <span className="tabular-nums">{fmtQ(total)}</span>
-              </div>
-            </div>
-
-            <div>
-              <SeccionTitulo>MÉTODO DE PAGO</SeccionTitulo>
-              <div className="grid grid-cols-2 border border-(--color-pos-borde-suave) rounded-b-lg overflow-hidden bg-(--color-pos-panel)">
-                {metodoEfectivo && (
-                  <button
-                    type="button"
-                    onClick={() => setMetodoActivo("efectivo")}
-                    className={cn(
-                      "py-6 text-base font-black border-r border-(--color-pos-borde-suave)",
-                      metodoActivo === "efectivo"
-                        ? "bg-(--color-pos-accent-suave) text-(--color-pagina)"
-                        : "text-(--color-gris-letra)"
-                    )}
-                  >
-                    <Banknote className="size-5 mx-auto mb-1" />
-                    EFECTIVO
-                  </button>
-                )}
-                {metodoBanco && (
-                  <button
-                    type="button"
-                    onClick={() => setMetodoActivo("banco")}
-                    className={cn(
-                      "py-6 text-base font-black",
-                      metodoActivo === "banco"
-                        ? "bg-(--color-pos-accent-suave) text-(--color-pagina)"
-                        : "text-(--color-gris-letra)"
-                    )}
-                  >
-                    <Building2 className="size-5 mx-auto mb-1" />
-                    BANCO
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -391,6 +354,42 @@ export default function FinalizarCotizacion() {
                 Abra una caja antes de finalizar la venta mayoreo.
               </p>
             )}
+
+            <div>
+              <SeccionTitulo>MÉTODO DE PAGO</SeccionTitulo>
+              <div className="grid grid-cols-2 border border-(--color-pos-borde-suave) rounded-b-lg overflow-hidden bg-(--color-pos-panel)">
+                {metodoEfectivo && (
+                  <button
+                    type="button"
+                    onClick={() => setMetodoActivo("efectivo")}
+                    className={cn(
+                      "py-6 text-base font-black border-r border-(--color-pos-borde-suave)",
+                      metodoActivo === "efectivo"
+                        ? "bg-(--color-pos-accent-suave) text-(--color-pagina)"
+                        : "text-(--color-gris-letra)"
+                    )}
+                  >
+                    <Banknote className="size-5 mx-auto mb-1" />
+                    EFECTIVO
+                  </button>
+                )}
+                {metodoBanco && (
+                  <button
+                    type="button"
+                    onClick={() => setMetodoActivo("banco")}
+                    className={cn(
+                      "py-6 text-base font-black",
+                      metodoActivo === "banco"
+                        ? "bg-(--color-pos-accent-suave) text-(--color-pagina)"
+                        : "text-(--color-gris-letra)"
+                    )}
+                  >
+                    <Building2 className="size-5 mx-auto mb-1" />
+                    BANCO
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

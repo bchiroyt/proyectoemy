@@ -471,7 +471,7 @@ const GestionAjuste = () => {
                             <td className={tdClass}>
                               <div className="min-w-0">
                                 <p className="font-semibold text-(--color-texto-principal) truncate">
-                                  {row.nombreVariante || "Sin variante"}
+                                  {row.nombreVariante || row.nombre || "Sin nombre"}
                                 </p>
                                 {row.extra && (
                                   <p className="text-xs text-(--color-gris-letra) truncate mt-0.5">{row.extra}</p>
@@ -598,6 +598,7 @@ const GestionAjuste = () => {
                         const color = v.color ?? v.Color ?? "";
                         const talla = v.tallaNombre ?? v.TallaNombre ?? v.talla ?? v.Talla ?? "";
                         const extra = [color, talla].filter(Boolean).join(" · ");
+                        const tituloPrincipal = nombreVariante || nombre || "Sin nombre";
 
                         return (
                           <button
@@ -608,14 +609,16 @@ const GestionAjuste = () => {
                           >
                             <div className="min-w-0">
                               <p className="font-semibold text-(--color-texto-principal)">
-                                {nombreVariante || "Sin variante"}
+                                {tituloPrincipal}
                               </p>
                               {extra && <p className="text-[10px] text-(--color-gris-letra) mt-0.5">{extra}</p>}
                             </div>
                             <div className="flex flex-col items-end shrink-0 gap-1">
-                              <span className="font-medium text-(--color-gris-letra) text-right">
-                                {nombre || "—"}
-                              </span>
+                              {nombreVariante ? (
+                                <span className="font-medium text-(--color-gris-letra) text-right">
+                                  {nombre || "—"}
+                                </span>
+                              ) : null}
                               <span className={cn("text-[10px] font-bold", (v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0) > 0 ? "text-emerald-600" : "text-(--color-rojo-obscuro)")}>
                                 Stock: {v.stockActual ?? v.StockActual ?? v.stock ?? v.Stock ?? 0}
                               </span>

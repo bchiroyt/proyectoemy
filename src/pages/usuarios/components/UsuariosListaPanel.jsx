@@ -239,7 +239,7 @@ export function UsuariosListaPanel({
 
       <p className="text-xs text-(--color-gris-letra)">
         Nota: la lista paginada puede no incluir todos los campos; al pulsar <strong>Editar</strong> se cargan los datos
-        completos con <code className="text-[11px]">GET /api/Usuarios/{"{id}"}</code>.
+        completos.
       </p>
 
       <NuevoUsuarioDialog open={nuevoUsuarioOpen} onOpenChange={onNuevoUsuarioOpenChange} />

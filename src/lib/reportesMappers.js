@@ -554,10 +554,17 @@ export function mapCatalogoPorMarca(raw) {
   };
 }
 
+/** El API a veces envía rangos con "$"; en UI/PDF usamos quetzales. */
+function normalizarSimboloRangoMoneda(rango) {
+  return String(rango || "").replace(/\$/g, "Q");
+}
+
 /** Buckets de precio — CatalogoRangosPrecioDto */
 export function mapCatalogoRangoPrecio(raw) {
   if (!raw) return null;
-  const rango = String(pick(raw, "rango", "Rango") ?? "").trim();
+  const rango = normalizarSimboloRangoMoneda(
+    String(pick(raw, "rango", "Rango") ?? "").trim()
+  );
   if (!rango) return null;
   return {
     rango,
@@ -759,7 +766,9 @@ export function mapValorizacionPorMarca(raw) {
 
 export function mapValorizacionRangoCosto(raw) {
   if (!raw) return null;
-  const rango = String(pick(raw, "rango", "Rango") ?? "").trim();
+  const rango = normalizarSimboloRangoMoneda(
+    String(pick(raw, "rango", "Rango") ?? "").trim()
+  );
   if (!rango) return null;
   return {
     rango,
