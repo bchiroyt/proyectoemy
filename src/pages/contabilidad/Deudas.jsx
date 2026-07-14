@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, ArrowLeft, CheckCircle, CreditCard, Loader2, Plus, Search, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNavigationStore } from "@/context/useNavigationStore";
-import { apiClient, getApiErrorMessage } from "@/lib/apiClient";
+import { apiClient, getApiErrorMessage, API_BASE_URL } from "@/lib/apiClient";
 import { obtenerFechaGuatemala } from "@/lib/deudaAbonoValidations";
 import { Skeleton } from "@/components/ui/skeleton";
 import Paginacion from "@/components/shared/Paginacion";
@@ -247,7 +247,7 @@ const Deudas = () => {
       };
       const token = obtenerTokenLocal();
 
-      const response = await fetch("https://localhost:7199/api/Deudas", {
+      const response = await fetch(`${API_BASE_URL}/api/Deudas`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -5,7 +5,7 @@ import { useNavigationStore } from "@/context/useNavigationStore";
 import { useSalidaSinGuardar } from "@/hooks/useSalidaSinGuardar";
 import { ModalConfirmarSalida } from "@/components/shared/ModalConfirmarSalida";
 import { useVentaCatalogoQuery } from "@/hooks/queries/useVentaQueries";
-import { filtrarCatalogoPorCodigoBarras } from "@/services/posProductoService";
+import { fetchVentaCatalogo } from "@/services/ventaService";
 import {
   useActualizarCotizacionMutation,
   useCotizacionDetalleQuery,
@@ -105,9 +105,40 @@ export default function NuevaCotizacion() {
   });
 
   const resultadosBusqueda = useMemo(
-    () => filtrarCatalogoPorCodigoBarras(catalogoQ.data?.items, debouncedCriterio),
-    [catalogoQ.data?.items, debouncedCriterio]
+    () => catalogoQ.data?.items ?? [],
+    [catalogoQ.data?.items]
   );
+
+  const handleSearchKeyDown = async (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const queryVal = criterio.trim();
+      if (!queryVal) return;
+
+      try {
+        const { items } = await fetchVentaCatalogo({ page: 1, pageSize: 5, criterio: queryVal });
+        if (items && items.length > 0) {
+          const qLower = queryVal.toLowerCase();
+          const exacta = items.find(
+            (p) =>
+              p.sku?.toLowerCase() === qLower ||
+              p.codigoBarras?.toLowerCase() === qLower ||
+              p.codigo?.toLowerCase() === qLower
+          );
+          
+          if (exacta) {
+            handleAgregarProducto(exacta);
+            setCriterio("");
+          } else if (items.length === 1) {
+            handleAgregarProducto(items[0]);
+            setCriterio("");
+          }
+        }
+      } catch (err) {
+        console.error("Error al buscar producto en keydown:", err);
+      }
+    }
+  };
 
   const crearM = useCrearCotizacionMutation();
   const actualizarM = useActualizarCotizacionMutation();
@@ -307,17 +338,18 @@ export default function NuevaCotizacion() {
             <BuscadorPrincipal
               value={criterio}
               onChange={(e) => setCriterio(e.target.value)}
-              placeholder="Busque por código de barras — clic para agregar"
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Busque por nombre, SKU o código de barras..."
               className="w-full"
               autoFocus={!esEdicion}
             />
             {criterio.trim() && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-(--color-blanco) border border-(--color-pos-borde-suave) shadow-lg rounded-lg max-h-60 overflow-y-auto z-10">
                 {catalogoQ.isFetching && resultadosBusqueda.length === 0 ? (
-                  <p className="p-3 text-xs text-(--color-gris-letra)">Buscando por código de barras...</p>
+                  <p className="p-3 text-xs text-(--color-gris-letra)">Buscando productos...</p>
                 ) : resultadosBusqueda.length === 0 ? (
                   <p className="p-3 text-xs text-(--color-gris-letra)">
-                    Sin resultados por código de barras para «{criterio.trim()}»
+                    Sin resultados para «{criterio.trim()}»
                   </p>
                 ) : (
                   resultadosBusqueda.map((prod) => {

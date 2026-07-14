@@ -1147,19 +1147,12 @@ const ModalNuevoProducto = ({ open, onClose, onSuccess }) => {
         onClose={() => setOpenMarcaModal(false)}
         onSave={async (form) => {
           try {
-            await crearMarca(form);
-            const marcasData = await obtenerMarcas({ Activo: true, Page: 1, PageSize: 500 });
-            const listaActualizada = marcasData?.items || [];
-            setMarcas(listaActualizada);
-            const marcaReciente = listaActualizada.find(
-              (m) => m?.nombre?.toLowerCase() === form.nombre.trim().toLowerCase()
-            );
-            if (marcaReciente) {
-              setMarcaSeleccionada(marcaReciente.idMarca);
-            }
+            const nuevaMarca = await crearMarca(form);
+            setMarcas((prev) => [...prev, nuevaMarca]);
+            setMarcaSeleccionada(nuevaMarca.idMarca);
           } catch (error) {
             console.error("Error al guardar marca:", error);
-          } {
+          } finally {
             setOpenMarcaModal(false);
           }
         }}
